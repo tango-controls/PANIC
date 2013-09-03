@@ -45,7 +45,7 @@
 
 """
 
-import traceback,re
+import traceback,re,time
 import fandango
 import fandango.functional as fun
 import PyTango
@@ -64,21 +64,146 @@ The _proxies object allows to retrieve either DeviceProxy or DeviceServer object
 
 """
 
-ALARM_TABLES = ['AlarmList','AlarmReceivers','AlarmDescriptions', 'AlarmConfigurations', 'AlarmSeverities']
-ALARM_CYCLE = ['Enabled','PollingPeriod','AlarmThreshold','AlertOnRecovery','Reminder', 'AutoReset','RethrowState','RethrowAttribute']
-ALARM_ARCHIVE = ['UseSnap','CreateNewContexts',]
-ALARM_LOGS = ['LogFile','HtmlFolder','FlagFile','FromAddress','MaxAlarmsPerDay','MaxMessagesPerAlarm',]
-ALARM_CONTROL = ['EvalTimeout','UseProcess','SMSConfig','LogLevel',]
-ALARM_CONFIG = ALARM_CYCLE+ALARM_ARCHIVE+ALARM_LOGS
-ALARM_12_ATTS = ALARM_CONFIG
+###############################################################################
+# PyAlarm Device Default Properties
+
+ALARM_TABLES = {
+    # Alarm Properties: This properties will be managed by API; DON'T ACCESS THEM WITH self.
+    'AlarmList':
+        [PyTango.DevVarStringArray,
+        "List of alarms to be monitorized. The format is:\n<br>domain/family/member #It simply checks that dev is alive\n<br>domain/family/member/attribute > VALUE\n<br>domain/family/member/State == UNKNOWN\n<br>domain/family/*/Temperature > VALUE\n<br>\n<br>When using wildcards all slash / must be included",
+        [] ],
+    'AlarmReceivers':
+        [PyTango.DevVarStringArray,
+        "Users that will be notified for each alarm. The format is:\n<br>[TYPE]:[ADDRESS]:[attributes];...\n<br>\n<br>[TYPE]: MAIL / SMS\n<br>[ADDRESS] : operator@accelerator.es / +34666555444\n<br>[attributes]: domain/family/member/attribute;domain/family/*",
+        [] ],
+    'AlarmDescriptions':
+        [PyTango.DevVarStringArray,
+        "Description to be included in emails for each alarm. The format is:\n<br>TAG:AlarmDescription...",
+        [] ],
+    'AlarmConfigurations':
+        [PyTango.DevVarStringArray,
+        "Configuration customization appliable to each alarm. The format is:\n<br>TAG:PAR1=Value1;PAR2=Value2;...",
+        [] ],
+    'AlarmSeverities':
+        [PyTango.DevVarStringArray,
+        "ALARM:DEBUG/INFO/WARNING/ERROR #DEBUG alarms will not trigger messages",
+        [] ],
+    }
+        
+ALARM_CYCLE = {
+    'Enabled':
+        [PyTango.DevString,
+        "If False forces the device to Disabled state and avoids messaging; if INT then it will last only for N seconds after Startup",
+        [ 'True'] ],
+    'AlarmThreshold':
+        [PyTango.DevLong,
+        "Min number of consecutive Events/Pollings that must trigger an Alarm.",
+        [ 3 ] ],
+    'AlertOnRecovery':
+        [PyTango.DevString,
+        "It can contain 'email' and/or 'sms' keywords to specify if an automatic message must be sent in case of alarm returning to safe level.",
+        [ "false" ] ],
+    'PollingPeriod':
+        [PyTango.DevFloat,
+        "Periode in seconds in which all attributes not event-driven will be polled.",
+        [ 15. ] ],
+    'Reminder':
+        [PyTango.DevLong,
+        "If a number of seconds is set, a reminder mail will be sent while the alarm is still active, if 0 no Reminder will be sent.",
+        [ 0 ] ],
+    'AutoReset':
+        [PyTango.DevFloat,
+        "If a number of seconds is set, the alarm will reset if the conditions are no longer active after the given interval.",
+        [ 3600. ] ],
+    'RethrowState':
+        [PyTango.DevBoolean,
+        "Whether exceptions in State reading will be rethrown.",
+        [ True ] ],
+    'RethrowAttribute':
+        [PyTango.DevBoolean,
+        "Whether exceptions in Attribute reading will be rethrown.",
+        [ False ] ],
+    }
+        
+ALARM_ARCHIVE = {
+    'UseSnap':
+        [PyTango.DevBoolean,
+        "If false no snapshots will be trigered (unless specifically added to receivers)",
+        [ True ] ],
+    'CreateNewContexts':
+        [PyTango.DevBoolean,
+        "It enables PyAlarm to create new contexts for alarms if no matching context exists in the database.",
+        [ False ] ],
+    }
+
+ALARM_LOGS = {
+    'LogFile':
+        [PyTango.DevString,
+        "File where alarms are logged, like /tmp/alarm_$NAME.log",
+        [ "" ] ], 
+    'HtmlFolder':
+        [PyTango.DevString,
+        "File where alarm reports are saved",
+        [ "htmlreports" ] ],
+    'FlagFile':
+        [PyTango.DevString,
+        "File where a 1 or 0 value will be written depending if theres active alarms or not.\n<br>This file can be used by other notification systems.",
+        [ "/tmp/alarm_ds.nagios" ] ],
+    'MaxAlarmsPerDay':
+        [PyTango.DevLong,
+        "Max Number of Alarms to be sent each day to the same receiver.",
+        [ 3 ] ],
+    'MaxMessagesPerAlarm':
+        [PyTango.DevLong,
+        "Max Number of messages to be sent each time that an Alarm is activated/recovered/reset.",
+        [ 20 ] ],
+    'FromAddress':
+        [PyTango.DevString,
+        "Address that will appear as Sender in mail and SMS",
+        [ "oncall" ] ],
+    }
+    
+DEVICE_CONFIG = {
+    'LogLevel':
+        [PyTango.DevString,
+        "stdout log filter",
+        [ "INFO" ] ],
+    'SMSConfig':
+        [PyTango.DevString,
+        "Arguments for sendSMS command",
+        [ ":" ] ],
+    'StartupDelay':
+        [PyTango.DevLong,
+        "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
+        [ 0 ] ],
+    'EvalTimeout':
+        [PyTango.DevLong,
+        "Timeout for read_attribute calls, in milliseconds .",
+        [ 500 ] ],
+    'UseProcess':
+        [PyTango.DevBoolean,
+        "To create new OS processes instead of threads.",
+        [ False ] ],
+    'UseTaurus':
+        [PyTango.DevBoolean,
+        "Use Taurus to connect to devices instead of plain PyTango.",
+        [ False ] ],
+    }
+    
+ALARM_CONFIG = ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()+ALARM_LOGS.keys()
+PyAlarmDefaultProperties = dict(fun.join(d.items() for d in (ALARM_CYCLE,ALARM_ARCHIVE,ALARM_LOGS,DEVICE_CONFIG)))
 ALARM_SEVERITIES = ['ERROR','ALARM','WARNING','DEBUG']
+
+# End of PyAlarm properties
+###############################################################################
 
 ###############################################################################
 #@todo: These methods and AlarmAPI.setAlarmDeviceProperty should be moved to AlarmDS
 
 def getAlarmDeviceProperties(device):
     """ Method used in all panic classes """
-    props = _TANGO.get_device_property(device,ALARM_TABLES)
+    props = _TANGO.get_device_property(device,ALARM_TABLES.keys())
     #Updating old property names
     if not props['AlarmList']:
         props['AlarmList'] = _TANGO.get_device_property(device,['AlarmsList'])['AlarmsList']
@@ -96,6 +221,7 @@ def setAlarmDeviceProperty(device, prop, value):
     _TANGO.put_device_property(device,{prop:[value]})
 
 ###############################################################################
+# Alarm object used by API
 
 class Alarm(object):
     def __init__(self,tag,device='',formula='',description='',receivers='',config='', severity='',api=None):
@@ -113,6 +239,7 @@ class Alarm(object):
 
     def clear(self):
         """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
+        #print 'Alarm.clear()'
         self.active = 0 #Last timestamp it was activated
         self.recovered = 0 #Last time it was recovered
         self.counter = 0 #N cycles being active
@@ -147,12 +274,34 @@ class Alarm(object):
         except: return AlarmDS(self.device,api=self.api)
 
     def get_active(self):
-        """ This method connect to the Device to get the value of the alarm attribute """
+        """ This method connects to the Device to get the value and timestamp of the alarm attribute """
         try:
-            self.active = int(self.get_ds().get().read_attribute(self.get_attribute()).value)
+            #self.active = int(self.get_ds().get().read_attribute(self.get_attribute()).value)
+            self.active = self.get_time()
         except:
             self.active = None
         return self.active
+            
+    def get_time(self,attr_value=None):
+        """
+        This method extracts alarm activation timestamp from the ActiveAlarms array.
+        It returns 0 if the alarm is not active.
+        """
+        if attr_value is None:
+            attr_value = self.get_ds().get().read_attribute('ActiveAlarms').value
+        elif not fun.isSequence(attr_value):
+            attr_value = [attr_value]
+        lines = [l for l in (attr_value or []) if l.startswith(self.tag+':')]
+        if lines: 
+            date = str((lines[0].replace(self.tag+':','').split('|')[0]).rsplit(':',1)[0].strip())
+            try:
+                return time.mktime(time.strptime(date))
+            except:
+                try:
+                    return fun.str2time(date)
+                except:
+                    return fun.END_OF_TIME
+        else: return 0
         
     def get_quality(self):
         """ it just translates severity to the equivalent Tango quality, but does NOT get actual attribute quality (which may be INVALID) """
@@ -178,6 +327,19 @@ class Alarm(object):
             config = {}
         return config
 
+    def get_enabled(self):
+        try: return not self.get_ds().get().CheckDisabled(self.tag)
+        except: return None
+
+    def enable(self):
+        """ Enables alarm evaluation """
+        return self.get_ds().get().Enable(self.tag)
+
+    def disable(self, comment=''):
+        """ Disables evaluation of Alarm in its PyAlarm device """
+        result = self.get_ds().get().Disable([self.tag, comment])
+        return result
+    
     def reset(self, comment):
         """ Acknowledges and resets the Alarm in its PyAlarm device """
         result = self.get_ds().acknowledge(self.tag, comment)
@@ -237,12 +399,12 @@ class Alarm(object):
         
     def add_receiver(self,receiver,write=True):
         """ Adds a new receiver """
-        self.receivers = ','.join([r for r in self.receivers.split(',') if r!=receiver]+[receiver])
+        self.receivers = ','.join([r for r in self.receivers.split(',') if r.strip()!=receiver]+[receiver])
         if write: self.write()
 
     def remove_receiver(self,receiver,write=True):
         """ Removes a receiver """
-        self.receivers = ','.join([r for r in self.receivers.split(',') if r!=receiver])
+        self.receivers = ','.join([r for r in self.receivers.split(',') if r.strip()!=receiver])
         if write: self.write()
 
     def replace_receiver(self,old,new,write=True):
@@ -274,18 +436,17 @@ class AlarmDS(object):
             for p,v in props.items():
                 if v in (False,True):
                     props[p] = v
-                elif v:
+                elif v and v[0] not in ('',None):
                     props[p] = v[0]
-                else:
+                else: #Using default property value
                     try: 
-                        import PyAlarm
-                        props[p] = (PyAlarm.PyAlarmClass.device_property_list[p][-1] or [''])[0]
+                        props[p] = (PyAlarmDefaultProperties[p][-1] or [''])[0]
                     except: print traceback.format_exc()
             self.config = props
         return self.config
                     
     def get_property(self,prop):
-        if fandango.isSequence(prop): return self.api.get_db_properties(self.name,prop)
+        if fun.isSequence(prop): return self.api.get_db_properties(self.name,prop)
         else: return self.api.get_db_property(self.name,prop)
         
     def put_property(self,prop,value):
@@ -303,7 +464,7 @@ class AlarmDS(object):
                     
     def get_alarm_properties(self):
         """ Method used in all panic classes """
-        props = self.api.get_db_properties(self.name,ALARM_TABLES)
+        props = self.api.get_db_properties(self.name,ALARM_TABLES.keys())
         #Updating old property names
         if not props['AlarmList']:
             props['AlarmList'] = self.api.get_db_property(self.name,'AlarmsList')
@@ -314,7 +475,8 @@ class AlarmDS(object):
 
     def state(self):
         """ Returns device state """
-        return self.get().State()
+        try: return self.get().State()
+        except: return None
     
     def status(self):
         """ Returns device status """
@@ -362,6 +524,7 @@ class AlarmDS(object):
             return (False if self.get().ResetAlarm(args) else True)
         except:
             print 'Device %s is not running' % self.name
+            print traceback.format_exc()
             return None
     
     def __repr__(self):
@@ -437,7 +600,7 @@ class AlarmAPI(fandango.SingletonMap):
         return
                 
     def load_from_csv(self,filename,device=None,write=True):
-        #fandango.tango.add_new_device('PyAlarm/RF','PyAlarm','SR/RF/ALARMS')
+        #fun.tango.add_new_device('PyAlarm/RF','PyAlarm','SR/RF/ALARMS')
         #DEVICE='sr/rf/alarms'
         #f = '/data/Archiving/Alarms/RF_Alarms_jocampo_20120601.csv')
         alarms,csv = {},fandango.CSVArray(filename,header=0,comment='#',offset=1)
@@ -473,19 +636,21 @@ class AlarmAPI(fandango.SingletonMap):
         return self.servers.db.get_device_property(ref,props)
      
     def get_db_property(self,ref,prop):
-        return self.get_db_properties(ref,[prop])[prop]
+        return list(self.get_db_properties(ref,[prop])[prop])
     
     def put_db_properties(self,ref,props):
         self.servers.db.put_device_property(ref,props)
         
     def put_db_property(self,ref,prop,value):
-        self.put_db_properties(ref,{prop:[value]})
+        if not fun.isSequence(value): value = [value]
+        self.put_db_properties(ref,{prop:value})
         
     def get_class_property(self,klass,prop):
-        return self.servers.db.get_class_property(klass,[prop])[prop]
+        return list(self.servers.db.get_class_property(klass,[prop])[prop])
     
     def put_class_property(self,klass,prop,value):
-        self.servers.db.put_class_property(klass,{prop:[value]})
+        if not fun.isSequence(value): value = [value]
+        self.servers.db.put_class_property(klass,{prop:value})
         
     def get_phonebook(self,load=True):
         """ gets the phonebook, returns a list """        
@@ -500,60 +665,46 @@ class AlarmAPI(fandango.SingletonMap):
                     for x,w in ph.items():
                         if s==x: ph[k] = v.replace(s,w)
             self.phonebook = ph
-            return ph
-        else: return self.phonebook
+        return self.phonebook
         
     def parse_phonebook(self,receivers):
+        """
+        Replaces phonebook entries in a receivers list
+        It does not seem to be the same method used in PyAlarm!?
+        """
         result,receivers = [],[s.strip() for s in receivers.split(',')]
         for r in receivers:
             if r in self.phonebook: result.append(self.phonebook[r])
             else: result.append(r)
         return ','.join(result)
 
-    def remove_from_phonebook(self, person):
+    def remove_phonebook(self, tag):
         """ Removes a person from the phonebook """        
         prop = self.get_class_property('PyAlarm','Phonebook')
-        new_prop = []
-        for line in prop:
-            l = line.split(':',1)[0]
-            if l!=person:
-                new_prop.append(line)
-        self.save_phonebook(new_prop)
+        if tag not in str(prop): raise Exception('NotFound:%s'%tag)
+        self.save_phonebook([p for p in prop if not p.split(':',1)[0]==tag])
 
-    def add_to_phonebook(self, person, section):
+    def edit_phonebook(self, tag, value, section=''):
         """ Adds a person to the phonebook """
         prop = self.get_class_property('PyAlarm','Phonebook')
-        new_prop = []
-        flag=0
-        for line in prop:
-            l = line.split(':',1)[0]
-            p = person.split(':',1)[0]
-            if l==p:
-                raise Exception('Person already exists in the database!')
-        for line in prop:
-            new_prop.append(line)
-            if not line.find('#'):
-                if line=='#'+section:
-                    print(line)
-                    new_prop.append(person)
-        self.save_phonebook(new_prop)
-
-    def change_in_phonebook(self, new):
-        who = new.split(':',1)[0]
-        prop = self.get_class_property('PyAlarm','Phonebook')
-        new_prop = []
-        for line in prop:
-            l = line.split(':',1)[0]
-            if l==who:
-                new_prop.append(new)
-            else:
-                new_prop.append(line)
-        #print(new_prop)l = ' 
-        self.save_phonebook(new_prop)
+        name = tag.upper()
+        value = '%s:%s'%(name,value)
+        lines = [line.strip().split(':',1)[0].upper() for line in prop]
+        if name in lines: #Replacing
+            index = lines.index(name)
+            print 'AlarmAPI.edit_phonebook(%s,%s,%s), replacing at [%d]'%(tag,value,section,index)
+            prop = prop[:index]+[value]+prop[index+1:]
+        else: #Adding
+            if section and '#' not in section: section = '#%s'%section
+            index = len(lines) if not section or section not in lines else lines.index(section)+1
+            print 'AlarmAPI.edit_phonebook(%s,%s,%s), adding at [%d]'%(tag,value,section,index)
+            prop = prop[:index]+[value]+prop[index:]
+        self.save_phonebook(prop)
 
     def save_phonebook(self, new_prop):
         """ Saves a new phonebook in the database """
         self.put_class_property('PyAlarm','Phonebook',new_prop)
+        self.phonebook = None #Force to reload
         return new_prop
 
     def findChild(self, att):
@@ -708,7 +859,7 @@ class AlarmAPI(fandango.SingletonMap):
                 'Action':'ACTION' in reks,
                 'SMS':'SMS' in reks,
                 }
-            result[alarm.tag].update((k,v) for k,v in self.devices[alarm.device].get_config().items() if k in ALARM_CYCLE+ALARM_ARCHIVE+ALARM_CONTROL)
+            result[alarm.tag].update((k,v) for k,v in self.devices[alarm.device].get_config().items() if k in ALARM_CONFIG)
         return result        
 
     def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True):
@@ -718,26 +869,30 @@ class AlarmAPI(fandango.SingletonMap):
         if device not in self.devices: raise Exception('DeviceDescriptiondDesntExist:%s'%device)
         alarm = Alarm(tag, api=self, device=device, formula=formula, description=description, receivers=receivers, severity=severity)
         alarm.write()
-        self.setAlarmProperties(device, tag)
+        self.set_alarm_configuration(tag,device,config)
         if load: self.load()
 
-    def setAlarmProperties(self, device, alarm):
-        print 'In panic.setAlarmProperties(%s,%s)'%(device,alarm)
+    def set_alarm_configuration(self,tag,device,config):
+        """
+        This method is not operative yet, in the future will be used to 
+        do customized setups for each alarm.
+        """
+        print 'In panic.set_alarm_configuration(%s,%s)'%(device,tag)
+        print '\tNotImplemented!'
+        return 
         props=self.devices[device].get_config(True)
         dictlist=[]
         for key, value in props.iteritems():
-            temp = str(key)+'='+str(value[0] if fandango.isSequence(value) else value)
+            temp = str(key)+'='+str(value[0] if fun.isSequence(value) else value)
             print '%s.%s.%s'%(device,alarm,temp)
             dictlist.append(temp)
         l=';'.join(dictlist)
-        l=str(alarm)+':'+l
+        l=str(tag)+':'+l
         old_props=self.get_db_property(device, 'AlarmConfigurations')
         new_props=str(old_props).strip("]'[")+l+';'
         #return new_props
-        try:
-            self.put_device_property(device, 'AlarmConfigurations', new_props)
-        except:
-            Exception('Cant append the database!')
+        try: self.put_device_property(device, 'AlarmConfigurations', new_props)
+        except: Exception('Cant append the database!')
 
     def purge(self,device,tag,load=False):
         """
