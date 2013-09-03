@@ -5,3 +5,14 @@ panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
 
 Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 
+Release 4.16
+
+References to taurus removed if UseTaurus property is False (default)
+Minimum polling reduced to 250 ms
+Using panic.PyAlarmDefaultProperties to have consitency between api/gui/device
+Solved bug that caused timeouts on alarm exception (time wait before finally clause)
+Disable method is now capable to disable alarms only for TIMEOUT argument
+If Enabled property is an integer, alarm changes will be ignored for INT seconds at startup; it should allow to restart devices w/out resending all active alarms; a ResetAll() can be used to rethrow all messages if wanted.
+CheckDisabled will manage alarm reactivation after timeout
+
+The Panic module has been renamed to panic; several bugs have been solved and methods for enabling/disabling alarms have been added.
