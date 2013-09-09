@@ -862,14 +862,15 @@ class AlarmAPI(fandango.SingletonMap):
             result[alarm.tag].update((k,v) for k,v in self.devices[alarm.device].get_config().items() if k in ALARM_CONFIG)
         return result        
 
-    def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True):
+    def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True, config=None):
         """ Adds a new Alarm to the database """
         device = device.lower()
         if tag in self.keys(): raise Exception('TagAlreadyExists:%s'%tag)
         if device not in self.devices: raise Exception('DeviceDescriptiondDesntExist:%s'%device)
         alarm = Alarm(tag, api=self, device=device, formula=formula, description=description, receivers=receivers, severity=severity)
+        if config is not None:
+            self.set_alarm_configuration(tag,device,config)
         alarm.write()
-        self.set_alarm_configuration(tag,device,config)
         if load: self.load()
 
     def set_alarm_configuration(self,tag,device,config):
