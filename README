@@ -5,6 +5,14 @@ panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
 
 Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 
+Release 4.17
+
+Added methods Status/dev_status to remove automatic messages on qualities.
+Added self.update_locals() for a better update of alarm values, periods and conditions reviewed.
+fandango.threads.WorkerProcess has been optimized, PyAlarm modified to use new pause method
+Methods returning sorted lists
+
+
 Release 4.16
 
 References to taurus removed if UseTaurus property is False (default)

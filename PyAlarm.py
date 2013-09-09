@@ -143,22 +143,30 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def set_state(self,state):
         self._state = state
         PyTango.Device_4Impl.set_state(self,state)
-        
     def get_state(self):
         #@Tango6
         #This have been overriden as it seemed not well managed when connecting devices in a same server
         return self._state
-    
     def dev_state(self):
         #@Tango7
         #This have been overriden to avoid device servers with states managed by qualities
         return self._state
-    
     def State(self):
         """ State redefinition is required to keep independency between 
         attribute configuration (max/min alarms) and the device State """
         #return self.get_state()
         return self._state    
+    
+    def set_status(self,status):
+        self._status = status
+        PyTango.Device_4Impl.set_status(self,status)
+    def get_status(self,status):
+        return self._status
+    def dev_status(self):
+        return self._status
+    def Status(self):
+        return self._status
+    
     #--------------------------------------------------------------------------
 
     def alarm_attr_read(self,attr,fire_event=True):
@@ -202,16 +210,43 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 )
             self.DynamicAttributes.append(new_attr_name)
         return new_attr_name
+        
+    def update_locals(self,_locals=None,check=True,update=False):
+        if _locals is None: _locals = {}
+        if check:
+            for k,v in self.Alarms.items():
+                val = v.active if not self.CheckDisabled(k) else False
+                if _locals.get(k,None)!=val: update = True
+                _locals[k] = val
+        if update:
+            self.info('In PyAlarm.update_locals(...)')
+            if self.worker:
+                try:
+                    self.worker.send('update_locals',
+                        target='update_locals',
+                        args={'dct':dict((k,v) for k,v in _locals.items() if k in self.Panic)},
+                        callback=None)
+                except: 
+                    self.error('worker.send(update_locals) failed!: %s'%traceback.format_exc())
+                    self.info(str(_locals))
+            else: self.Eval.update_locals(_locals)
+        return _locals
 
     def dyn_attr(self):
         ## Dynamic Attributes Creator
         self.debug( '#'*40)
         self.info( 'In PyAlarm(%s).dyn_attr()'%self.get_name())
         alarms = self.Alarms.keys()# if hasattr(self,'Alarms') else [a.tag for a in self.panic.get(device=self.get_name())]
+        self.update_locals(dict.fromkeys(self.Panic.keys()),check=False) # Done here to avoid subprocess triggering exceptions
+        
         for alarm in alarms:
             try:
                 self.create_alarm_attribute(alarm)
-                if self.worker: self.worker.add(alarm,'eval',{'formula':self.Alarms[alarm].formula,'_raise':True},period=self.PollingPeriod,expire=self.AlarmThreshold*self.PollingPeriod)
+                if self.worker: 
+                    self.worker.add(alarm,'eval',
+                        {'formula':self.Alarms[alarm].formula,'_raise':True},
+                        period=self.PollingPeriod,
+                        expire=self.AlarmThreshold*self.PollingPeriod)
             except:
                 self.warning( 'Unable to create %s attribute'%alarm)
                 self.warning( traceback.format_exc())
@@ -292,9 +327,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         elif e in ('','false','0','no','none','disabled'):
             return False
         elif fandango.matchCl('^[0-9]+$',e):
-                return (time.time()>(self.TStarted+self.StartupDelay+int(e))):
-        elif fandango.matchCl('^[0-9]+$',e):
-                return (time.time()>(self.TStarted+self.StartupDelay+int(e))):
+                return (time.time()>(self.TStarted+self.StartupDelay+int(e)))
         else:
             return False
         
@@ -323,12 +356,17 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.info( 'In PyAlarm::updateAlarms ...')
         self.event.clear()
         polled_attrs = []
+        #Alarms will not start evaluation until StartupDelay seconds has passed.
         if time.time()<(self.TStarted+self.StartupDelay):
             self.info('Alarms evaluation not started yet, waiting StartupDelay=%d seconds.'%self.StartupDelay)
             self.event.wait(self.StartupDelay-(time.time()-self.TStarted))
+        #Checking that the background test process is running
         if self.worker:
             if not self.worker.isAlive(): self.worker.start()
             self.event.wait(self.PollingPeriod)
+        #Initializing alarm values used in formulas
+        _locals = self.update_locals()
+            
         while not self.event.isSet():
             try:
                 try:
@@ -337,12 +375,13 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 except:
                     self.warning('Tango database is not available!\n%s'%traceback.format_exc())
                     self.set_state(PyTango.DevState.FAULT)
+                    ## This wait is here just to prevent the loop to spin continuously
+                    # The update_locals command will not allow background process to die
                     for k in self.Alarms.servers:
                         self.event.wait(self.PollingPeriod/len(self.Alarms.servers))
-                        if self.worker: 
-                            try: self.worker.send('update_locals',target='update_locals',args={'dct':_locals.items()},callback=None)
-                            except: self.error('worker.send(update_locals) failed!: %s'%traceback.format_exc())
+                        if self.worker: _locals = self.update_locals(_locals,update=True)
                     continue
+
                 ###############################################################
                 try:
                     self.lock.acquire()
@@ -371,11 +410,13 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     except Exception,e: 
                         self.debug('\tunable to set taurus polling period: %s'%e)
                         #self.warning(traceback.format_exc())
+                elif self.worker:
+                    self.info('Worker last alive at %s: %s,%s'%(time.ctime(self.worker.last_alive),self.worker._process.is_alive(),self.worker._receiver.is_alive()))
                 ###############################################################
                 self.info('-'*80+'\n'+'-'*80)
                 self.info( 'Enabled alarms to process in next %d s cycle (UseProcess=%s): %s ' % (self.PollingPeriod,self.UseProcess,[a[0] for a in myAlarms]))
                     
-                for tag_name, alarm in myAlarms: #Format is:    TAG3:LT/VC/Dev1/Pressure > 1e-4
+                for tag_name,alarm in myAlarms: #Format is:    TAG3:LT/VC/Dev1/Pressure > 1e-4
                     now = self.last_attribute_check = time.time()
                     STATE,VALUE,variables = False,None,[]
                     ######################################################################################################################
@@ -383,10 +424,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     try:
                         self.lock.acquire()
                         # Update Locals (Done here to minimize time in which WorkerProcess is IDLE)
-                        _locals = dict((tag,alarm.active if not self.CheckDisabled(tag) else False) for tag,alarm in self.Alarms.items())
-                        if self.worker:
-                            self.worker.send('update_locals',target='update_locals',args={'dct':_locals.items()},callback=None)
-                        else: self.Eval.update_locals(_locals)
+                        _locals = self.update_locals(_locals)
                         
                         # ALARM EVALUATION
                         #####################################################
@@ -912,12 +950,20 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     raise e
                 finally: self.lock.release()
                 self.get_device_properties(self.get_device_class())
+                #self.info("The contents of the phone book is: %s" % self.AddressList)
+                self.info("Current Alarm server configuration is:\n\t"+"\n\t".join(
+                    sorted("%s: %s"%(k,getattr(self,k,None)) for k in 
+                    #('Reminder','AutoReset','AlarmThreshold','AlertOnRecovery','PollingPeriod','MaxAlarmsPerDay','MaxMessagesPerAlarm'))+'\n')
+                    panic.PyAlarmDefaultProperties)))
+                
                 if self.PollingPeriod>300: self.PollingPeriod = self.PollingPeriod*1e-3 #Converting from ms to s
                 if str(self.AlertOnRecovery).strip().lower() in ('false','no','none'): self.AlertOnRecovery=''
                 if str(self.Reminder).strip().lower()=='false': self.Reminder=0
                 
                 if not self.UseTaurus:
                     fandango.tango.USE_TAU,fandango.tango.TAU = False,None
+                else:
+                    self.info('UseTaurus = %s'%self.UseTaurus)
                 if self.Eval is None:
                     self.Eval = (SingletonTangoEval if self.UseProcess and PROCESS else fandango.tango.TangoEval)(timeout=self.EvalTimeout,trace=self.LogLevel.upper()=='DEBUG',cache=2*self.AlarmThreshold,use_tau=False)
                     self.Eval.update_locals(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
@@ -925,23 +971,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 if hasattr(self.Eval,'clear'): self.Eval.clear()
                 
                 if self.UseProcess and PROCESS and not self.worker:
-                    #Do not reduce worker timeout or you may have problems if main thread idles (e.g. Tango database is down).
-                    self.worker = WorkerProcess(self.Eval,start=True,timeout=self.PollingPeriod*max((self.AlarmThreshold,3)))
+                    #Do not reduce worker timeout or you may have problems if main thread idles (e.g. Tango database is down)
                     self.info('Configuring WorkerProcess ...')
+                    self.worker = WorkerProcess(self.Eval,start=True,timeout=self.PollingPeriod*max((self.AlarmThreshold,3)))
+                    self.worker.send('set_timeout','set_timeout',self.EvalTimeout)
                     self.worker.command('import threading')
-                    self.worker.send('wait','threading.Event().wait(%d)'%self.StartupDelay)
                     #,timewait=0.05*self.PollingPeriod/len(self.Alarms))
                     self.worker.add('previous',target='dict([(k,str(v)) for k,v in executor.previous.items()])',args='',period=self.PollingPeriod/2.,expire=self.AlarmThreshold*self.PollingPeriod)
-                    try: 
-                        self.worker.command('import taurus')
-                        self.worker.add('update_polling','[taurus.Attribute(a).changePollingPeriod(%d) for a in taurus.Factory().tango_attrs.keys()]'%max((500,1e3*self.PollingPeriod/2.)),period=self.PollingPeriod)
-                    except: print traceback.format_exc()
-                    self.info('Configured WorkerProcess ...')
-                elif self.worker:
-                    self.worker.send('set_timeout','set_timeout',self.EvalTimeout)
-                    # If it was not done in dyn_attr has to be redone here.
-                    for a,v in self.Alarms.items():
-                        self.worker.add(a,'eval',{'formula':v.formula,'_raise':True},period=self.PollingPeriod,expire=4.*self.PollingPeriod) #<---- timeouts here!
+                    if self.UseTaurus:
+                        try: 
+                            self.worker.command('import taurus')
+                            self.worker.add('update_polling','[taurus.Attribute(a).changePollingPeriod(%d) for a in taurus.Factory().tango_attrs.keys()]'%max((500,1e3*self.PollingPeriod/2.)),period=self.PollingPeriod)
+                        except: print traceback.format_exc()
+                    #raise Exception,'The StartupDelay should be asynchronous!!! It cannot be called before any "command" call or will block!'
+                    self.worker.pause(self.StartupDelay)
+                    self.info('Configured WorkerProcess, waiting %s seconds in background ...'%self.StartupDelay)
+
                 self.PhoneBook = self.Alarms.phonebook
                 if '$NAME' in self.LogFile:
                     self.LogFile = self.LogFile.replace('$NAME',self.get_name().replace('/','-'))
@@ -953,9 +998,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     if v in self.AddressList:
                         self.AddressList[name] = self.AddressList[name].replace(v,self.AddressList[v])
 
-            #self.info("The contents of the phone book is: %s" % self.AddressList)
-            self.info("Current Alarm server configuration is:\n\t"+"\n\t".join("%s: %s"%(k,getattr(self,k,None)) for k in 
-                ('Reminder','AutoReset','AlarmThreshold','AlertOnRecovery','PollingPeriod','MaxAlarmsPerDay','MaxMessagesPerAlarm'))+'\n')
             for tag,alarm in self.Alarms.items():
                 self.info('\n\t%s: %s\n\t\tFormula: %s\n\t\tSeverity: %s\n\t\tReceivers: %s'%(tag,alarm.description,alarm.formula,alarm.severity,alarm.receivers))
 
@@ -996,8 +1038,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.set_status('Alarm Values not being processed!!!') 
             else:
                 self.set_state(PyTango.DevState.DISABLE if not self.get_enabled() else (PyTango.DevState.ALARM if actives else PyTango.DevState.ON))
-
-                status = "There are %d active alarms\n" % len(actives)
+                if self.get_enabled():
+                    status = "There are %d active alarms\n" % len(actives)
+                else:
+                    status = "Device is DISABLED temporarily (Enabled=%s)\n"%self.Enabled
                 for date,tag_name in actives:
                     status+='%s:%s:\n\t%s\n\tSeverity:%s\n\tSent to:%s\n' % (time.ctime(date),tag_name,self.Alarms[tag_name].description,self.Alarms[tag_name].severity,self.Alarms[tag_name].receivers)
                 if self.FailedAlarms:
@@ -1079,7 +1123,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug( "In "+self.get_name()+"::read_AcknowledgedAlarms()")
 
         #    Add your own code here
-        attr_AcknowledgedAlarms_read = list(self.AcknowledgedAlarms)[-512:]
+        attr_AcknowledgedAlarms_read = sorted(self.AcknowledgedAlarms)[-512:]
         attr.set_value(attr_AcknowledgedAlarms_read, len(attr_AcknowledgedAlarms_read))
 
 #------------------------------------------------------------------
@@ -1089,7 +1133,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug( "In "+self.get_name()+"::read_DisabledAlarms()")
 
         #    Add your own code here
-        attr_DisabledAlarms_read = list(self.DisabledAlarms)[-512:]
+        [self.CheckDisabled(t) for t in self.DisabledAlarms]
+        attr_DisabledAlarms_read = sorted('%s until %s'%(a,time.ctime(t)) for a,t in self.DisabledAlarms.items())[-512:]
         attr.set_value(attr_DisabledAlarms_read, len(attr_DisabledAlarms_read))
 
 #------------------------------------------------------------------
@@ -1134,7 +1179,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #    Add your own code here
         try:
             self.lock.acquire()
-            attr_AlarmList_read = ['%s:%s:%s'%(alarm.tag,alarm.description,alarm.formula) for alarm in self.Alarms.values()]
+            attr_AlarmList_read = sorted('%s:%s:%s'%(alarm.tag,alarm.description,alarm.formula) for alarm in self.Alarms.values())
             attr.set_value(attr_AlarmList_read, len(self.Alarms))
         finally:
             self.lock.release()
@@ -1148,7 +1193,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #    Add your own code here
         try:
             self.lock.acquire()
-            attr_AlarmReceivers_read = ['%s:%s'%(k,v.receivers) for k,v in self.Alarms.items()]
+            attr_AlarmReceivers_read = sorted('%s:%s'%(k,v.receivers) for k,v in self.Alarms.items())
         finally:
             self.lock.release()
         attr.set_value(attr_AlarmReceivers_read, len(attr_AlarmReceivers_read))
@@ -1163,7 +1208,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #    Add your own code here
         try:
             self.lock.acquire()
-            attr_PhoneBook_read = ['%s:%s'%(k,v) for k,v in self.AddressList.items() if v]
+            attr_PhoneBook_read = sorted('%s:%s'%(k,v) for k,v in self.AddressList.items() if v)
         finally:
             self.lock.release()
         attr.set_value(attr_PhoneBook_read, len(attr_PhoneBook_read))        
