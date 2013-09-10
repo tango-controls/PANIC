@@ -1,3 +1,4 @@
+VERSION = 4.17: srubio-2013/09/09
 
 PyAlarm is the alarm device server used by ALBA Alarm System, it requires PyTango and Fandango modules, both available from tango-cs.sourceforge.net
 
