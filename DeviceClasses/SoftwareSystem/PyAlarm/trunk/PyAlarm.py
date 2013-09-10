@@ -55,9 +55,9 @@ except:
     #PyTango.PyDeviceClass = PyTango.DeviceClass
     #PyTango.PyUtil = PyTango.Util
 
-MAJOR_VERSION = '4'
-MINOR_VERSION = '16'
-__RELEASE__ = "%s.%s: srubio-2013/07/07"%(MAJOR_VERSION,MINOR_VERSION)
+try: __RELEASE__ = (l for l in open(os.path.dirname(os.path.abspath(__file__))+'/README').readlines() if l.startswith('VERSION')).next().split('=',1)[-1].strip()
+except Exception,e: __RELEASE__ = str(e)
+print '> ',__RELEASE__
 
 ###############################################################################
 # Checking Dependencies
@@ -213,6 +213,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
     def update_locals(self,_locals=None,check=True,update=False):
         if _locals is None: _locals = {}
+        if not check: update = True #If check is True locals will be updated only if necessary or forced
         if check:
             for k,v in self.Alarms.items():
                 val = v.active if not self.CheckDisabled(k) else False
@@ -237,7 +238,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug( '#'*40)
         self.info( 'In PyAlarm(%s).dyn_attr()'%self.get_name())
         alarms = self.Alarms.keys()# if hasattr(self,'Alarms') else [a.tag for a in self.panic.get(device=self.get_name())]
-        self.update_locals(dict.fromkeys(self.Panic.keys()),check=False) # Done here to avoid subprocess triggering exceptions
+        self.update_locals(dict.fromkeys(self.Panic.keys()),check=False,update=True) # Done here to avoid subprocess triggering exceptions
         
         for alarm in alarms:
             try:
@@ -523,7 +524,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.Uncatched=''
 
             except Exception,e:
-                tr=traceback.format_exc()
+                from traceback import format_exc
+                tr=format_exc()
                 self.error( 'Uncatched exception in PyAlarm::updateAlarmsThread:\n%s'%tr + '\n' + '='*80)
                 self.Uncatched+=tr+'\n'
                 self.event.wait(timewait)
@@ -1064,7 +1066,16 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def read_attr_hardware(self,data):
         self.debug("In "+self.get_name()+"::read_attr_hardware()")
 
+#------------------------------------------------------------------
+#    Read VersionNumber attribute
+#------------------------------------------------------------------
+    def read_VersionNumber(self, attr):
+        self.debug( "In "+self.get_name()+"::read_VersionNumber()")
 
+        #    Add your own code here
+        attr_VersionNumber_read = __RELEASE__ #"%s.%s: srubio-2013/07/07"%(MAJOR_VERSION,MINOR_VERSION)
+        attr.set_value(attr_VersionNumber_read)
+        
 #------------------------------------------------------------------
 #    Read LastAlarm attribute
 #------------------------------------------------------------------
@@ -1903,6 +1914,14 @@ class PyAlarmClass(PyTango.DeviceClass):
 
     #    Attribute definitions
     attr_list = {
+        'VersionNumber':
+            [[PyTango.DevString,
+            PyTango.SCALAR,
+            PyTango.READ],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+                'description':"Version number and release note",
+            } ],
         'LastAlarm':
             [[PyTango.DevString,
             PyTango.SCALAR,
@@ -1975,20 +1994,21 @@ class PyAlarmClass(PyTango.DeviceClass):
 
     def dyn_attr(self,dev_list):
         print ( '>'*40)
-        print ("In PyAlarmClass.dyn_attr(%s)"%dev_list)
-        for dev in dev_list:
+        print ("In PyAlarmClass.dyn_attr(%s)"%sorted(dev_list))
+        for dev in sorted(dev_list):
+            print ("In PyAlarmClass.dyn_attr(%s)"%dev)
             dev.dyn_attr()
 
 #------------------------------------------------------------------
 #    PyAlarmClass Constructor
 #------------------------------------------------------------------
     def __init__(self, name):
+        print ( "In PyAlarmClass  constructor")
         import panic
         for k in panic.PyAlarmDefaultProperties:
             PyAlarmClass.device_property_list[k][-1] = panic.PyAlarmDefaultProperties[k][-1]
         PyTango.DeviceClass.__init__(self, name)
         self.set_type(name);
-        print ( "In PyAlarmClass  constructor")
 
 #==================================================================
 #
