@@ -433,12 +433,13 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         variables = self.Eval.parse_variables(alarm.formula,_locals)
                         self.debug('In updateAlarms(%s): variables = %s'%(tag_name,variables))
                         STATE = any((not attribute or attribute.lower().strip() == 'state') for device,attribute,what in variables)
+                        RAISE = (STATE and self.RethrowState) or self.RethrowAttribute
                         self.debug('In updateAlarms(%s): STATE = %s'%(tag_name,STATE))
                         if self.worker:
                             self.debug('\tself.worker.get(%s)'%alarm.tag)
-                            VALUE = self.worker.get(alarm.tag,None,_raise=True)
+                            VALUE = self.worker.get(alarm.tag,None,_raise=RAISE)
                         else:
-                            VALUE = self.Eval.eval(alarm.formula,_raise=True)
+                            VALUE = self.Eval.eval(alarm.formula,_raise=RAISE)
                         variables = self.get_alarm_variables(alarm=tag_name,variables=variables)
                         self.debug('%s: %s, Values = %s'%(tag_name,VALUE,variables))
                     except Exception,e:
@@ -447,7 +448,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                             self.warning('-> Exception while checking State alarm %s:'%tag_name + '\n%s'%alarm.formula + '\n%s'%(traceback.format_exc()))
                         else:
                             self.debug( '-> Exception while checking alarm %s:\n%s'%(tag_name,desc))
-                        if (self.RethrowState and STATE) or (self.RethrowAttribute and not STATE):
+                        if (self.RethrowState and STATE) or self.RethrowAttribute:
                             # STATE EXCEPTION: Exceptions in reading of State attributes will trigger alarms
                             ###################################################################################
                             VALUE = desc or str(e) or 'Exception!' #Must Have a Value!
