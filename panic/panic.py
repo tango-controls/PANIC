@@ -191,7 +191,7 @@ DEVICE_CONFIG = {
         [ False ] ],
     }
     
-ALARM_CONFIG = ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()+ALARM_LOGS.keys()
+ALARM_CONFIG = ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()+ALARM_LOGS.keys()+DEVICE_CONFIG.keys()
 PyAlarmDefaultProperties = dict(fun.join(d.items() for d in (ALARM_CYCLE,ALARM_ARCHIVE,ALARM_LOGS,DEVICE_CONFIG)))
 ALARM_SEVERITIES = ['ERROR','ALARM','WARNING','DEBUG']
 
@@ -534,6 +534,8 @@ class AlarmAPI(fandango.SingletonMap):
     """
     Panic API is a dictionary-like object
     """
+    CURRENT = None
+    
     def __init__(self,filters='*',tango_host=None):
         print 'In AlarmAPI(%s)'%filters
         self.alarms = {}
@@ -597,32 +599,53 @@ class AlarmAPI(fandango.SingletonMap):
                 else: #Creating a new alarm
                     self.alarms[k] = Alarm(k,api=self,device=d,formula=v['formula'],description=v['description'],receivers=v['receivers'],severity=v['severity'])
         print 'AlarmAPI.load(%s): %d alarms loaded'%(filters,len(self.alarms))
+        
+        AlarmAPI.CURRENT = self
         return
-                
+    
+    CSV_COLUMNS = 'tag,device,description,severity,receivers,formula'.split(',')
+
     def load_from_csv(self,filename,device=None,write=True):
         #fun.tango.add_new_device('PyAlarm/RF','PyAlarm','SR/RF/ALARMS')
         #DEVICE='sr/rf/alarms'
         #f = '/data/Archiving/Alarms/RF_Alarms_jocampo_20120601.csv')
         alarms,csv = {},fandango.CSVArray(filename,header=0,comment='#',offset=1)
-        #csv.load(f,'#')
-        #csv.header = 0
-        #csv.xoffset = 1
-        #csv.getHeaders()
-        #api = panic.AlarmAPI()
         for i in range(len(csv)):
             line = fandango.CaselessDict(csv.getd(i))
-            line['tag'] = line.get('tag',line['alarm_name'])
-            line['device'] = device or line.get('device') or '%s/%s/ALARMS'%(line['system'],line['subsystem'] or 'CT')
-            alarms[line['tag']] = dict([('load',False)]+[(k,line[k]) for k in ('tag','device','description','severity','receivers','formula')] )
+            line['tag'] = line.get('tag',line.get('alarm_name'))
+            line['device'] = str(device or line.get('device') or '%s/%s/ALARMS'%(line.get('system'),line.get('subsystem') or 'CT')).lower()
+            alarms[line['tag']] = dict([('load',False)]+[(k,line.get(k)) for k in self.CSV_COLUMNS] )
+        loaded = alarms.keys()[:]
+        for i,tag in enumerate(loaded):
+            new,old = alarms[tag],self[tag]
+            if tag in self and all(new.get(k)==getattr(old,k) for k in self.CSV_COLUMNS):
+                alarms.pop(tag)
+            elif write:
+                print('%d/%d: Loading %s from %s: %s'%(i,len(loaded),tag,filename,new))
         if write:
             devs = set(v['device'] for v in alarms.values())
             for d in devs:
                 if d not in self.devices:
                     raise Exception('PyAlarm %s does not exist!'%d)
-            [self.add(**v) for v in alarms.values()]
-            self.load()
+            for i,(tag,v) in enumerate(alarms.items()):
+                if tag not in self.keys(): 
+                    self.add(**v)
+                else: 
+                    self.modify(**v)
             [self.devices[d].init() for d in devs]
+            self.load()
         return alarms
+            
+    def export_to_csv(self,filename,regexp=None,alarms=None):
+        """ Saves the alarms currently loaded to a .csv file """
+        csv = fandango.CSVArray(header=0,comment='#',offset=1)
+        alarms = self.filter_alarms(regexp,alarms=alarms)
+        csv.resize(1+len(alarms),len(self.CSV_COLUMNS))
+        csv.setRow(0,map(str.upper,self.CSV_COLUMNS))
+        for i,(d,alarm) in enumerate(sorted((a.device,a) for a in alarms)):
+            csv.setRow(i+1,[getattr(alarm,k) for k in self.CSV_COLUMNS])
+        csv.save(filename)
+        return 
 
     def save_tag(self,tag):
         """ Shortcut to force alarm update in database """
@@ -774,7 +797,7 @@ class AlarmAPI(fandango.SingletonMap):
         if not getattr(self,'_eval',None): self._eval = fandango.TangoEval()
         return self._eval.parse_variables(self.replace_alarms(formula) if replace else formula)
 
-    def get(self,tag='',device='',attribute='',receiver='', severity=''):
+    def get(self,tag='',device='',attribute='',receiver='', severity='', alarms = None):
         """ 
         Gets alarms matching the given filters (tag,device,attribute,receiver,severity) 
         """
@@ -784,33 +807,52 @@ class AlarmAPI(fandango.SingletonMap):
         if device and not device.endswith('$'): device+='$'
         #if receiver and not receiver.startswith('%'): receiver='%'+receiver
         if severity and not severity.endswith('$'): severity+='$'
-        for k,alarm in self.alarms.items():
-            if  ((not tag or fun.searchCl(tag,k)) and
+        for alarm in (alarms or self.alarms.values()):
+            if  ((not tag or fun.searchCl(tag,alarm.tag)) and
                 (not device or fun.searchCl(device,alarm.device)) and
                 (not attribute or fun.searchCl(attribute,alarm.formula)) and
                 (not receiver or receiver in alarm.receivers) and
                 (not severity or fun.searchCl(severity,alarm.severity))):
                 result.append(alarm)
         return result
+            
+    def filter_alarms(self, regexp, alarms = None):
+        """
+        Filter alarms by regular expression, use ! to negate the search
+        """
+        from fandango import searchCl
+        alarms = alarms or self.values()
+        if not regexp: return alarms
+        exclude = regexp.startswith('!')
+        if exclude: regexp = regexp.replace('!','').strip()
+        result = []
+        for a in alarms:
+            if isinstance(a,basestring): a = self[a]
+            match = searchCl(regexp,' '.join([a.receivers,a.severity,a.description,a.tag,a.formula,a.device]))
+            if (exclude and not match) or (not exclude and match): result.append(a)
+        #trace('\tregExFiltering(%d): %d alarms returned'%(len(source),len(alarms)))
+        return result
 
-    def filter_hierarchy(self, rel):
+    def filter_hierarchy(self, rel, alarms = None):
         """
         TOP are those alarms which state is evaluated using other Alarms values.
         BOTTOM are those alarms that have no alarms below or have a TOP alarm that depends from them.
         """ 
         print 'AlarmAPI.filter_hierarchy(%s)'%rel
+        alarms = alarms or self.alarms.values()
         if rel=='TOP':
             #children = [c.tag for c in self.children()]
-            result = [v for a,v in self.items() if self.parse_alarms(v.formula)]#a not in children]
+            result = [v for v in alarms if self.parse_alarms(v.formula)]#a not in children]
         elif rel=='BOTTOM':
             result = self.children()
-        else: result=self.values()
+        else: result=alarms.values()
         return result
 
-    def filter_severity(self, sev):
+    def filter_severity(self, sev, alarms = None):
         print 'AlarmAPI.filter_severity(%s)'%sev
+        alarms = alarms or self.alarms
         result=[]
-        for k,alarm in self.alarms.items():
+        for alarm in alarms:
             if sev=='WARNING':
                 if(alarm.severity in ['WARNING', 'ALARM', 'ERROR']): result.append(alarm)
             elif sev=='ALARM':
@@ -872,6 +914,17 @@ class AlarmAPI(fandango.SingletonMap):
             self.set_alarm_configuration(tag,device,config)
         alarm.write()
         if load: self.load()
+        
+    def modify(self,tag,device,formula='',description='',receivers='', severity='WARNING', config=None, load=True):
+        """ Modfies an Alarm in the database """
+        device = device.lower()
+        if tag not in self.keys(): raise Exception('TagDoesntExist:%s'%tag)
+        if device not in self.devices: raise Exception('DeviceDescriptiondDoesntExist:%s'%device)
+        alarm = self[tag]
+        old_device,new_device = alarm.device,device
+        alarm.setup(tag=tag,device=old_device,formula=formula,description=description,receivers=receivers,severity=severity,write=False)
+        if config is not None: self.set_alarm_configuration(tag,device,config)
+        self.rename(tag,tag,new_device,load=True)
 
     def set_alarm_configuration(self,tag,device,config):
         """
@@ -954,3 +1007,6 @@ class AlarmAPI(fandango.SingletonMap):
         return 'AlarmAPI(%s,%s,[%d])'%(self.filters,self.tango_host,len(self))
 
 api = AlarmAPI 
+
+def current():
+    return AlarmAPI.CURRENT or AlarmAPI()
