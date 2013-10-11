@@ -1,15 +1,22 @@
-VERSION = 4.17: srubio-2013/09/09
+VERSION = 4.17+: srubio-2013/10/11
 
 PyAlarm is the alarm device server used by ALBA Alarm System, it requires PyTango and Fandango modules, both available from tango-cs.sourceforge.net
 panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
 Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 
-@pending
+@pending 2013/10/11
 
 RethrowState=False and RethrowAttribute=False will disable exception propagation from TangoEval, it allows to manage exceptions as None in the alarm formulas.
 
+In AlarmAPI:
 
-Release 4.17
+Added filter_alarms, export_to_csv, modify methods
+get/filter* methods modified to allow custom alarm lists
+Bugs solved in load_from_csv
+getCurrent will return last API instance used
+
+
+Release 4.17 2013/09/09
 
 Added VersionNumber attribute
 Added methods Status/dev_status to remove automatic messages on qualities.
