@@ -36,3 +36,13 @@ If Enabled property is an integer, alarm changes will be ignored for INT seconds
 CheckDisabled will manage alarm reactivation after timeout
 
 The Panic module has been renamed to panic; several bugs have been solved and methods for enabling/disabling alarms have been added.
+
+
+4.15 September 2012
+Disabled LogFile by default
+BETA: Cache added to TangoEval to try alarm on transition.
+
+4.14, September 2012
+Added StartupDelay property
+Bugs solved in Snap context creation.
+Added user message to alarm RESET emails.
