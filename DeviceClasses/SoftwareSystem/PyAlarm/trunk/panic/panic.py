@@ -124,6 +124,10 @@ ALARM_CYCLE = {
         [PyTango.DevBoolean,
         "Whether exceptions in Attribute reading will be rethrown.",
         [ False ] ],
+    'IgnoreExceptions':
+        [PyTango.DevBoolean,
+        "If True unreadable values will be replaced by None instead of Exception.",
+        [ True ] ],
     }
         
 ALARM_ARCHIVE = {
@@ -543,6 +547,7 @@ class AlarmAPI(fandango.SingletonMap):
         self.tango_host = tango_host
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
+        self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
         try: self.servers = fandango.servers.ServersDict(tango_host=tango_host)
         except: self.servers = fandango.servers.ServersDict()
         self.load(self.filters)
@@ -730,32 +735,6 @@ class AlarmAPI(fandango.SingletonMap):
         self.phonebook = None #Force to reload
         return new_prop
 
-    def findChild(self, att):
-        ##@todo : THIS METHOD SHOULD USE PARSE_ALARMS INSTEAD!
-        #Gets variables from an string an attribute name, gets device and attribute and checks if it matches an existing alarm attribute
-        parsed = fandango.TangoEval().parse_variables(att)
-        print 'In findChild(%s): parsed variables are %s' % (att,parsed)
-        if parsed and parsed[0]:
-            path,variable = parsed[0][:2]
-            if str(path+'/'+variable) in [a.device+'/'+a.tag for a in self.get()]:
-                return True
-        return False
-
-    def children(self):
-        """
-        Children are those alarms that have no alarms below or have a higher alarm that depends from them.
-        """ 
-        print 'Getting Alarm children ...'
-        result=[]
-        for a,v in self.items():
-            children = self.parse_alarms(v.formula)
-            if children: 
-                result.extend(children)
-            else: 
-                result.append(a)
-        result = set(result)
-        return [v for a,v in self.items() if a in result]
-
     def parse_alarms(self, formula):
         """
         Searches for alarm tags used in the formula
@@ -790,12 +769,20 @@ class AlarmAPI(fandango.SingletonMap):
             print('Exception in replace_alarms():%s'%traceback.format_exc())
             return formula
                         
-    def parse_variables(self, formula, replace = True):
+    def parse_attributes(self, formula, replace = True):
         """ Returns all tango attributes that appear in a formula """
         if formula in self.alarms: formula = self.alarms[formula].formula
         formula = getattr(formula,'formula',formula)
-        if not getattr(self,'_eval',None): self._eval = fandango.TangoEval()
-        return self._eval.parse_variables(self.replace_alarms(formula) if replace else formula)
+        attributes = self._eval.parse_variables(self.replace_alarms(formula) if replace else formula)
+        return sorted('%s/%s'%(t[:2]) for t in attributes)
+        
+    def evaluate(self, formula):
+        #Returns the result of evaluation on formula
+        #Both result and attribute values are kept!, be careful to not generate memory leaks
+        try:
+            return self._eval.eval(self.replace_alarms(formula))
+        except Exception,e:
+            return e
 
     def get(self,tag='',device='',attribute='',receiver='', severity='', alarms = None):
         """ 
@@ -815,6 +802,21 @@ class AlarmAPI(fandango.SingletonMap):
                 (not severity or fun.searchCl(severity,alarm.severity))):
                 result.append(alarm)
         return result
+            
+    def get_basic_alarms(self):
+        """
+        Children are those alarms that have no alarms below or have a higher alarm that depends from them.
+        """ 
+        print 'Getting Alarm children ...'
+        result=[]
+        for a,v in self.items():
+            children = self.parse_alarms(v.formula)
+            if children: 
+                result.extend(children)
+            else: 
+                result.append(a)
+        result = set(result)
+        return [v for a,v in self.items() if a in result]
             
     def filter_alarms(self, regexp, alarms = None):
         """
@@ -841,10 +843,9 @@ class AlarmAPI(fandango.SingletonMap):
         print 'AlarmAPI.filter_hierarchy(%s)'%rel
         alarms = alarms or self.alarms.values()
         if rel=='TOP':
-            #children = [c.tag for c in self.children()]
-            result = [v for v in alarms if self.parse_alarms(v.formula)]#a not in children]
+            result = [v for v in alarms if self.parse_alarms(v.formula)]
         elif rel=='BOTTOM':
-            result = self.children()
+            result = self.get_basic_alarms()
         else: result=alarms.values()
         return result
 
