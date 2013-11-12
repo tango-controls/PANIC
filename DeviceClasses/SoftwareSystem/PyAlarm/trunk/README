@@ -7,6 +7,9 @@ Some configuration panels in the GUI require PyAlarm to be available in the PYTH
 @pending 2013/10/11
 
 RethrowState=False and RethrowAttribute=False will disable exception propagation from TangoEval, it allows to manage exceptions as None in the alarm formulas.
+Added IgnoreExceptions property
+Using polling period instead of timeout as keeptime on TangoEval
+Renamed method get_attribute_values to get_last_values
 
 In AlarmAPI:
 
@@ -14,6 +17,10 @@ Added filter_alarms, export_to_csv, modify methods
 get/filter* methods modified to allow custom alarm lists
 Bugs solved in load_from_csv
 getCurrent will return last API instance used
+
+Added IgnoreExceptions property
+children() replaced by get_basic_alarms method
+parse_variables replaced by parse_attributes and evaluate()
 
 
 Release 4.17 2013/09/09
