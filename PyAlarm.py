@@ -333,7 +333,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             return False
         
     
-    def get_alarm_variables(self,alarm='',variables=None):
+    def get_last_values(self,alarm='',variables=None):
         if variables is None: variables = self.Eval.parse_variables(self.Alarms[alarm].formula)
         formula = self.Alarms[alarm].formula if alarm in self.Alarms else ''
         if self.worker:
@@ -433,14 +433,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         variables = self.Eval.parse_variables(alarm.formula,_locals)
                         self.debug('In updateAlarms(%s): variables = %s'%(tag_name,variables))
                         STATE = any((not attribute or attribute.lower().strip() == 'state') for device,attribute,what in variables)
-                        RAISE = (STATE and self.RethrowState) or self.RethrowAttribute
+                        RAISE = (STATE and self.RethrowState) or self.RethrowAttribute or not self.IgnoreExceptions
                         self.debug('In updateAlarms(%s): STATE = %s'%(tag_name,STATE))
                         if self.worker:
                             self.debug('\tself.worker.get(%s)'%alarm.tag)
                             VALUE = self.worker.get(alarm.tag,None,_raise=RAISE)
                         else:
                             VALUE = self.Eval.eval(alarm.formula,_raise=RAISE)
-                        variables = self.get_alarm_variables(alarm=tag_name,variables=variables)
+                        variables = self.get_last_values(alarm=tag_name,variables=variables)
                         self.debug('%s: %s, Values = %s'%(tag_name,VALUE,variables))
                     except Exception,e:
                         desc = except2str(e)
@@ -452,7 +452,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                             # STATE EXCEPTION: Exceptions in reading of State attributes will trigger alarms
                             ###################################################################################
                             VALUE = desc or str(e) or 'Exception!' #Must Have a Value!
-                            #variables = self.get_alarm_variables(alarm=tag_name,variables=variables)
+                            #variables = self.get_last_values(alarm=tag_name,variables=variables)
                             variables = {tag_name:VALUE}
                         else:
                             self.FailedAlarms[tag_name]=desc
@@ -968,7 +968,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 else:
                     self.info('UseTaurus = %s'%self.UseTaurus)
                 if self.Eval is None:
-                    self.Eval = (SingletonTangoEval if self.UseProcess and PROCESS else fandango.tango.TangoEval)(timeout=self.EvalTimeout,trace=self.LogLevel.upper()=='DEBUG',cache=2*self.AlarmThreshold,use_tau=False)
+                    self.Eval = (SingletonTangoEval if self.UseProcess and PROCESS else fandango.tango.TangoEval)(
+                        timeout=self.EvalTimeout,keeptime=self.PollingPeriod/2.,trace=self.LogLevel.upper()=='DEBUG',cache=2*self.AlarmThreshold,use_tau=False
+                        )
                     self.Eval.update_locals(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
                     self.Eval.set_timeout(self.EvalTimeout)
                 if hasattr(self.Eval,'clear'): self.Eval.clear()
@@ -1859,6 +1861,10 @@ class PyAlarmClass(PyTango.DeviceClass):
             [PyTango.DevBoolean,
             "Whether exceptions in Attribute reading will be rethrown.",
             [ False ] ],#Overriden by panic.DefaultPyAlarmProperties
+        'IgnoreExceptions':
+            [PyTango.DevBoolean,
+            "If True unreadable values will be replaced by None instead of Exception.",
+            [ True ] ],#Overriden by panic.DefaultPyAlarmProperties
         }
 
     #    Command definitions
@@ -2020,7 +2026,9 @@ if __name__ == '__main__':
     try:
         py = PyTango.Util(sys.argv)
         py.add_TgClass(PyAlarmClass,PyAlarm,'PyAlarm')
-
+        import sys
+        from fandango.device import Gatera
+        Gatera.addToServer(py,'PyAlarm',sys.argv[1])
         U = PyTango.Util.instance()
         U.server_init()
         U.server_run()
