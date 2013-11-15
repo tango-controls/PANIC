@@ -573,18 +573,33 @@ class AlarmAPI(fandango.SingletonMap):
         self.devices,all_alarms = fandango.CaselessDict(),{}
         import time
         print '%s: Loading PyAlarm devices matching %s'%(time.ctime(),filters)
-        self.servers.load_by_name('PyAlarm/*')
-        for s,r in self.servers.items():
-            for d in r.get_device_list():
+        
+        t0 = tdevs = time.time()
+        all_devices = map(str.lower,fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
+        all_servers = map(str.lower,self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
+        if filters!='*' and any(fun.matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
+            self.servers.load_by_name(filters)
+            matched = [d for d in self.servers.get_all_devices() if d.lower() in all_devices]
+        else:
+            matched = []
+        #If filter is the name of a pyalarm server, only those devices will be loaded
+        if filters.lower() in all_servers: all_devices = matched
+            
+        tdevs = time.time() - tdevs
+        tprops = time.time()
+
+        for d in all_devices:
                 d = d.lower()
                 ad = AlarmDS(d,api=self)
-                if fun.matchCl(filters,s,terminate=True) or fun.matchCl(filters,d,terminate=True):
+                if filters=='*' or d in matched or fun.matchCl(filters,d,terminate=True):
                     self.devices[d],all_alarms[d] = ad,ad.read()
                 else:
                     alarms = ad.read(filters=filters)
                     if alarms: self.devices[d],all_alarms[d] = ad,alarms
+        tprops=(time.time()-tprops)
         print '\t%d PyAlarm devices loaded, %d alarms'%(len(self.devices),sum(len(v) for v in all_alarms.values()))
 
+        tcheck = time.time()
         #Loading phonebook
         self.get_phonebook(load=True)
             
@@ -603,9 +618,12 @@ class AlarmAPI(fandango.SingletonMap):
                     self.alarms[k].setup(k,device=d,formula=v['formula'],description=v['description'],receivers=v['receivers'],severity=v['severity'])
                 else: #Creating a new alarm
                     self.alarms[k] = Alarm(k,api=self,device=d,formula=v['formula'],description=v['description'],receivers=v['receivers'],severity=v['severity'])
+                    
+        tcheck = time.time()-tcheck
         print 'AlarmAPI.load(%s): %d alarms loaded'%(filters,len(self.alarms))
-        
         AlarmAPI.CURRENT = self
+        
+        print '%ss dedicated to,\n load devices %s\n load properties %s\nother checks %s'% (time.time()-t0,tdevs,tprops,tcheck)
         return
     
     CSV_COLUMNS = 'tag,device,description,severity,receivers,formula'.split(',')
