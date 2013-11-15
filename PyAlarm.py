@@ -2027,8 +2027,8 @@ if __name__ == '__main__':
         py = PyTango.Util(sys.argv)
         py.add_TgClass(PyAlarmClass,PyAlarm,'PyAlarm')
         import sys
-        from fandango.device import Gatera
-        Gatera.addToServer(py,'PyAlarm',sys.argv[1])
+        from fandango.device import DDebug
+        DDebug.addToServer(py,'PyAlarm',sys.argv[1])
         U = PyTango.Util.instance()
         U.server_init()
         U.server_run()
