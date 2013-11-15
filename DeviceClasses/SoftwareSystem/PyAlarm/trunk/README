@@ -4,8 +4,13 @@ PyAlarm is the alarm device server used by ALBA Alarm System, it requires PyTang
 panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
 Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 
-@pending 2013/10/11
+@pending: solve threads and UseProcess issues
 
+Release 4.18
+
+Disable screen in launch script, replaced by Tango logging
+Added DDebug device for debugging threads
+AlarmsAPI.load() time consumption reduced to avoid timeouts
 RethrowState=False and RethrowAttribute=False will disable exception propagation from TangoEval, it allows to manage exceptions as None in the alarm formulas.
 Added IgnoreExceptions property
 Using polling period instead of timeout as keeptime on TangoEval
