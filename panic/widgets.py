@@ -3,6 +3,7 @@ from PyQt4 import Qt, QtCore, QtGui
 
 from taurus.qt.qtgui.base.taurusbase import TaurusBaseComponent
 from taurus.qt.qtgui.base.taurusbase import TaurusBaseWidget
+from taurus.qt.qtgui.display.taurusvaluelabel import TaurusValueLabel
 from taurus.qt.qtgui.container import TaurusMainWindow
 from taurus.qt.qtgui.resource import getThemeIcon
 from taurus.qt.qtgui.panel import TaurusForm
@@ -30,6 +31,33 @@ class GuiWidget(QtGui.QWidget):
         self._gui.show()
         self._gui.raise_()
         self._gui.activateWindow()
+
+##############################################################################
+        
+class AlarmValueLabel(TaurusValueLabel):
+    def setModel(self,model):
+        if fandango.isString(model) and '/' not in model:
+            model = str(model)
+            model = panic.AlarmAPI(model)[model]
+        if isinstance(model,panic.Alarm):
+            model = model.device + '/' + model.get_attribute()
+        TaurusValueLabel.setModel(self,model)
+            
+    def updateStyle(self,extra=''):
+        self.setAlignment(QtCore.Qt.AlignCenter)
+        value = getattr(self.getModelValueObj(), 'value', None)
+        if value:
+            self.ss = "background-color:red; color:black;"
+            self.setText("ALARM")
+        elif value is None:
+            self.ss = "background-color:grey; color:black;"
+            self.setText("NONE")
+        else:
+            self.ss = "background-color:lightgreen; color:black;"
+            self.setText("OK")
+        self.setStyleSheet(self.ss)
+        TaurusBaseWidget.updateStyle(self)
+        
         
 ###############################################################################
 
