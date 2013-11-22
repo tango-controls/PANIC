@@ -576,6 +576,8 @@ class AlarmAPI(fandango.SingletonMap):
         
         t0 = tdevs = time.time()
         all_devices = map(str.lower,fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
+        exported = map(str.lower,fandango.tango.get_database().get_device_exported('*'))
+        all_devices = [d for d in all_devices if d in exported]
         all_servers = map(str.lower,self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
         if filters!='*' and any(fun.matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
             self.servers.load_by_name(filters)
@@ -768,20 +770,22 @@ class AlarmAPI(fandango.SingletonMap):
         """
         try:
             var = self.parse_alarms(formula)
-            for l,a in reversed([(len(s),s) for s in var]):
-                x = '(?:^|[^/a-zA-Z0-9-_])(%s)(?:$|[^/a-zA-Z0-9-_])'%a
-                attr = self[a].device+'/'+a
-                m,new_formula = True,''
-                #print 'replacing %s by %s'%(a,attr)
-                while m:
-                    m = re.search(x,formula)
-                    if m:
-                        start,end = m.start(),m.end()
-                        if not formula.startswith(a): start+=1
-                        if not formula.endswith(a): end-=1
-                        new_formula += formula[:start]+attr
-                        formula = formula[end:]
-                formula = new_formula+formula
+            print 'replace_alarms(%s): %s'%(formula,var)
+            if var:
+                for l,a in reversed([(len(s),s) for s in var]):
+                    x = '(?:^|[^/a-zA-Z0-9-_])(%s)(?:$|[^/a-zA-Z0-9-_])'%a
+                    attr = self[a].device+'/'+a
+                    m,new_formula = True,''
+                    #print 'replacing %s by %s'%(a,attr)
+                    while m:
+                        m = re.search(x,formula)
+                        if m:
+                            start,end = m.start(),m.end()
+                            if not formula.startswith(a): start+=1
+                            if not formula.endswith(a): end-=1
+                            new_formula += formula[:start]+attr
+                            formula = formula[end:]
+                    formula = new_formula+formula
             return formula
         except:
             print('Exception in replace_alarms():%s'%traceback.format_exc())
