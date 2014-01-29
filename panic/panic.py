@@ -562,7 +562,7 @@ class AlarmAPI(fandango.SingletonMap):
     def values(self): return self.alarms.values()
     def items(self): return self.alarms.items()
 
-    def load(self,filters=None):
+    def load(self,filters=None,exported=False):
         """
         Reloads all alarm properties from the database
         :param filters: is used to specify which devices to be loaded
@@ -576,8 +576,9 @@ class AlarmAPI(fandango.SingletonMap):
         
         t0 = tdevs = time.time()
         all_devices = map(str.lower,fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
-        exported = map(str.lower,fandango.tango.get_database().get_device_exported('*'))
-        all_devices = [d for d in all_devices if d in exported]
+        if exported:
+            dev_exported = map(str.lower,fandango.tango.get_database().get_device_exported('*'))
+            all_devices = [d for d in all_devices if d in dev_exported]
         all_servers = map(str.lower,self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
         if filters!='*' and any(fun.matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
             self.servers.load_by_name(filters)
@@ -642,8 +643,8 @@ class AlarmAPI(fandango.SingletonMap):
             alarms[line['tag']] = dict([('load',False)]+[(k,line.get(k)) for k in self.CSV_COLUMNS] )
         loaded = alarms.keys()[:]
         for i,tag in enumerate(loaded):
-            new,old = alarms[tag],self[tag]
-            if tag in self and all(new.get(k)==getattr(old,k) for k in self.CSV_COLUMNS):
+            new,old = alarms[tag],self.alarms.get(tag,None)
+            if old and all(new.get(k)==getattr(old,k) for k in self.CSV_COLUMNS):
                 alarms.pop(tag)
             elif write:
                 print('%d/%d: Loading %s from %s: %s'%(i,len(loaded),tag,filename,new))
@@ -770,7 +771,7 @@ class AlarmAPI(fandango.SingletonMap):
         """
         try:
             var = self.parse_alarms(formula)
-            print 'replace_alarms(%s): %s'%(formula,var)
+            #print 'replace_alarms(%s): %s'%(formula,var)
             if var:
                 for l,a in reversed([(len(s),s) for s in var]):
                     x = '(?:^|[^/a-zA-Z0-9-_])(%s)(?:$|[^/a-zA-Z0-9-_])'%a
