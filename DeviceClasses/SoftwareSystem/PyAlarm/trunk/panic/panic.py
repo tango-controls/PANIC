@@ -582,7 +582,7 @@ class AlarmAPI(fandango.SingletonMap):
         all_servers = map(str.lower,self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
         
         #If filter is the name of a pyalarm device, only those alarms will be loaded
-        if filters in all_devices:
+        if filters.lower() in all_devices:
             all_devices = matched = [filters]
         elif filters!='*' and any(fun.matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
             self.servers.load_by_name(filters)
@@ -609,7 +609,7 @@ class AlarmAPI(fandango.SingletonMap):
         tcheck = time.time()
         #Loading phonebook
         self.get_phonebook(load=True)
-            
+        
         #Verifying that previously loaded alarms still exist
         for k in self.alarms.keys()[:]:
             if not any(k in vals for vals in all_alarms.values()):
