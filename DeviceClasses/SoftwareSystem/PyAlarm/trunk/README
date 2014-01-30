@@ -2,12 +2,13 @@ VERSION = 4.19: srubio-2013/11/22
 
 PyAlarm is the alarm device server used by ALBA Alarm System, it requires PyTango and Fandango modules, both available from tango-cs.sourceforge.net
 panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
-Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 
-@pending: solve threads and UseProcess issues
+Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
+devices
 
 Release 4.19
-Solved bugs in alarm parsing
+@pending: solve threads and UseProcess issues
+Solved bugs in alarm parsing, loading .csv and loading alarms from device
 Added AlarmValueLabel widget
 
 Release 4.18
