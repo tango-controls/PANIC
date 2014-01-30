@@ -580,25 +580,29 @@ class AlarmAPI(fandango.SingletonMap):
             dev_exported = map(str.lower,fandango.tango.get_database().get_device_exported('*'))
             all_devices = [d for d in all_devices if d in dev_exported]
         all_servers = map(str.lower,self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
-        if filters!='*' and any(fun.matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
+        
+        #If filter is the name of a pyalarm device, only those alarms will be loaded
+        if filters in all_devices:
+            all_devices = matched = [filters]
+        elif filters!='*' and any(fun.matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
             self.servers.load_by_name(filters)
             matched = [d for d in self.servers.get_all_devices() if d.lower() in all_devices]
+            #If filter is the name of a pyalarm server, only those devices will be loaded
+            if filters.lower() in all_servers: all_devices = matched
         else:
             matched = []
-        #If filter is the name of a pyalarm server, only those devices will be loaded
-        if filters.lower() in all_servers: all_devices = matched
             
         tdevs = time.time() - tdevs
         tprops = time.time()
 
         for d in all_devices:
-                d = d.lower()
-                ad = AlarmDS(d,api=self)
-                if filters=='*' or d in matched or fun.matchCl(filters,d,terminate=True):
-                    self.devices[d],all_alarms[d] = ad,ad.read()
-                else:
-                    alarms = ad.read(filters=filters)
-                    if alarms: self.devices[d],all_alarms[d] = ad,alarms
+            d = d.lower()
+            ad = AlarmDS(d,api=self)
+            if filters=='*' or d in matched or fun.matchCl(filters,d,terminate=True):
+                self.devices[d],all_alarms[d] = ad,ad.read()
+            else:
+                alarms = ad.read(filters=filters)
+                if alarms: self.devices[d],all_alarms[d] = ad,alarms
         tprops=(time.time()-tprops)
         print '\t%d PyAlarm devices loaded, %d alarms'%(len(self.devices),sum(len(v) for v in all_alarms.values()))
 
