@@ -1524,11 +1524,18 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         report += '\n\tSeverity: %s'%self.Alarms[tag_name].parse_severity()
         report += '\n\tFormula: %s'%(self.Alarms[tag_name].formula)
         if values:
-            #report += '\n\n' + 'Values were: \n\t' + ('\n\t'.join('%s:\t%s'%(k,v) for k,v in sorted(values.items())) if hasattr(values,'items') else str(values))
-            report += '\n\n' + 'Values are: \n\t'
+            report += '\n\n' + 'Values are: \n'
             if hasattr(values,'items'):
-                try: report += ('\n\t'.join('%s:\t%s'%(k if not self.Panic.findChild(k) else '<a href="%s.html">%s</a>'%(k.split('/')[-1],k),v) for k,v in sorted(values.items())))
-                except: report += str(values).strip() or traceback.format_exc()
+                try: 
+                    #report += ('\n\t'.join('%s:\t%s'%(k if not self.Panic.findChild(k) else '<a href="%s.html">%s</a>'%(k.split('/')[-1],k),v) for k,v in sorted(values.items())))
+                    for k,v in sorted(values.items()):
+                        if any(k.lower().endswith('/%s'%s.lower()) for s in self.keys()): k = k.split('/')[-1]
+                        elif k.lower().endswith('/state'): v = str(PyTango.DevState.values.get(v,v))
+                        report+='\t%s:\t%s'%(k,v) + '\n'
+                except: 
+                    msg = traceback.format_exc()
+                    report += str(values).strip() or msg
+                    self.error('Error parsing values for email:\n%s'%msg)
             else: report+= str(values).strip()
         if maillist and len(maillist)>1:
             report += '\n\n' + 'Alarm receivers are: ' + '\n\t'.join([''] + maillist)
