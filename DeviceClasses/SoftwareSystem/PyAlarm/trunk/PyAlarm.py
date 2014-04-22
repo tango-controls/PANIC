@@ -419,46 +419,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     
                 for tag_name,alarm in myAlarms: #Format is:    TAG3:LT/VC/Dev1/Pressure > 1e-4
                     now = self.last_attribute_check = time.time()
-                    STATE,VALUE,variables = False,None,[]
                     ######################################################################################################################
                     self.debug( '-'*80+'\n'+'%s: Reading alarm tag %s; formula: %s'%(now,tag_name,alarm.formula))
-                    try:
-                        self.lock.acquire()
-                        # Update Locals (Done here to minimize time in which WorkerProcess is IDLE)
-                        _locals = self.update_locals(_locals)
-                        
-                        # ALARM EVALUATION
-                        #####################################################
-                        alarm.formula = self.Panic.replace_alarms(alarm.formula) #This replace those alarm names that are not in locals()
-                        variables = self.Eval.parse_variables(alarm.formula,_locals)
-                        self.debug('In updateAlarms(%s): variables = %s'%(tag_name,variables))
-                        STATE = any((not attribute or attribute.lower().strip() == 'state') for device,attribute,what in variables)
-                        RAISE = (STATE and self.RethrowState) or self.RethrowAttribute or not self.IgnoreExceptions
-                        self.debug('In updateAlarms(%s): STATE = %s'%(tag_name,STATE))
-                        if self.worker:
-                            self.debug('\tself.worker.get(%s)'%alarm.tag)
-                            VALUE = self.worker.get(alarm.tag,None,_raise=RAISE)
-                        else:
-                            VALUE = self.Eval.eval(alarm.formula,_raise=RAISE)
-                        variables = self.get_last_values(alarm=tag_name,variables=variables)
-                        self.debug('%s: %s, Values = %s'%(tag_name,VALUE,variables))
-                    except Exception,e:
-                        desc = except2str(e)
-                        if STATE or self.RethrowAttribute: 
-                            self.warning('-> Exception while checking State alarm %s:'%tag_name + '\n%s'%alarm.formula + '\n%s'%(traceback.format_exc()))
-                        else:
-                            self.debug( '-> Exception while checking alarm %s:\n%s'%(tag_name,desc))
-                        if (self.RethrowState and STATE) or self.RethrowAttribute:
-                            # STATE EXCEPTION: Exceptions in reading of State attributes will trigger alarms
-                            ###################################################################################
-                            VALUE = desc or str(e) or 'Exception!' #Must Have a Value!
-                            #variables = self.get_last_values(alarm=tag_name,variables=variables)
-                            variables = {tag_name:VALUE}
-                        else:
-                            self.FailedAlarms[tag_name]=desc
-                            self.info('-> Exceptions in Non-State attributes (%s) do not trigger Alarm'%(tag_name))
-                    finally: 
-                        self.lock.release()
+                    
+                    variables = {}
+                    VALUE = self.EvaluateFormula(alarm.formula,tag_name=tag_name,as_string=False,lock=True,_locals=_locals,variables=variables)
                         
                     #Wait moved out of try/except to avoid locked waits.
                     if VALUE is None and tag_name in self.FailedAlarms:
@@ -519,8 +484,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.lock.release()
                     ######################################################################################################################
                     self.event.wait(timewait)
-                self.update_flag_file()
-                self.update_log_file()
                 if not myAlarms: self.event.wait(timewait)
                 self.Uncatched=''
 
@@ -535,6 +498,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
     #@self_locked
     def set_alarm(self,tag_name):
+        result = False
         self.debug( '#'*80)
         self.info( 'In set_alarm(%s)'%tag_name)
         try:
@@ -542,10 +506,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if not self.Alarms[tag_name].active:
                 self.Alarms[tag_name].active = time.time()
                 self.Alarms[tag_name].recovered = 0
-                return True
-            return False
+                result = True
+            self.update_flag_file()
+            self.update_log_file()
         finally:
             self.lock.release()
+        return result
 
     def get_active_alarms(self):
         return [k for k,v in self.Alarms.items() if v.active]
@@ -554,13 +520,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def free_alarm(self,tag_name,comment='',message=None, notify=True):
         """ message for freeing alarm must be RESET/ACKNOWLEDGED/DISABLED """
         try:
+            result = False
             self.info('-'*80)
             self.info('In free_alarm(%s,%s,%s,%s)'%(tag_name,comment,message,notify))
             self.lock.acquire()
             if message=='RESET' and self.CheckDisabled(tag_name): 
                 self.Enable(tag_name)
             if not self.Alarms[tag_name].active:
-                return False
+                result = False
             else:
                 if message!='ACKNOWLEDGED':
                     date = self.Alarms[tag_name].active
@@ -572,7 +539,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     receivers = self.parse_receivers(tag_name)
                     print '\treceivers: %s'%receivers
                     self.SendMail(self.GenerateReport(tag_name,self.parse_receivers(tag_name,'@',receivers),message=message or 'RESET',user_comment=comment))
-                    self.update_log_file()
                     
                     try:
                         if SNAP_ALLOWED and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers)): 
@@ -592,11 +558,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     if action_receivers:
                         self.info('checking %s actions ... %s'%(message,action_receivers))
                         [self.triggerAction(self.Alarms[tag_name],ac) for ac in action_receivers]
+            self.update_flag_file()
+            self.update_log_file()
         except:
             self.warning( 'ResetAlarm(%s) failed!: %s' % (tag_name,traceback.format_exc()))
         finally:
             self.lock.release()
         self.info('-'*80)
+        return result
 
     #########################################################################################################
     ##@name Alarm Sending
@@ -1273,6 +1242,69 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #==================================================================
 
 #------------------------------------------------------------------
+#    EvaluateFormula command:
+#
+#    Description: Evaluate an Alarm formula
+#
+#    argin:  DevString    formula to evaluate
+#    argout: DevString
+#------------------------------------------------------------------
+    def EvaluateFormula(self,argin,tag_name=None,as_string=True,lock=False,_locals=None,variables=None):
+        """
+        This method can be called from both updateAlarms thread or external clients 
+        """
+        #    Add your own code here
+        STATE,VALUE,variables = False,None,{} if variables is None else variables
+        try:
+            if lock: self.lock.acquire()
+            # Update Locals (Done here to minimize time in which WorkerProcess is IDLE)
+            _locals = self.update_locals(_locals)
+            if argin in self.Alarms: argin = self.Alarms[argin].formula
+            formula = self.Panic.replace_alarms(argin) #This replace those alarm names that are not in locals()
+            varnames = self.Eval.parse_variables(formula,_locals)
+            
+            self.info('In EvaluateFormula(%s): variables = %s'%(tag_name or formula,varnames))
+            STATE = any((not attribute or attribute.lower().strip() == 'state') for device,attribute,what in varnames)
+            RAISE = (STATE and self.RethrowState) or self.RethrowAttribute or not self.IgnoreExceptions
+            self.debug('In EvaluateFormula(%s): STATE = %s'%(tag_name or formula,STATE))
+            # ALARM EVALUATION
+            #####################################################
+            if self.worker and tag_name:
+                if tag_name in self.Alarms:
+                    alarm = self.Alarms[tag_name]
+                    self.debug('\tself.worker.get(%s)'%alarm.tag)
+                    VALUE = self.worker.get(alarm.tag,None,_raise=RAISE)
+                else:
+                    STATE = True
+                    raise Exception('UNKNOWN ALARM %s!!'%tag_name)
+            else:
+                VALUE = self.Eval.eval(formula,_raise=RAISE)
+            if tag_name:
+                variables.update(self.get_last_values(alarm=tag_name,variables=varnames))
+            else:
+                variables.update(self.Eval.last)
+            self.debug('%s: %s, Values = %s'%(tag_name or formula,VALUE,variables))
+        except Exception,e:
+            desc = except2str(e)
+            if STATE or self.RethrowAttribute: 
+                self.warning('-> Exception while checking State alarm %s:'%tag_name + '\n%s'%formula + '\n%s'%(traceback.format_exc()))
+            else:
+                self.debug( '-> Exception while checking alarm %s:\n%s'%(tag_name or formula,desc))
+            if (self.RethrowState and STATE) or self.RethrowAttribute:
+                # STATE EXCEPTION: Exceptions in reading of State attributes will trigger alarms
+                ###################################################################################
+                VALUE = desc or str(e) or 'Exception!' #Must Have a Value!
+                #variables = self.get_last_values(alarm=tag_name,variables=variables)
+                variables = {tag_name or 'VALUE':VALUE}
+            else:
+                if tag_name: self.FailedAlarms[tag_name]=desc
+                self.info('-> Exceptions in Non-State attributes (%s) do not trigger Alarm'%(tag_name or formula))
+        finally: 
+            if lock: self.lock.release()
+        
+        return str(VALUE) if as_string else VALUE
+
+#------------------------------------------------------------------
 #    ResetAlarm command:
 #
 #    Description: Reset alarm, it will be removed from active alarms
@@ -1721,7 +1753,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 return 'DONE'
         return 'FAILED'
 
-
 #==================================================================
 #
 #    PyAlarmClass class definition
@@ -1882,6 +1913,9 @@ class PyAlarmClass(PyTango.DeviceClass):
             {
                 #'Display level':PyTango.DispLevel.EXPERT,
              } ],
+        'EvaluateFormula':
+            [[PyTango.DevString, "alarm formula to test with the current environment"],
+            [PyTango.DevString,"result obtained"]],
         'ResetAlarm':
             [[PyTango.DevVarStringArray, "This is used to inform which alarm should be reset. If it doesn't exst an error occurs, comment"],
             [PyTango.DevVarStringArray, "If succeed, returns the list of ActiveAlarms"]],
