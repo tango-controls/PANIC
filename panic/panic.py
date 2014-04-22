@@ -45,7 +45,7 @@
 
 """
 
-import traceback,re,time
+import traceback,re,time,os,sys
 import fandango
 import fandango.functional as fun
 import PyTango
@@ -544,7 +544,7 @@ class AlarmAPI(fandango.SingletonMap):
         print 'In AlarmAPI(%s)'%filters
         self.alarms = {}
         self.filters = filters
-        self.tango_host = tango_host
+        self.tango_host = tango_host or os.getenv('TANGO_HOST')
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
         self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
@@ -676,6 +676,38 @@ class AlarmAPI(fandango.SingletonMap):
             csv.setRow(i+1,[getattr(alarm,k) for k in self.CSV_COLUMNS])
         csv.save(filename)
         return 
+        
+    def load_configurations(self,filename,regexp=None):
+        """
+        Updates devices properties values from a .csv file
+        """
+        csv = fandango.CSVArray(filename,header=0,comment='#',offset=1)
+        print 'Loading %s file'%filename
+        for i in range(csv.size()[0]):
+            l = csv.getd(i)
+            if not fun.matchCl(l['Host'],self.tango_host): continue
+            d = l['Device']
+            if not d or d not in self.devices or regexp and not fun.matchCl(regexp,d):
+                continue
+            diff = [k for k,v in self.devices[d].get_config().items() 
+                if str(v).lower()!=str(l[k]).lower()]
+            if diff:
+                print 'Updating %s properties: %s'%(d,diff)
+                self.put_db_properties(d,dict((k,[l[k]]) for k in diff))
+                self.devices[d].init()
+        return
+        
+    def export_configurations(self,filename,regexp=None):
+        """
+        Save devices property values to a .csv file
+        """
+        lines = [['Host','Device']+ALARM_CONFIG]
+        for d,v in self.devices.items():
+            if regexp and not matchCl(regexp,d): continue
+            c = v.get_config()
+            lines.append([self.tango_host,d]+[str(c[k]) for k in ALARM_CONFIG])
+        open(filename,'w').write('\n'.join('\t'.join(l) for l in lines))
+        print '%s devices exported to %s'%(len(lines),filename)
 
     def save_tag(self,tag):
         """ Shortcut to force alarm update in database """
