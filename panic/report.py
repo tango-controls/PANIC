@@ -18,10 +18,12 @@ lines = []
 severities = ['ALARM','WARNING','ERROR','INFO','DEBUG']
 txt = '<html>\n'+web.title('Active alarms in %s'%HOST,2)
 summary  = dict((k,0) for k in severities)
+values = {}
 for d in sorted(api.devices):
     try:
-        dev = panic.AlarmDS(d).get()
+        dev = panic.AlarmDS(d,api).get()
         active = dev.read_attribute('ActiveAlarms').value
+        values[HOST+'/'+d]=active
         if active:
             lines.append(web.title(d.upper(),3))
             lines.append(web.list_to_ulist([a for a in active]))
@@ -36,3 +38,5 @@ for d in sorted(api.devices):
 txt+=web.paragraph(', '.join('%s:%s'%(k,summary[k]) for k in severities)+'<hr>')
 txt+='\n'.join(lines)+'\n</html>'
 open(OUTPUT,'w').write(txt)
+import pickle
+pickle.dump(values,open(OUTPUT.rsplit('.',1)[0]+'.pck','w'))
