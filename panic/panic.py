@@ -154,10 +154,6 @@ ALARM_LOGS = {
         [PyTango.DevString,
         "File where a 1 or 0 value will be written depending if theres active alarms or not.\n<br>This file can be used by other notification systems.",
         [ "/tmp/alarm_ds.nagios" ] ],
-    'MaxAlarmsPerDay':
-        [PyTango.DevLong,
-        "Max Number of Alarms to be sent each day to the same receiver.",
-        [ 3 ] ],
     'MaxMessagesPerAlarm':
         [PyTango.DevLong,
         "Max Number of messages to be sent each time that an Alarm is activated/recovered/reset.",
@@ -271,6 +267,11 @@ class Alarm(object):
     def get_attribute(self,full=False):
         """ Gets the boolean attribute associated to this alarm """
         return (self.device+'/' if full else '')+self.tag.replace(' ','_').replace('/','_')
+    
+    def get_model(self):
+        model = self.get_attribute(full=True)
+        if ':' not in model: model = self.api.tango_host + '/' + model
+        return model
 
     def get_ds(self):
         """ Gets and AlarmDS object related to this alarm """
@@ -548,6 +549,10 @@ class AlarmAPI(fandango.SingletonMap):
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
         self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
+        self.macros = [
+            ('GROUP(%s)',self.GROUP_EXP,self.group_macro)
+            ]
+        [self._eval.add_macro(*m) for m in self.macros]
         try: self.servers = fandango.servers.ServersDict(tango_host=tango_host)
         except: self.servers = fandango.servers.ServersDict()
         self.load(self.filters)
@@ -791,6 +796,34 @@ class AlarmAPI(fandango.SingletonMap):
         self.put_class_property('PyAlarm','Phonebook',new_prop)
         self.phonebook = None #Force to reload
         return new_prop
+    
+    GROUP_EXP = fandango.tango.TangoEval.FIND_EXP.replace('FIND','GROUP')
+    
+    def group_macro(self,match):
+        """
+        For an expression matching multiple ALARM attributes returns a new formula that will evaluate to True
+        if any of the alarm changes to active state (.delta). NOTE, THIS IS NOT any(FIND(*)); it will react only
+        on change, not if already active!
+        
+        For example, GROUP(test/alarms/*/TEST_[ABC]) will be replaced by:
+            (any([d>0 for d in FIND(test/alarms/*/TEST_[ABC].delta)]) and FIND(test/alarms/*/TEST_[ABC]))
+            
+        By default GROUP is active if any .delta is >0. It can be modified if the formula contains a semicolon ";" and 
+        a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm
+            GROUP(bl09/vc/vgct-*/p[12],x>1e-5) => [x>1e-5 for x in FIND(bl09/vc/vgct-*/p[12])]
+        """
+        match,cond = match.split(';',1) if ';' in match else (match,'')
+        
+        if not cond: #It just tries to find DELTA in all variables matching the condition
+            exp = '(any([d>0 for d in FIND(%s.delta)]) and FIND(%s))'%(match,match) #By default, summarize which attributes has changed
+            if '/' not in match: #Trying to match alarm names instead of attributes
+                matches = [a for a in self.alarms if fun.matchCl(match+'$',a)]
+                if matches:
+                    attrs = sorted(set(self.alarms[a].get_attribute(full=True) for a in self.alarms if fun.matchCl(match+'$',a)))
+                    exp = '('+'any([d>0 for d in [ %s ] ])'%' , '.join(s+'.delta' for s in attrs) + ' and [ %s ])'%' , '.join(attrs)
+        else:
+            exp = '(any([%s for x in FIND(%s)]))'%(cond,match)
+        return exp
 
     def parse_alarms(self, formula):
         """
@@ -964,10 +997,12 @@ class AlarmAPI(fandango.SingletonMap):
             result[alarm.tag].update((k,v) for k,v in self.devices[alarm.device].get_config().items() if k in ALARM_CONFIG)
         return result        
 
-    def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True, config=None):
+    def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True, config=None,overwrite=False):
         """ Adds a new Alarm to the database """
         device = device.lower()
-        if tag in self.keys(): raise Exception('TagAlreadyExists:%s'%tag)
+        if tag in self.keys(): 
+            if not overwrite: raise Exception('TagAlreadyExists:%s'%tag)
+            else: self.modify(tag=tag,device=device,formula=formula,description=description,receivers=receivers,severity=severity,load=load,config=config)
         if device not in self.devices: raise Exception('DeviceDescriptiondDesntExist:%s'%device)
         alarm = Alarm(tag, api=self, device=device, formula=formula, description=description, receivers=receivers, severity=severity)
         if config is not None:
@@ -1070,3 +1105,4 @@ api = AlarmAPI
 
 def current():
     return AlarmAPI.CURRENT or AlarmAPI()
+
