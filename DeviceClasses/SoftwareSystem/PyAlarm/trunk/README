@@ -6,10 +6,20 @@ panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
 Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 devices
 
-Release 4.20 PENDING!
+Release 4.20
+-------------------------------------------------------------------------------
+@pending: solve threads and UseProcess issues
+MaxAlarmsPerDay property removed (was unused)
+Added new GROUP macro to formula evaluation.
+SnapContext: Using modify instead of create context when this already exists
+Added methods to taurus-like get_model from alarms
 Email report refactored to show values in rows and parse state values.
 Added methods do import/export alarm configurations from .csv files
 EvaluateFormula converted in a Tango command callable by clients
+Solved bugs using SNAP as receiver.
+Snap: Using newest context when several match the alarm name
+Eval cache reduced to AlarmThreshold+1 to adjust .delta to AlarmThreshold
+Solved bug in SMS sending when source contains non-alpha characters
 
 Release 4.19
 @pending: solve threads and UseProcess issues
