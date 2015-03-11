@@ -94,8 +94,8 @@ ALARM_TABLES = {
 ALARM_CYCLE = {
     'Enabled':
         [PyTango.DevString,
-        "If False forces the device to Disabled state and avoids messaging; if INT then it will last only for N seconds after Startup",
-        [ 'True'] ],
+        "If False forces the device to Disabled state and avoids messaging; if INT then it will last only for N seconds after Startup; if a python formula is written it will be used to enable/disable the device",
+        [ '120' ] ],#Overriden by panic.DefaultPyAlarmProperties
     'AlarmThreshold':
         [PyTango.DevLong,
         "Min number of consecutive Events/Pollings that must trigger an Alarm.",
@@ -125,9 +125,9 @@ ALARM_CYCLE = {
         "Whether exceptions in Attribute reading will be rethrown.",
         [ False ] ],
     'IgnoreExceptions':
-        [PyTango.DevBoolean,
-        "If True unreadable values will be replaced by None instead of Exception.",
-        [ True ] ],
+        [PyTango.DevString,
+        "Value can be False/True/NaN to return Exception, None or NotANumber in case of read_attribute exception.",
+        [ 'True' ] ],#Overriden by panic.DefaultPyAlarmProperties
     }
         
 ALARM_ARCHIVE = {
@@ -559,10 +559,11 @@ class AlarmAPI(fandango.SingletonMap):
 
     ## Dictionary-like methods
     def __getitem__(self,*a,**k): return self.alarms.__getitem__(*a,**k)
-    def __setitem__(self,*a,**k): return self.alarms.__setitem__(*a,**k)
+    def __setitem__(self,k,v): return self.alarms.__setitem__(k,v)
     def __len__(self): return self.alarms.__len__()
     def __iter__(self): return self.alarms.__iter__()
-    def __containes__(self,obj): return self.alarms.__contains__(obj)
+    def __contains__(self,obj): 
+        return self.has_tag(obj,False) #return self.alarms.__contains__(obj)
     def keys(self): return self.alarms.keys()
     def values(self): return self.alarms.values()
     def items(self): return self.alarms.items()
@@ -576,7 +577,6 @@ class AlarmAPI(fandango.SingletonMap):
         filters = filters or self.filters or '*'
         if fun.isSequence(filters): filters = '|'.join(filters)
         self.devices,all_alarms = fandango.CaselessDict(),{}
-        import time
         print '%s: Loading PyAlarm devices matching %s'%(time.ctime(),filters)
         
         t0 = tdevs = time.time()
@@ -663,7 +663,7 @@ class AlarmAPI(fandango.SingletonMap):
                 if d not in self.devices:
                     raise Exception('PyAlarm %s does not exist!'%d)
             for i,(tag,v) in enumerate(alarms.items()):
-                if tag not in self.keys(): 
+                if tag not in self:
                     self.add(**v)
                 else: 
                     self.modify(**v)
@@ -713,11 +713,15 @@ class AlarmAPI(fandango.SingletonMap):
             lines.append([self.tango_host,d]+[str(c[k]) for k in ALARM_CONFIG])
         open(filename,'w').write('\n'.join('\t'.join(l) for l in lines))
         print '%s devices exported to %s'%(len(lines),filename)
+        
+    def has_tag(self,tag,raise_=False):
+        nt = fun.first((k for k in self.keys() if k.lower()==tag.lower()),None)
+        if raise_ and nt is None: raise('TagDoesntExist:%s'%tag)
+        return nt
 
     def save_tag(self,tag):
         """ Shortcut to force alarm update in database """
-        if tag not in self.keys(): raise Exception('TagNotFound')
-        self[tag].write()
+        self[self.has_tag(tag,True)].write()
         
     def get_ds_proxy(self,dev):
         return self.servers.proxies[dev]
@@ -805,24 +809,34 @@ class AlarmAPI(fandango.SingletonMap):
         if any of the alarm changes to active state (.delta). NOTE, THIS IS NOT any(FIND(*)); it will react only
         on change, not if already active!
         
+        It uses the read_attribute schema from TangoEval, thus using .delta to keep track of which values has changed.
         For example, GROUP(test/alarms/*/TEST_[ABC]) will be replaced by:
-            (any([d>0 for d in FIND(test/alarms/*/TEST_[ABC].delta)]) and FIND(test/alarms/*/TEST_[ABC]))
+            any([t.delta>0 for d in FIND(test/alarms/*/TEST_[ABC].all)])
             
         By default GROUP is active if any .delta is >0. It can be modified if the formula contains a semicolon ";" and 
         a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm
             GROUP(bl09/vc/vgct-*/p[12],x>1e-5) => [x>1e-5 for x in FIND(bl09/vc/vgct-*/p[12])]
         """
-        match,cond = match.split(';',1) if ';' in match else (match,'')
-        
-        if not cond: #It just tries to find DELTA in all variables matching the condition
-            exp = '(any([d>0 for d in FIND(%s.delta)]) and FIND(%s))'%(match,match) #By default, summarize which attributes has changed
-            if '/' not in match: #Trying to match alarm names instead of attributes
-                matches = [a for a in self.alarms if fun.matchCl(match+'$',a)]
-                if matches:
-                    attrs = sorted(set(self.alarms[a].get_attribute(full=True) for a in self.alarms if fun.matchCl(match+'$',a)))
-                    exp = '('+'any([d>0 for d in [ %s ] ])'%' , '.join(s+'.delta' for s in attrs) + ' and [ %s ])'%' , '.join(attrs)
+        match,cond = match.split(';',1) if ';' in match else (match,'x>0')
+        if '/' not in match and self._eval._locals.get('DEVICE',None): match = self._eval._locals['DEVICE']+'/'+match
+        matches = []
+        if '/' in match:
+            matches = [d+'/'+a for dev,attr in [match.rsplit('/',1)] for d,dd in self.devices.items() for a in dd.alarms if fun.matchCl(dev,d) and fun.matchCl(attr,a)]
         else:
-            exp = '(any([%s for x in FIND(%s)]))'%(cond,match)
+            matches = [self[a].get_attribute(full=True) for a in self if fun.matchCl(match,a)]
+        if not cond: matches = [m+'.delta' for m in matches]
+        exp = 'any([%s for x in [ %s ]])'%(cond,' , '.join(matches))
+        print exp
+        #if not cond: #It just tries to find DELTA in all variables matching the condition
+            ##By default, summarize which attributes has changed
+            #exp = "any([t.delta>0 for t in FIND(%s.all) if PANIC.has_tag(t.name)])"%(match)
+            #if '/' not in match: #Trying to match alarm names instead of attributes
+                #matches = [a for a in self.alarms if fun.matchCl(match+'$',a)]
+                #if matches:
+                    #attrs = sorted(set(self.alarms[a].get_attribute(full=True) for a in self.alarms if fun.matchCl(match+'$',a)))
+                    #exp = '('+'any([d>0 for d in [ %s ] ])'%' , '.join(s+'.delta' for s in attrs) + ' and [ %s ])'%' , '.join(attrs)
+        #else:
+            #exp = '(any([%s for x in FIND(%s)]))'%(cond,match)
         return exp
 
     def parse_alarms(self, formula):
@@ -872,6 +886,7 @@ class AlarmAPI(fandango.SingletonMap):
         #Returns the result of evaluation on formula
         #Both result and attribute values are kept!, be careful to not generate memory leaks
         try:
+            self._eval.update_locals({'PANIC':self})
             return self._eval.eval(self.replace_alarms(formula))
         except Exception,e:
             return e
@@ -999,21 +1014,22 @@ class AlarmAPI(fandango.SingletonMap):
 
     def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True, config=None,overwrite=False):
         """ Adds a new Alarm to the database """
-        device = device.lower()
-        if tag in self.keys(): 
+        device,match = device.lower(),self.has_tag(tag)
+        if match:
+            tag = match
             if not overwrite: raise Exception('TagAlreadyExists:%s'%tag)
             else: self.modify(tag=tag,device=device,formula=formula,description=description,receivers=receivers,severity=severity,load=load,config=config)
         if device not in self.devices: raise Exception('DeviceDescriptiondDesntExist:%s'%device)
         alarm = Alarm(tag, api=self, device=device, formula=formula, description=description, receivers=receivers, severity=severity)
-        if config is not None:
-            self.set_alarm_configuration(tag,device,config)
+        if config is not None: self.set_alarm_configuration(tag,device,config)
         alarm.write()
         if load: self.load()
+        return tag
         
     def modify(self,tag,device,formula='',description='',receivers='', severity='WARNING', config=None, load=True):
         """ Modfies an Alarm in the database """
         device = device.lower()
-        if tag not in self.keys(): raise Exception('TagDoesntExist:%s'%tag)
+        tag = self.has_tag(tag,raise_=True)
         if device not in self.devices: raise Exception('DeviceDescriptiondDoesntExist:%s'%device)
         alarm = self[tag]
         old_device,new_device = alarm.device,device
@@ -1059,7 +1075,7 @@ class AlarmAPI(fandango.SingletonMap):
 
     def remove(self,tag,load=True):
         """ Removes an alarm from the system. """
-        if tag not in self.keys(): raise Exception('TagNotFound')
+        tag = self.has_tag(tag,True)
         val = self.alarms.pop(tag) #Order matters!
         self.purge(val.device,tag)
         if load: self.load()
@@ -1069,7 +1085,7 @@ class AlarmAPI(fandango.SingletonMap):
         """ Renames an existing tag, it also allows to move to a new device. """
         new_device = new_device.lower()
         if new_device and new_device not in self.devices: raise Exception('DeviceDoesntExist:%s'%new_device)
-        if tag not in self.keys(): raise Exception('TagNotFound:%s'%tag)
+        tag = self.has_tag(tag,True)
         alarm = self.remove(tag)
         new_device = new_device or alarm.device
         new_tag = new_tag or alarm.tag
