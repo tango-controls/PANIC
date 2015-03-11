@@ -7,14 +7,20 @@ Some configuration panels in the GUI require PyAlarm to be available in the PYTH
 devices
 
 Ongoing 5.0
--------------------------------------------------------------------------------
-Enabled property, from string to DevVarStringArray to allow time and formulas
-RethrowAttribute, from boolean to string to allow choosing False/0/NaN/None
 
-Solved bug that didn't send VALUES on State/Attribute exception
-Removed locks from read methods (UI was locking the evaluation trend), lock is needed only on write/update actions
+-------------------------------------------------------------------------------
+NOTE: Requires Fandango update, to use NaN values and new TangoEval macros
+
 API: Improved group macro to use only cached values for evaluation
-Added EvalTimes dictionary to keep the time needed on each EvaluateFormula() call.
+API: Improved caselessness on API
+
+Eval: Added EvalTimes dictionary to keep the time needed on each EvaluateFormula() call.
+Eval: Added DEVICE, ALARMS, PANIC objects to locals()
+Eval: Added own Attribute values to Eval cache to avoid deadlocks when evaluating itself
+Enabled property, converted from string to DevVarStringArray to allow time and formulas
+Attributes: Removed locks from read methods (UI was locking the evaluation trend), lock is needed only on write/update actions
+Solved bug that didn't send VALUES on State/Attribute exception
+RethrowAttribute, from boolean to string to allow choosing False/0/NaN/None
 
 
 Release 4.20
