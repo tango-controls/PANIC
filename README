@@ -1,4 +1,4 @@
-VERSION = 4.20: srubio-2013/11/22
+VERSION = 5.0: srubio-2013/11/22
 
 PyAlarm is the alarm device server used by ALBA Alarm System, it requires PyTango and Fandango modules, both available from tango-cs.sourceforge.net
 panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
@@ -6,14 +6,12 @@ panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
 Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 devices
 
-Ongoing 5.0
-
+Release 5.0 - May 2015
 -------------------------------------------------------------------------------
 NOTE: Requires Fandango update, to use NaN values and new TangoEval macros
 
 API: Improved group macro to use only cached values for evaluation
 API: Improved caselessness on API
-
 Eval: Added EvalTimes dictionary to keep the time needed on each EvaluateFormula() call.
 Eval: Added DEVICE, ALARMS, PANIC objects to locals()
 Eval: Added own Attribute values to Eval cache to avoid deadlocks when evaluating itself
@@ -21,6 +19,9 @@ Enabled property, converted from string to DevVarStringArray to allow time and f
 Attributes: Removed locks from read methods (UI was locking the evaluation trend), lock is needed only on write/update actions
 Solved bug that didn't send VALUES on State/Attribute exception
 RethrowAttribute, from boolean to string to allow choosing False/0/NaN/None
+Emails: solved problems string arrays and '\r' and '"' characters
+Traces: shortened strings
+
 
 
 Release 4.20
