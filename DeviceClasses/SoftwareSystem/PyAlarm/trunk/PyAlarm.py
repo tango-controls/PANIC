@@ -41,7 +41,7 @@ import PyTango
 import fandango
 import fandango.tango
 import fandango.functional as fun
-from fandango.log import except2str
+from fandango.log import except2str,shortstr
 from fandango.objects import __lock__, self_locked,Singleton
 from fandango.dicts import defaultdict_fromkey
 try:
@@ -215,6 +215,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if _locals is None: _locals = {}
         _locals.update(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
         _locals.update({'DEVICE':self.get_name(),'ALARMS':self.Alarms.keys(),'PANIC':self.Panic,'SELF':self})
+        _locals.update({'t':time.time() - (self.TStarted+self.StartupDelay)})
         if not check: update = True #If check is True locals will be updated only if necessary or forced
         if check:
             for k,v in self.Alarms.items():
@@ -222,7 +223,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 if _locals.get(k,None)!=val: update = True
                 _locals[k] = val
         if update:
-            self.info('In PyAlarm.update_locals(...)')
+            self.debug('In PyAlarm.update_locals(...)')
             if self.worker:
                 try:
                     self.worker.send('update_locals',
@@ -274,11 +275,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             #This check has been already done in AlarmAPI.parse_phonebook(receivers); it can be checked and removed
             for name,value in self.AddressList.items():
                 if name in receivers and value:
-                    self.info( 'In parse_receivers: %s phone book replaced by %s' % (name,value.split('#')[0]))
+                    self.debug( 'In parse_receivers: %s phone book replaced by %s' % (name,value.split('#')[0]))
                     receivers = receivers.replace(name,value.split('#')[0].strip())
         else: receivers = ','.join(receivers)
         receivers = [r for r in receivers.split(',') if not filtre or filtre in r]
-        self.info( 'In parse_receivers(%s): receivers added: %s' % (tag_name,receivers))
+        self.debug( 'In parse_receivers(%s): receivers added: %s' % (tag_name,receivers))
         return receivers
         
     def parse_action_receivers(self,tag_name,message,receivers):
@@ -328,23 +329,26 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
     ###########################################################################
     
-    def get_enabled(self):
+    def get_enabled(self, force=False):
         e = str(self.Enabled).lower().strip()
-        t = time.time() - (self.TStarted+self.StartupDelay)
-        if e in ('true','1','yes','enabled'):
-            return True
-        elif e in ('','false','0','no','none','disabled'):
-            return None
-        elif e=='nan':
-            return fandango.NaN
-        elif fandango.matchCl('^[0-9]+$',e):
-                return t > int(e)
-        else:
+        last = self.PastValues.get('Enabled',(0,0))
+        t = int(time.time() - (self.TStarted+self.StartupDelay))
+        if not force and t-last[0] < self.PollingPeriod: return last[1]
+        if e in ('true','1','yes','enabled'): r = True
+        elif e in ('','false','0','no','none','disabled'): r = None
+        elif e=='nan': r = fandango.NaN
+        elif fandango.matchCl('^[0-9]+$',e): r = t > int(e)
+        else: #Evaluating an alarm formula
             try:
-                return self.EvaluateFormula(self.Enabled,as_string=False,_locals={'t':t})
+                self.FailedAlarms.pop('Enabled',None)
+                r = self.EvaluateFormula(self.Enabled,as_string=False,_locals={'t':t})
             except:
-                print(traceback.format_exc())
-                return False
+                self.FailedAlarms['Enabled'] = traceback.format_exc()
+                print(self.FailedAlarms['Enabled'])
+                r = False
+        self.PastValues['Enabled'] = t,r
+        return r
+
         
     
     def get_last_values(self,alarm='',variables=None):
@@ -402,10 +406,13 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.lock.acquire()
                     timewait = float(self.PollingPeriod)/(len(self.Alarms) or 1.)
                     self.info( 'updateAlarms(): timewait between polling is %f s'%timewait)
-                    if not self.get_enabled(): self.info( '=============> ALARM SENDING DISABLED!!')
                     myAlarms = sorted(a for a in self.Alarms.items() if not self.CheckDisabled(a[0])) #copied without disabled alarms
                 finally: 
                     self.lock.release()
+                self.info('\n\n'+
+                    'Enabled alarms to process in next %d s cycle (UseProcess=%s): %s ' % (self.PollingPeriod,self.UseProcess,[a[0] for a in myAlarms])
+                    +'\n'+'#'*80)
+                if not self.get_enabled(force=True): self.info( 'ALARM SENDING IS DISABLED!!')
                 ###############################################################
                 # NOT using a subProcess and Using Taurus to update the variables
                 if not self.worker and self.UseTaurus:
@@ -428,9 +435,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 elif self.worker:
                     self.info('Worker last alive at %s: %s,%s'%(time.ctime(self.worker.last_alive),self.worker._process.is_alive(),self.worker._receiver.is_alive()))
                 ###############################################################
-                self.info('\n\n'+
-                    'Enabled alarms to process in next %d s cycle (UseProcess=%s): %s ' % (self.PollingPeriod,self.UseProcess,[a[0] for a in myAlarms])
-                    +'\n'+'#'*80)
                     
                 for tag_name,alarm in myAlarms: #Format is:    TAG3:LT/VC/Dev1/Pressure > 1e-4
                     now = self.last_attribute_check = time.time()
@@ -602,7 +606,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         ACKNOWLEDGE/RESET messages are not managed here, but in free_alarm
         """
         self.info('-'*80)
-        self.info( 'In PyAlarm.send_alarm(%s,%s,%s)'%(tag_name,message,values))
+        self.info(shortstr('In PyAlarm.send_alarm(%s,%s,%s)'%(tag_name,message,values),255))
         try:
             if self.Alarms[tag_name].sent >= self.MaxMessagesPerAlarm: #This counter is reset calling .clear() from free_alarm()
                 self.debug('*'*80)
@@ -616,7 +620,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     mail_receivers = self.parse_receivers(tag_name,'@',receivers)
                     sms_receivers = self.parse_receivers(tag_name,'SMS',receivers)
                     action_receivers = self.parse_action_receivers(tag_name,message,receivers)
-                    self.debug('receivers:\n'+'\n'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers)))
+                    self.debug('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers)))
                 finally:
                     self.lock.release()
 
@@ -788,11 +792,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.snap.db.update_context_attributes(self.snap.db.get_context_ids(tag_name)[0], existingAttrsAllowed)
             if user_comment and user_comment!='ALARM':
                 if user_comment in ('DISABLED','RECOVERED'):
-                    ctx.take_snapshot(comment=fandango.log.shortstr(user_comment,255))
+                    ctx.take_snapshot(comment=shortstr(user_comment,255))
                 else: 
-                    ctx.take_snapshot(comment=fandango.log.shortstr('ACKNOWLEDGED: %s'%user_comment,255))
+                    ctx.take_snapshot(comment=shortstr('ACKNOWLEDGED: %s'%user_comment,255))
             else: 
-                ctx.take_snapshot(comment=fandango.log.shortstr('ALARM: %s'%self.Alarms[tag_name].description,255))
+                ctx.take_snapshot(comment=shortstr('ALARM: %s'%self.Alarms[tag_name].description,255))
                 
         except Exception,e:
             self.warning( 'Exception in trigger snapshot: %s' % traceback.format_exc())
@@ -1038,10 +1042,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.set_state(PyTango.DevState.FAULT)
                 self.set_status('Alarm Values not being processed!!!') 
             else:
-                self.set_state(PyTango.DevState.DISABLE if not self.get_enabled() else (PyTango.DevState.ALARM if actives else PyTango.DevState.ON))
                 if self.get_enabled():
+                    self.set_state(PyTango.DevState.ALARM if actives else PyTango.DevState.ON)
                     status = "There are %d active alarms\n" % len(actives)
                 else:
+                    self.set_state(PyTango.DevState.DISABLE)
                     status = "Device is DISABLED temporarily (Enabled=%s)\n"%self.Enabled
                 for date,tag_name in actives:
                     status+='%s:%s:\n\t%s\n\tSeverity:%s\n\tSent to:%s\n' % (time.ctime(date),tag_name,self.Alarms[tag_name].description,self.Alarms[tag_name].severity,self.Alarms[tag_name].receivers)
@@ -1284,7 +1289,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 variables.update(self.get_last_values(alarm=tag_name,variables=varnames))
             else:
                 variables.update(self.Eval.last)
-            self.debug('%s: %s, Values = %s'%(tag_name or formula,VALUE,variables))
+            self.debug(shortstr('%s: %s, Values = %s'%(tag_name or formula,VALUE,variables),512))
         except Exception,e:
             desc = except2str(e)
             if STATE or self.RethrowAttribute: 
@@ -1564,6 +1569,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     for k,v in sorted(values.items(),key=lambda t:(t[-1],t[0])):
                         if any(k.lower().endswith('/%s'%s.lower()) for s in self.Panic.keys()): k = k.split('/')[-1]
                         elif k.lower().endswith('/state'): v = str(PyTango.DevState.values.get(v,v))
+                        elif fun.isSequence(v) and len(v) and fun.isString(v[0]): v = ';\n\t'.join(v)
                         report+='\t%s:\t%s'%(k,v) + '\n'
                 except: 
                     msg = traceback.format_exc()
@@ -1630,7 +1636,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         def format4sendmail(report):
             MAX_MAIL_LENGTH = 512
-            out = report.replace('\n','\\n')
+            out = report.replace('\r','\n').replace('\n\n','\n').replace('\n','\\n').replace('"',"'") #.replace("'",'')
             #if len(out)>MAX_MAIL_LENGTH: out = out[:(MAX_MAIL_LENGTH-5)]+'\\n...'
             return out
         try:
@@ -1639,7 +1645,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             command += '| mail -s "%s" ' % argin[1]
             command += '-S from=%s ' % self.FromAddress #'-r %s ' % (self.FromAddress)
             command += (argin[2] if fun.isString(argin[2]) else ','.join(argin[2]))
-            self.info( 'Launching mail command: '+command)
+            self.info( 'Launching mail command: '+shortstr(command,512))
             os.system(command)
             for m in argin[2]:
                 self.SentEmails[m.lower()]+=1
