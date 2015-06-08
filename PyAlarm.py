@@ -213,32 +213,35 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
     def update_locals(self,_locals=None,check=True,update=False):
         if _locals is None: _locals = {}
-        _locals.update(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
-        _locals.update({'DEVICE':self.get_name(),'ALARMS':self.Alarms.keys(),'PANIC':self.Panic,'SELF':self})
-        _locals.update({'t':time.time() - (self.TStarted+self.StartupDelay)})
-        if not check: update = True #If check is True locals will be updated only if necessary or forced
-        if check:
-            for k,v in self.Alarms.items():
-                val = v.active if not self.CheckDisabled(k) else False
-                if _locals.get(k,None)!=val: update = True
-                _locals[k] = val
-        if update:
-            self.debug('In PyAlarm.update_locals(...)')
-            if self.worker:
-                try:
-                    self.worker.send('update_locals',
-                        target='update_locals',
-                        args={'dct':dict((k,v) for k,v in _locals.items() if k in self.Panic)},
-                        callback=None)
-                except: 
-                    self.error('worker.send(update_locals) failed!: %s'%traceback.format_exc())
-                    self.info(str(_locals))
-            else: 
-                self.Eval.update_locals(_locals)
-                if self.get_name()+'/'+self.Alarms.keys()[0] not in self.Eval.attributes:
-                    self.Eval.attributes.update(dict((str(n).lower(),fandango.tango.CachedAttributeProxy(n,fake=True))
-                        for n in (self.get_name()+'/'+k for k in self.Alarms) ))
-                [self.Eval.attributes[self.get_name()+'/'+k].set_cache(_locals[k]) for k in self.Alarms]
+        try:
+            _locals.update(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
+            _locals.update({'DEVICE':self.get_name(),'ALARMS':self.Alarms.keys(),'PANIC':self.Panic,'SELF':self})
+            _locals.update({'t':time.time() - (self.TStarted+self.StartupDelay)})
+            if not check: update = True #If check is True locals will be updated only if necessary or forced
+            if check:
+                for k,v in self.Alarms.items():
+                    val = v.active if not self.CheckDisabled(k) else False
+                    if _locals.get(k,None)!=val: update = True
+                    _locals[k] = val
+            if update:
+                self.debug('In PyAlarm.update_locals(...)')
+                if self.worker:
+                    try:
+                        self.worker.send('update_locals',
+                            target='update_locals',
+                            args={'dct':dict((k,v) for k,v in _locals.items() if k in self.Panic)},
+                            callback=None)
+                    except: 
+                        self.error('worker.send(update_locals) failed!: %s'%traceback.format_exc())
+                        self.info(str(_locals))
+                else: 
+                    self.Eval.update_locals(_locals)
+                    if self.get_name()+'/'+self.Alarms.keys()[0] not in self.Eval.attributes:
+                        self.Eval.attributes.update(dict((str(n).lower(),fandango.tango.CachedAttributeProxy(n,fake=True))
+                            for n in (self.get_name()+'/'+k for k in self.Alarms) ))
+                    [self.Eval.attributes[self.get_name()+'/'+k].set_cache(_locals[k]) for k in self.Alarms]
+        except:
+            self.warning(traceback.format_exc())
         return _locals
 
     def dyn_attr(self):
