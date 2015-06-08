@@ -990,6 +990,7 @@ class AlarmAPI(fandango.SingletonMap):
                     raise Exception('')
             except Exception,e:
                 print 'device %s is not running'%device
+                traceback.print_exc()
                 [setattr(self.alarms[a],'active',None) for a in d.alarms]
                 return dict((a,None) for a in d.alarms)
         else:
