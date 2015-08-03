@@ -416,6 +416,9 @@ class Alarm(object):
         """ Replaces a receiver """
         self.remove_receiver(old,False)
         self.add_receiver(new,write)
+        
+    def to_str(self):
+        return str(self.__dict__.items())
 
     def __repr__(self):
         return 'Alarm(%s:%s)' % (self.tag,self.description)
@@ -1012,6 +1015,12 @@ class AlarmAPI(fandango.SingletonMap):
                 }
             result[alarm.tag].update((k,v) for k,v in self.devices[alarm.device].get_config().items() if k in ALARM_CONFIG)
         return result        
+
+    def get_admins_for_alarm(self,alarm=''):
+        users = filter(bool,self.get_class_property('PyAlarm','PanicAdminUsers'))
+        if alarm: 
+            users = users+[r.strip().split('@')[0] for r in self.parse_phonebook(self[alarm].receivers).split(',') if '@' in r]
+        return users
 
     def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True, config=None,overwrite=False):
         """ Adds a new Alarm to the database """
