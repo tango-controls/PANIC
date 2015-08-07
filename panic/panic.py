@@ -885,12 +885,19 @@ class AlarmAPI(fandango.SingletonMap):
         attributes = self._eval.parse_variables(self.replace_alarms(formula) if replace else formula)
         return sorted('%s/%s'%(t[:2]) for t in attributes)
         
-    def evaluate(self, formula):
+    def evaluate(self, formula, device=None,timeout=500,_locals=None):
         #Returns the result of evaluation on formula
         #Both result and attribute values are kept!, be careful to not generate memory leaks
         try:
-            self._eval.update_locals({'PANIC':self})
-            return self._eval.eval(self.replace_alarms(formula))
+            if device and device in self.devices:
+                d = self.devices[device].get()
+                d.set_timeout_millis(timeout)
+                return d.evaluateFormula(formula)
+            else:
+                self._eval.set_timeout(timeout)
+                self._eval.update_locals({'PANIC':self})
+                if _locals: self._eval.update_locals(_locals)
+                return self._eval.eval(self.replace_alarms(formula))
         except Exception,e:
             return e
 
