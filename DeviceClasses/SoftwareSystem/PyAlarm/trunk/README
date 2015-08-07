@@ -6,6 +6,17 @@ panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
 Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
 devices
 
+Release 5.2 - New evaluate() from API/GUI, added user admins for alarms
+-------------------------------------------------------------------------------
+API
+get_admins_for_alarm() method added to enable some minimal access control from GUI's
+evaluate() method adapted to be usable by GUI and test evaluation on a remote PyAlarm device
+
+Release 5.1 - May 2015
+-------------------------------------------------------------------------------
+PyAlarm: added try/except to update_locals() method
+API: get_admins_for_alarm() method added to enable some minimal access control.
+
 Release 5.0 - May 2015
 -------------------------------------------------------------------------------
 NOTE: Requires Fandango update, to use NaN values and new TangoEval macros
