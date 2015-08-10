@@ -8,9 +8,8 @@ devices
 
 Release 5.2 - New evaluate() from API/GUI, added user admins for alarms
 -------------------------------------------------------------------------------
-API
-get_admins_for_alarm() method added to enable some minimal access control from GUI's
 evaluate() method adapted to be usable by GUI and test evaluation on a remote PyAlarm device
+Bug solved on SentEmails recording.
 
 Release 5.1 - May 2015
 -------------------------------------------------------------------------------
