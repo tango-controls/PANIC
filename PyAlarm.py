@@ -1271,7 +1271,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             formula = self.Panic.replace_alarms(argin) #This replace those alarm names that are not in locals()
             varnames = self.Eval.parse_variables(formula,_locals)
             
-            self.info('In EvaluateFormula(%s): variables = %s'%(tag_name or formula,varnames))
+            self.info('In EvaluateFormula(%s): %d variables from %s'%(tag_name or formula,len(varnames),sorted(set([tuple(v)[0] for v in varnames]))))
             STATE = any((not attribute or attribute.lower().strip() == 'state') for device,attribute,what in varnames)
             RAISE = (STATE and self.RethrowState) or self.RethrowAttribute or fandango.isFalse(self.IgnoreExceptions)
             if not RAISE: RAISE = fandango.NaN if fandango.isNaN(self.IgnoreExceptions) else None
