@@ -1650,7 +1650,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             command += (argin[2] if fun.isString(argin[2]) else ','.join(argin[2]))
             self.info( 'Launching mail command: '+shortstr(command,512))
             os.system(command)
-            for m in argin[2]:
+            for m in argin[2].split(','):
                 self.SentEmails[m.lower()]+=1
             return 'DONE'
         except Exception,e:
