@@ -246,6 +246,7 @@ class Alarm(object):
         self.sent = 0 #Messages sent
         self.last_sent = 0 #Time when last message was sent
         self.acknowledged = 0 #If active no more reminders will be sent
+        self.disabled = 0 #If disabled the alarm is not evaluated
 
     @staticmethod
     def parse_formula(formula):
@@ -333,17 +334,27 @@ class Alarm(object):
         return config
 
     def get_enabled(self):
-        try: return not self.get_ds().get().CheckDisabled(self.tag)
+        try: 
+                self.disabled = self.get_ds().get().CheckDisabled(self.tag)
+                return not self.disabled
         except: return None
 
     def enable(self):
         """ Enables alarm evaluation """
         return self.get_ds().get().Enable(self.tag)
 
-    def disable(self, comment=''):
+    def disable(self, comment='',timeout=''):
         """ Disables evaluation of Alarm in its PyAlarm device """
-        result = self.get_ds().get().Disable([self.tag, comment])
+        args = [self.tag, comment]
+        if timeout: args.append(str(timeout))
+        result = self.get_ds().get().Disable(args)
         return result
+        
+    def get_acknowledged(self):
+        try: 
+                self.acknowledged = not self.get_ds().get().CheckDisabled(self.tag)
+                return self.acknowledged
+        except: return None        
     
     def reset(self, comment):
         """ Acknowledges and resets the Alarm in its PyAlarm device """
@@ -460,15 +471,27 @@ class AlarmDS(object):
     def put_property(self,prop,value):
         return self.api.put_db_property(self.name,prop,value)
                     
-    def enable(self):
-        #This method will enable all alarm notifications from this device
-        self.api.put_db_property(self.name,'Enabled',True)
-        self.init()
+    def enable(self,tag=None):
+        """ If Tag is None, this method will enable the whole device, but individual disables will be kept """
+        if tag is None:
+                self.api.put_db_property(self.name,'Enabled',True)
+                self.init()
+                print('%s: Enabled!' %self.name)
+        else:
+                tags = [a for a in self.alarms if fun.matchCl(tag,a)]
+                print('%s: Enabling %d alarms: %s' % (self.name,len(tags),tags))
+                [self.get().Enable([str(a)]) for t in tags]
                     
-    def disable(self):
-        #This method will disable all alarm notifications from this device
-        self.api.put_db_property(self.name,'Enabled',False)
-        self.init()
+    def disable(self,tag=None,comment=None,timeout=None):
+        """ If Tag is None this method disables the whole device """
+        if tag is None:
+                self.api.put_db_property(self.name,'Enabled',False)
+                self.init()
+                print('%s: Disabled!' %self.name)
+        else:
+                tags = [a for a in self.alarms if fun.matchCl(tag,a)]
+                print('%s: Disabling %d alarms: %s' % (self.name,len(tags),tags))
+                [self.get().Disable([str(a) for a in (t,comment,timeout) if a is not None]) for t in tags]
                     
     def get_alarm_properties(self):
         """ Method used in all panic classes """
@@ -477,7 +500,7 @@ class AlarmDS(object):
         if not props['AlarmList']:
             props['AlarmList'] = self.api.get_db_property(self.name,'AlarmsList')
             if props['AlarmList']:
-                print '%s: AlarmsList property renamed to AlarmList'%self.name
+                print('%s: AlarmsList property renamed to AlarmList'%self.name)
                 self.api.put_db_properties(self.name,{'AlarmList':props['AlarmList'],'AlarmsList':[]})
         return props
 
