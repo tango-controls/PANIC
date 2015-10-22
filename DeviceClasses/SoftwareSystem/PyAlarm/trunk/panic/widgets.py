@@ -1,3 +1,12 @@
+"""
+This file belongs to the PANIC Alarm Suite, developed by ALBA Synchrotron for Tango Control System
+GPL Licensed 
+
+Enjoy,
+
+Sergi Rubio, 2010
+"""
+
 import sys, os, taurus, fandango, PyTango, getpass, traceback, time
 from PyQt4 import Qt, QtCore, QtGui
 
@@ -9,7 +18,10 @@ from taurus.qt.qtgui.resource import getThemeIcon
 from taurus.qt.qtgui.panel import TaurusForm
 import panic
 from panic import AlarmAPI
-try: from panic.gui import AlarmGUI
+
+try: 
+  #if available, this module will try to load the full AlarmGUI
+  from panic.gui import AlarmGUI
 except: AlarmGUI = None
 
 ###############################################################################
