@@ -958,7 +958,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     #('Reminder','AutoReset','AlarmThreshold','AlertOnRecovery','PollingPeriod','MaxAlarmsPerDay','MaxMessagesPerAlarm'))+'\n')
                     panic.PyAlarmDefaultProperties)))
                 
-                if self.PollingPeriod>300: self.PollingPeriod = self.PollingPeriod*1e-3 #Converting from ms to s
+                #@TODO: Period should be in SECONDS!: this patch must be DEPRECATED
+                if self.PollingPeriod>3600: self.PollingPeriod = self.PollingPeriod*1e-3 #Converting from ms to s
                 if str(self.AlertOnRecovery).strip().lower() in ('false','no','none'): self.AlertOnRecovery=''
                 if str(self.Reminder).strip().lower()=='false': self.Reminder=0
                 
@@ -1849,7 +1850,7 @@ class PyAlarmClass(PyTango.DeviceClass):
             [ "/tmp/alarm_ds.nagios" ] ],#Overriden by panic.DefaultPyAlarmProperties
         'PollingPeriod':
             [PyTango.DevFloat,
-            "Periode in seconds in which all attributes not event-driven will be polled; for convenience any value above 300 will be divided by 1000",
+            "Periode in SECONDS in which all attributes not event-driven will be polled; @TODO for convenience any value above 300 will be divided by 1000, it must be DEPRECATED in the future.",
             [ 15. ] ],#Overriden by panic.DefaultPyAlarmProperties
         'MaxMessagesPerAlarm':
             [PyTango.DevLong,
