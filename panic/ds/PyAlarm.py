@@ -2082,13 +2082,17 @@ class PyAlarmClass(PyTango.DeviceClass):
 #    PyAlarm class main method
 #
 #==================================================================
-if __name__ == '__main__':
+
+def main(args=None):
+    import sys
+    if args is None:
+        args = sys.argv
     try:
-        py = PyTango.Util(sys.argv)
+        py = PyTango.Util(args)
         py.add_TgClass(PyAlarmClass,PyAlarm,'PyAlarm')
         import sys
         from fandango.device import DDebug
-        DDebug.addToServer(py,'PyAlarm',sys.argv[1])
+        DDebug.addToServer(py,'PyAlarm',args[1])
         U = PyTango.Util.instance()
         U.server_init()
         U.server_run()
@@ -2096,4 +2100,7 @@ if __name__ == '__main__':
     except PyTango.DevFailed,e:
         print '-------> Received a DevFailed exception:',e
     except Exception,e:
-        print '-------> An unforeseen exception occured....',e
+        print '-------> An unforeseen exception occured....',e    
+  
+if __name__ == '__main__':
+    main(sys.argv)

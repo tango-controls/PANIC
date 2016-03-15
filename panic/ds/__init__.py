@@ -1,2 +1,2 @@
 
-from PyAlarm import PyAlarm,PyAlarmClass
+import PyAlarm
