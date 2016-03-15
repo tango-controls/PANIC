@@ -55,7 +55,7 @@ except:
     #PyTango.PyDeviceClass = PyTango.DeviceClass
     #PyTango.PyUtil = PyTango.Util
 
-try: __RELEASE__ = (l for l in open(os.path.dirname(os.path.abspath(__file__))+'/README').readlines() if l.startswith('VERSION')).next().split('=',1)[-1].strip()
+try: __RELEASE__ = open(os.path.dirname(os.path.abspath(__file__))+'/VERSION').read().strip()
 except Exception,e: __RELEASE__ = str(e)
 print '> ',__RELEASE__
 
@@ -276,7 +276,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if receivers is None:
             raw_receivers = self.Alarms[tag_name].receivers.split('#')[0]
             receivers = self.Alarms.parse_phonebook(receivers)
-            self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers)
+            self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
         else: receivers = ','.join(receivers)
         receivers = [r for r in receivers.split(',') if not filtre or filtre in r]
         self.debug( 'In parse_receivers(%s): receivers added: %s' % (tag_name,receivers))
