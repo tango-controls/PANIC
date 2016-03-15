@@ -274,12 +274,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         '''
         if tag_name not in self.Alarms: return []
         if receivers is None:
-            receivers = self.Alarms[tag_name].receivers
-            #This check has been already done in AlarmAPI.parse_phonebook(receivers); it can be checked and removed
-            for name,value in self.AddressList.items():
-                if name in receivers and value:
-                    self.debug( 'In parse_receivers: %s phone book replaced by %s' % (name,value.split('#')[0]))
-                    receivers = receivers.replace(name,value.split('#')[0].strip())
+            raw_receivers = self.Alarms[tag_name].receivers.split('#')[0]
+            receivers = self.Alarms.parse_phonebook(receivers)
+            self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers)
         else: receivers = ','.join(receivers)
         receivers = [r for r in receivers.split(',') if not filtre or filtre in r]
         self.debug( 'In parse_receivers(%s): receivers added: %s' % (tag_name,receivers))
@@ -566,8 +563,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if was_active:
                 if self.get_enabled() and notify:
                     print '\treceivers: %s'%receivers
-                    self.SendMail(self.GenerateReport(tag_name,self.parse_receivers(tag_name,'@',receivers),message=message or 'RESET',user_comment=comment))
                     
+                    ## Actions must be evaluated first in case rapid action is needed
+                    action_receivers = self.parse_action_receivers(tag_name,message,receivers)
+                    if action_receivers:
+                        self.info('checking %s actions ... %s'%(message,action_receivers))
+                        for ac in action_receivers:
+                            try:
+                                self.trigger_action(alarm_obj,ac)
+                            except:
+                                self.warning( 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc())
+                        
+                    try:
+                        self.SendMail(self.GenerateReport(tag_name,self.parse_receivers(tag_name,'@',receivers),message=message or 'RESET',user_comment=comment))
+                    except Exception,e:
+                        self.warning( 'PyAlarm.SendMail crashed with exception:\n%s' % traceback.format_exc())
+                      
                     try:
                         if SNAP_ALLOWED and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers)): 
                             self.info('>'*80+'\n'+'triggering snapshot for alarm:'+tag_name)
@@ -581,11 +592,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                             self.SaveHtml(self.GenerateReport(tag_name,message=message or 'RESET',user_comment=comment, html=True))
                     except Exception, e:
                         self.warning( 'PyAlarm.saveHtml crashed with exception:\n%s' % traceback.format_exc())
-                    
-                    action_receivers = self.parse_action_receivers(tag_name,message,receivers)
-                    if action_receivers:
-                        self.info('checking %s actions ... %s'%(message,action_receivers))
-                        [self.triggerAction(alarm_obj,ac) for ac in action_receivers]
             
             self.update_flag_file()
             self.update_log_file()
@@ -623,14 +629,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     mail_receivers = self.parse_receivers(tag_name,'@',receivers)
                     sms_receivers = self.parse_receivers(tag_name,'SMS',receivers)
                     action_receivers = self.parse_action_receivers(tag_name,message,receivers)
-                    self.debug('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers)))
+                    self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers)))
                 finally:
                     self.lock.release()
 
                 if self.get_enabled():
                     if self.Alarms[tag_name].severity=='DEBUG':
-                        self.info('%s Alarm with severity==DEBUG do not trigger messaging or snapshoting'%tag_name)
+                        self.info('%s Alarm with severity==DEBUG do not trigger actions, messages or snapshot'%tag_name)
                     else:
+                        ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
+                        if action_receivers:
+                            self.info('checking %s actions ... %s'%(message,action_receivers))
+                            for ac in action_receivers:
+                                try:
+                                    self.trigger_action(self.Alarms[tag_name],ac)
+                                except:
+                                    self.warning( 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc())                      
                         if mail_receivers: 
                             try:
                                 self.SendMail(self.GenerateReport(tag_name,mail_receivers,message=message,values=values))
@@ -657,10 +671,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                                 if (self.Alarms[tag_name].severity!='DEBUG'): self.trigger_snapshot(tag_name,message)
                             except Exception, e:
                                 self.warning('PyAlarm.trigger_snapshot crashed with exception:\n%s' % traceback.format_exc())
-                    
-                    if action_receivers:
-                        self.info('checking %s actions ... %s'%(message,action_receivers))
-                        [self.triggerAction(self.Alarms[tag_name],ac) for ac in action_receivers]
+
                 else:
                     self.info('=============> ALARM SENDING DISABLED!!')
 
@@ -705,7 +716,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         finally:
             self.lock.release()
 
-    def triggerAction(self, alarm, args):
+    def trigger_action(self, alarm, args):
         """  
         Executing a command on alarm/disable/reset/acknowledge: 
             ACTION(alarm:command,mach/alarm/beep/play_sequence,$DESCRIPTION)
@@ -716,20 +727,27 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         if fun.isString(alarm): alarm = self.Alarms[alarm]
         action = args if fun.isSequence(args) else re.split('[,:;]',args)
-        self.info('In PyAlarm.triggerAction(%s,%s)'%(alarm.tag,args))
+        self.info('In PyAlarm.trigger_action(%s,%s)'%(alarm.tag,args))
         if action[0] in ('command','attribute'):
             try:
                 dev = action[1].rsplit('/',1)[0]
                 cmd = [action[1].rsplit('/',1)[1]]+action[2:]
-                cmd = [c.replace('$ALARM',alarm.tag).replace('$DESCRIPTION',alarm.description).replace('$alarm',alarm.tag).replace('$description',alarm.description) for c in cmd]
-                try: #This eval will allow to 
+                cmd = [c.replace('$ALARM',alarm.tag
+                    ).replace('$DESCRIPTION',alarm.description
+                    ).replace('$alarm',alarm.tag
+                    ).replace('$description',alarm.description
+                    ) for c in cmd]
+                try: #This eval will allow to pass numeric/float arguments
                     arg = eval(cmd[1]) if len(cmd)==2 else [eval(c) for c in cmd[1:]]
                 except: 
                     arg = cmd[1] if len(cmd)==2 else cmd[1:]
+                    
                 if action[0] == 'command':
                     self.info('\tlaunching: %s / %s (%s)' % (dev,cmd[0],cmd[1:]))
-                    val = PyTango.DeviceProxy(dev).command_inout(cmd[0],arg)
+                    cargs = [cmd[0],arg] if arg else [cmd[0]]
+                    val = PyTango.DeviceProxy(dev).command_inout(*cargs)
                     self.info('\t'+str(val))
+                    
                 else:
                     self.info('\tlaunching: %s / %s = %s' % (dev,cmd[0],cmd[1:]))
                     val = PyTango.DeviceProxy(dev).write_attribute(cmd[0],arg)
@@ -952,14 +970,15 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     raise e
                 finally: self.lock.release()
                 self.get_device_properties(self.get_device_class())
-                #self.info("The contents of the phone book is: %s" % self.AddressList)
                 self.info("Current Alarm server configuration is:\n\t"+"\n\t".join(
                     sorted("%s: %s"%(k,getattr(self,k,None)) for k in 
-                    #('Reminder','AutoReset','AlarmThreshold','AlertOnRecovery','PollingPeriod','MaxAlarmsPerDay','MaxMessagesPerAlarm'))+'\n')
                     panic.PyAlarmDefaultProperties)))
                 
                 #@TODO: Period should be in SECONDS!: this patch must be DEPRECATED
-                if self.PollingPeriod>3600: self.PollingPeriod = self.PollingPeriod*1e-3 #Converting from ms to s
+                if self.PollingPeriod>3600: 
+                  self.warning('PERIODS IN MILLISECONDS ARE DEPRECATED!!!!!!!: '+
+                      '%s ms >> %s s'%(self.PollingPeriod,self.PollingPeriod*1e-3))
+                  self.PollingPeriod = self.PollingPeriod*1e-3 #Converting from ms to s
                 if str(self.AlertOnRecovery).strip().lower() in ('false','no','none'): self.AlertOnRecovery=''
                 if str(self.Reminder).strip().lower()=='false': self.Reminder=0
                 
@@ -1001,11 +1020,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.LogFile = self.LogFile.replace('$NAME',self.get_name().replace('/','-'))
 
             self.AddressList = dict(self.PhoneBook)
-            #This check has been already done in AlarmAPI.get_phonebook(); it can be checked and removed from here
-            for name,value in self.AddressList.items():
-                for v in value.split(','):
-                    if v in self.AddressList:
-                        self.AddressList[name] = self.AddressList[name].replace(v,self.AddressList[v])
 
             for tag,alarm in self.Alarms.items():
                 self.info('\n\t%s: %s\n\t\tFormula: %s\n\t\tSeverity: %s\n\t\tReceivers: %s'%(tag,alarm.description,alarm.formula,alarm.severity,alarm.receivers))
