@@ -1,9 +1,42 @@
+# PANIC, Tango Alarm System
+# https://svn.code.sf.net/p/tango-ds/code/DeviceClasses/SoftwareSystem/PyAlarm/tags/latest
 
-PyAlarm is the alarm device server used by ALBA Alarm System, it requires PyTango and Fandango modules, both available from tango-cs.sourceforge.net
-panic is a module package used by PyAlarm, Panic Toolbar and Panic GUI.
+http://www.tango-controls.org/community/projects/panic
 
-Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; so it could be loaded as a part of the module.
-devices
+Panic package contains the python AlarmAPI for managing the PyAlarm device servers from a client 
+application or a python shell. The panic module is used by PyAlarm, Panic Toolbar and Panic GUI.
+
+
+# PyAlarm Device Server
+# https://svn.code.sf.net/p/tango-ds/code/DeviceClasses/SoftwareSystem/PyAlarm/tags/latest/panic/ds
+
+PyAlarm is the alarm device server used by ALBA Alarm System, it requires PyTango and Fandango modules, 
+both available from tango-cs.sourceforge.net
+
+Some configuration panels in the GUI require PyAlarm to be available in the PYTHONPATH, to do so you can 
+add the PyAlarm.py folder to the PYTHONPATH variable or copy the PyAlarm.py file within the panic folder; 
+so it could be loaded as a part of the module.
+
+
+# Panic GUI
+# https://svn.code.sf.net/p/tango-ds/code/Clients/python/Panic/latest
+
+Panic is an application for controlling and managing alarms.
+It allows the user to visualize existing alarms in a clear form and adding/editing/deleting alarms.
+In edit mode user can change name, move alarms to another device, change descriptions and modify formulas.
+Additional widgets in which the app is equipped allows alarm history viewing, phonebook editing and 
+device settings manipulation.
+
+
+----
+
+# TAGS 
+
+trunk will contain current development
+tags/latest will contain sources for building packages
+tags/release_* will contain stable releases
+
+----
 
 Sergi Rubio
 Alba Synchrotron 2006
