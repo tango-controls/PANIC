@@ -48,6 +48,7 @@
 import traceback,re,time,os,sys
 import fandango
 import fandango.functional as fun
+from fandango.tango import CachedAttributeProxy
 import PyTango
 
 
@@ -294,7 +295,7 @@ class Alarm(object):
         It returns 0 if the alarm is not active.
         """
         if attr_value is None:
-            attr_value = self.get_ds().get().read_attribute('ActiveAlarms').value
+            attr_value = self.get_ds().get_active_alarms()#get().read_attribute('ActiveAlarms').value
         elif not fun.isSequence(attr_value):
             attr_value = [attr_value]
         lines = [l for l in (attr_value or []) if l.startswith(self.tag+':')]
@@ -428,8 +429,12 @@ class Alarm(object):
         self.remove_receiver(old,False)
         self.add_receiver(new,write)
         
+    def to_dict(self):
+        isprivate = lambda k: k.startswith('_') or k=='api'
+        return dict((k,v) for k,v in self.__dict__.items() if not isprivate(k))
+        
     def to_str(self):
-        return str(self.__dict__.items())
+        return str(self.to_dict().items())
 
     def __repr__(self):
         return 'Alarm(%s:%s)' % (self.tag,self.description)
@@ -440,6 +445,7 @@ class AlarmDS(object):
         self.name = name
         self.api = api
         self.alarms = {}
+        self._actives = None
         self.get_config(True)
         self.proxy = None
 
@@ -448,6 +454,12 @@ class AlarmDS(object):
         if self.proxy is None:
             self.proxy = self.api.get_ds_proxy(self.name)
         return self.proxy
+      
+    def ping(self):
+        try:
+          return self.get().ping()
+        except:
+          return None
         
     def get_config(self,update=False):
         if not getattr(self,'config',None) or update: 
@@ -503,6 +515,12 @@ class AlarmDS(object):
                 print('%s: AlarmsList property renamed to AlarmList'%self.name)
                 self.api.put_db_properties(self.name,{'AlarmList':props['AlarmList'],'AlarmsList':[]})
         return props
+      
+    def get_active_alarms(self):
+        """ Returns the list of currently active alarms """
+        if self._actives is None:
+          self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',keeptime=1000.)
+        return self._actives.read().value
 
     def state(self):
         """ Returns device state """
@@ -567,8 +585,17 @@ class AlarmAPI(fandango.SingletonMap):
     """
     CURRENT = None
     
-    def __init__(self,filters='*',tango_host=None):
-        print 'In AlarmAPI(%s)'%filters
+    def __init__(self,filters='*',tango_host=None,logger=fandango.log.WARNING):
+      
+        if fandango.isCallable(logger):
+          self.log = self.debug = self.info = self.warning = self.error = logger
+        elif fandango.isNumber(logger) or fandango.isString(logger):
+          self._logger = fandango.log.Logger('PANIC',level=logger)
+          for l in fandango.log.LogLevels:
+            setattr(self,l.lower(),getattr(self._logger,l.lower()))
+          self.log = self.debug
+          
+        self.log('In AlarmAPI(%s)'%filters)
         self.alarms = {}
         self.filters = filters
         self.tango_host = tango_host or os.getenv('TANGO_HOST')
@@ -579,8 +606,10 @@ class AlarmAPI(fandango.SingletonMap):
             ('GROUP(%s)',self.GROUP_EXP,self.group_macro)
             ]
         [self._eval.add_macro(*m) for m in self.macros]
+        
         try: self.servers = fandango.servers.ServersDict(tango_host=tango_host)
         except: self.servers = fandango.servers.ServersDict()
+        
         self.load(self.filters)
 
     ## Dictionary-like methods
@@ -603,7 +632,7 @@ class AlarmAPI(fandango.SingletonMap):
         filters = filters or self.filters or '*'
         if fun.isSequence(filters): filters = '|'.join(filters)
         self.devices,all_alarms = fandango.CaselessDict(),{}
-        print '%s: Loading PyAlarm devices matching %s'%(time.ctime(),filters)
+        self.log('%s: Loading PyAlarm devices matching %s'%(time.ctime(),filters))
         
         t0 = tdevs = time.time()
         all_devices = map(str.lower,fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
@@ -635,7 +664,7 @@ class AlarmAPI(fandango.SingletonMap):
                 alarms = ad.read(filters=filters)
                 if alarms: self.devices[d],all_alarms[d] = ad,alarms
         tprops=(time.time()-tprops)
-        print '\t%d PyAlarm devices loaded, %d alarms'%(len(self.devices),sum(len(v) for v in all_alarms.values()))
+        self.log('\t%d PyAlarm devices loaded, %d alarms'%(len(self.devices),sum(len(v) for v in all_alarms.values())))
 
         tcheck = time.time()
         #Loading phonebook
@@ -644,24 +673,24 @@ class AlarmAPI(fandango.SingletonMap):
         #Verifying that previously loaded alarms still exist
         for k in self.alarms.keys()[:]:
             if not any(k in vals for vals in all_alarms.values()):
-                print 'AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,self.alarms[k].device)
+                self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,self.alarms[k].device))
                 self.alarms.pop(k)
         #Updating alarms dictionary
         for d,vals in sorted(all_alarms.items()):
             for k,v in vals.items():
                 if k in self.alarms: #Updating
                     if self.alarms[k].device.lower()!=d.lower():
-                        print 'AlarmAPI.load(): WARNING!: Alarm %s duplicated in devices %s and %s' % (k,self.alarms[k].device,d)
+                        self.warning('AlarmAPI.load(): WARNING!: Alarm %s duplicated in devices %s and %s' % (k,self.alarms[k].device,d))
                     #ALARM State is not changed here, if the formula changed something it will be managed by the AutoReset/Reminder/Recovered cycle
                     self.alarms[k].setup(k,device=d,formula=v['formula'],description=v['description'],receivers=v['receivers'],severity=v['severity'])
                 else: #Creating a new alarm
                     self.alarms[k] = Alarm(k,api=self,device=d,formula=v['formula'],description=v['description'],receivers=v['receivers'],severity=v['severity'])
                     
         tcheck = time.time()-tcheck
-        print 'AlarmAPI.load(%s): %d alarms loaded'%(filters,len(self.alarms))
+        self.log('AlarmAPI.load(%s): %d alarms loaded'%(filters,len(self.alarms)))
         AlarmAPI.CURRENT = self
         
-        print '%ss dedicated to,\n load devices %s\n load properties %s\nother checks %s'% (time.time()-t0,tdevs,tprops,tcheck)
+        self.info('%ss dedicated to,\n load devices %s\n load properties %s\nother checks %s'% (time.time()-t0,tdevs,tprops,tcheck))
         return
     
     CSV_COLUMNS = 'tag,device,description,severity,receivers,formula'.split(',')
@@ -697,16 +726,39 @@ class AlarmAPI(fandango.SingletonMap):
             self.load()
         return alarms
             
-    def export_to_csv(self,filename,regexp=None,alarms=None):
+    def export_to_csv(self,filename,regexp=None,alarms=None,config=False,states=False):
         """ Saves the alarms currently loaded to a .csv file """
         csv = fandango.CSVArray(header=0,comment='#',offset=1)
         alarms = self.filter_alarms(regexp,alarms=alarms)
+        columns = self.CSV_COLUMNS + (['ACTIVE'] if states else [])
         csv.resize(1+len(alarms),len(self.CSV_COLUMNS))
         csv.setRow(0,map(str.upper,self.CSV_COLUMNS))
         for i,(d,alarm) in enumerate(sorted((a.device,a) for a in alarms)):
-            csv.setRow(i+1,[getattr(alarm,k) for k in self.CSV_COLUMNS])
+            row = [getattr(alarm,k) for k in self.CSV_COLUMNS]
+            if states: row += alarm.get_active()
+            csv.setRow(i+1,row)
         csv.save(filename)
         return 
+      
+    def export_to_dict(self,regexp=None,alarms=None,config=True,states=False):
+        """
+        If config is True, the returned dictionary contains a double key:
+         - data['alarms'][TAG] = {alarm config}
+         - data['devices'] = {PyAlarm properties}
+        """
+        alarms = self.filter_alarms(regexp,alarms=alarms)
+        data = dict((a.tag,a.to_dict()) for a in alarms)
+
+        if states:
+          for a,s in data.items():
+            s['active'] = self[a].get_active()
+            s['date'] = fun.time2str(s['active'])
+            
+        if config:
+          data = {'alarms':data}
+          data['devices'] = dict((d,t.get_config()) for d,t in self.devices.items())
+          
+        return data
         
     def load_configurations(self,filename,regexp=None):
         """
@@ -947,7 +999,7 @@ class AlarmAPI(fandango.SingletonMap):
         """
         Children are those alarms that have no alarms below or have a higher alarm that depends from them.
         """ 
-        print 'Getting Alarm children ...'
+        self.log('Getting Alarm children ...')
         result=[]
         for a,v in self.items():
             children = self.parse_alarms(v.formula)
@@ -980,7 +1032,7 @@ class AlarmAPI(fandango.SingletonMap):
         TOP are those alarms which state is evaluated using other Alarms values.
         BOTTOM are those alarms that have no alarms below or have a TOP alarm that depends from them.
         """ 
-        print 'AlarmAPI.filter_hierarchy(%s)'%rel
+        self.log('AlarmAPI.filter_hierarchy(%s)'%rel)
         alarms = alarms or self.alarms.values()
         if rel=='TOP':
             result = [v for v in alarms if self.parse_alarms(v.formula)]
@@ -990,7 +1042,7 @@ class AlarmAPI(fandango.SingletonMap):
         return result
 
     def filter_severity(self, sev, alarms = None):
-        print 'AlarmAPI.filter_severity(%s)'%sev
+        self.log('AlarmAPI.filter_severity(%s)'%sev)
         alarms = alarms or self.alarms
         result=[]
         for alarm in alarms:
@@ -1048,8 +1100,9 @@ class AlarmAPI(fandango.SingletonMap):
 
     def get_admins_for_alarm(self,alarm=''):
         users = filter(bool,self.get_class_property('PyAlarm','PanicAdminUsers'))
-        if alarm: 
-            users = users+[r.strip().split('@')[0] for r in self.parse_phonebook(self[alarm].receivers).split(',') if '@' in r]
+        if users:
+          if alarm: 
+             users = users+[r.strip().split('@')[0] for r in self.parse_phonebook(self[alarm].receivers).split(',') if '@' in r]
         return users
 
     def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True, config=None,overwrite=False):
@@ -1082,8 +1135,8 @@ class AlarmAPI(fandango.SingletonMap):
         This method is not operative yet, in the future will be used to 
         do customized setups for each alarm.
         """
-        print 'In panic.set_alarm_configuration(%s,%s)'%(device,tag)
-        print '\tNotImplemented!'
+        self.info('In panic.set_alarm_configuration(%s,%s)'%(device,tag))
+        self.error('\tNotImplemented!')
         return 
         props=self.devices[device].get_config(True)
         dictlist=[]
@@ -1135,7 +1188,7 @@ class AlarmAPI(fandango.SingletonMap):
     def update_servers(self,targets):
         """ Forces PyAlarm devices to reload selected alarms """
         devs = set((self[t].device if t in self.alarms else t) for t in targets)
-        print 're-Initializing devices: %s'%devs
+        self.warning('re-Initializing devices: %s'%devs)
         [self.devices[d].init() for d in devs]
 
     def start_servers(self,tag='',device='',host=''):
@@ -1161,4 +1214,7 @@ api = AlarmAPI
 
 def current():
     return AlarmAPI.CURRENT or AlarmAPI()
+  
+def main():
+    import sys,fandango as Fn
 
