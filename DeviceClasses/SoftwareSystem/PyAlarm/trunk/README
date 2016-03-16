@@ -1,10 +1,17 @@
 # PANIC, Tango Alarm System
+# http://www.tango-controls.org/community/projects/panic
 # https://svn.code.sf.net/p/tango-ds/code/DeviceClasses/SoftwareSystem/PyAlarm/tags/latest
 
-http://www.tango-controls.org/community/projects/panic
+
 
 Panic package contains the python AlarmAPI for managing the PyAlarm device servers from a client 
 application or a python shell. The panic module is used by PyAlarm, Panic Toolbar and Panic GUI.
+
+The optional panic submodules are:
+
+ panic.ds : PyAlarm device server
+ panic.extra : PyAlarm/panic plugins (e.g., install here your smslib.py module)
+ panic.gui :  Placeholder for the PanicGUI application
 
 
 # PyAlarm Device Server
@@ -33,7 +40,7 @@ device settings manipulation.
 # TAGS 
 
 trunk will contain current development
-tags/latest will contain sources for building packages
+tags/latest will contain sources for building nightly packages
 tags/release_* will contain stable releases
 
 ----

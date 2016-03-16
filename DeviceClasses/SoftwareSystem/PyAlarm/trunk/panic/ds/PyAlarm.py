@@ -56,8 +56,8 @@ except:
     #PyTango.PyUtil = PyTango.Util
 
 try: __RELEASE__ = open(os.path.dirname(os.path.abspath(__file__))+'/VERSION').read().strip()
-except Exception,e: __RELEASE__ = str(e)
-print '> ',__RELEASE__
+except Exception,e: __RELEASE__ = '?.?'
+print '> PyAlarm %s'%__RELEASE__
 
 ###############################################################################
 # Checking Dependencies
@@ -68,17 +68,22 @@ except:
     print 'Unable to load panic module: %s'%traceback.format_exc()
 
 try:
-    import smslib
+    try: import panic.extra.smslib as smslib
+    except:
+      try: import albasmslib as smslib
+      except:
+        import smslib
     SMS_ALLOWED=True
+    print('Using smslib from %s'%smslib.__file__)
 except Exception,e: 
-    print 'UNABLE TO LOAD SMSLIB ... SMS MESSAGING DISABLED: ',str(e)
+    print('UNABLE TO LOAD SMSLIB ... SMS MESSAGING DISABLED: ',str(e))
     SMS_ALLOWED=False
 
 try:
     from PyTangoArchiving import snap
     SNAP_ALLOWED=True
 except Exception,e:
-    print 'UNABLE TO LOAD SNAP ... SNAP ARCHIVING DISABLED: ',str(e)
+    print('UNABLE TO LOAD SNAP ... SNAP ARCHIVING DISABLED: ',str(e))
     SNAP_ALLOWED=False
 #The device is not ready yet for Snapshoting
 #SNAP_ALLOWED=False
