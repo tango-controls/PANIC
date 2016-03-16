@@ -19,7 +19,7 @@ so it could be loaded as a part of the module.
 
 
 # Panic GUI
-# https://svn.code.sf.net/p/tango-ds/code/Clients/python/Panic/latest
+# https://svn.code.sf.net/p/tango-ds/code/Clients/python/Panic/tags/latest
 
 Panic is an application for controlling and managing alarms.
 It allows the user to visualize existing alarms in a clear form and adding/editing/deleting alarms.
