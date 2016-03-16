@@ -55,7 +55,7 @@ except:
     #PyTango.PyDeviceClass = PyTango.DeviceClass
     #PyTango.PyUtil = PyTango.Util
 
-try: __RELEASE__ = open(os.path.dirname(os.path.abspath(__file__))+'/VERSION').read().strip()
+try: __RELEASE__ = open(os.path.dirname(os.path.abspath(__file__))+'../VERSION').read().strip()
 except Exception,e: __RELEASE__ = '?.?'
 print '> PyAlarm %s'%__RELEASE__
 
