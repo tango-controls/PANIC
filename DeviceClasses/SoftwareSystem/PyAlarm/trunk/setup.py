@@ -8,15 +8,25 @@ python setup.py install --root=/tmp/builds
 """
 
 from setuptools import setup, find_packages
-setup(
-    name="python-panic",
-    version=open('VERSION').read().strip(),
-    packages=find_packages(exclude=["tags", ]),
-    entry_points={
+
+
+install_requires = ['taurus',
+                    'fandango',
+                    'PyTango',]
+
+entry_points = {
         'console_scripts': [
             'PyAlarm = panic.ds.PyAlarm:main',
         ],
-    }
+}
+
+
+setup(
+    name="panic",
+    version=open('VERSION').read().strip(),
+    packages=find_packages(),
+    install_requires=install_requires,
+    entry_points=entry_points
 )
 
 
