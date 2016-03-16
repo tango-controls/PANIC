@@ -23,7 +23,7 @@ entry_points = {
 
 setup(
     name="panic",
-    version=open('VERSION').read().strip(),
+    version=open('panic/VERSION').read().strip(),
     packages=find_packages(),
     install_requires=install_requires,
     entry_points=entry_points
