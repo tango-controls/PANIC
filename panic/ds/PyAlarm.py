@@ -280,7 +280,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if tag_name not in self.Alarms: return []
         if receivers is None:
             raw_receivers = self.Alarms[tag_name].receivers.split('#')[0]
-            receivers = self.Alarms.parse_phonebook(receivers)
+            receivers = self.Alarms.parse_phonebook(raw_receivers)
             self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
         else: receivers = ','.join(receivers)
         receivers = [r for r in receivers.split(',') if not filtre or filtre in r]
