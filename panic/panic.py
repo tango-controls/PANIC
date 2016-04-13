@@ -842,7 +842,6 @@ class AlarmAPI(fandango.SingletonMap):
     def parse_phonebook(self,receivers):
         """
         Replaces phonebook entries in a receivers list
-        It does not seem to be the same method used in PyAlarm!?
         """
         result,receivers = [],[s.strip() for s in receivers.split(',')]
         for r in receivers:

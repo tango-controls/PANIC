@@ -926,7 +926,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.delete_device(True)
 
     def delete_device(self,allow=False):
-        self.warning( "0[Device delete_device method] for device",self.get_name())
+        self.warning( "0[Device delete_device method] for device %s"%self.get_name())
         if allow:
             self.set_state(PyTango.DevState.INIT)
             self.stop()
