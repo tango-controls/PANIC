@@ -1810,7 +1810,7 @@ class PyAlarmClass(PyTango.DeviceClass):
         'StartupDelay':
             [PyTango.DevLong,
             "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
-            [ 60 ] ],
+            [ 0 ] ],
         }
 
     #    Device Properties
