@@ -17,11 +17,13 @@ install_requires = ['taurus',
 
 package_data = {'': ['VERSION']}
 
-entry_points = {
-        'console_scripts': [
-            'PyAlarm = panic.ds.PyAlarm:main',
-        ],
-}
+scripts = ['./panic/ds/PyAlarm',]
+
+#entry_points = {
+        #'console_scripts': [
+            #'PyAlarm = panic.ds.PyAlarm:main',
+        #],
+#}
 
 
 setup(
@@ -30,7 +32,8 @@ setup(
     packages=find_packages(),
     package_data=package_data,
     install_requires=install_requires,
-    entry_points=entry_points
+    #entry_points=entry_points,
+    scripts=scripts,
 )
 
 
