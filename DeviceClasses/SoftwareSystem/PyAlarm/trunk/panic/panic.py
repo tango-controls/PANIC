@@ -915,6 +915,34 @@ class AlarmAPI(fandango.SingletonMap):
         #else:
             #exp = '(any([%s for x in FIND(%s)]))'%(cond,match)
         return exp
+      
+    def split_formula(self,formula,keep_operators=False):
+        f = self[formula].formula if formula in self else formula
+        i,count,buff,final = 0,0,'',[]
+        while i<len(f):
+          s = f[i]
+          if s in '([{': count+=1
+          if s in ')]}': count-=1
+          if not count and s in ' \t':
+            if f[i:i+4].strip().lower() == 'or':
+              nx = 'or'
+              i+=len(nx)+2
+            elif f[i:i+5].strip().lower() == 'and':
+              nx = 'and'     
+              i+=len(nx)+2
+            else:
+              nx = ''
+            if nx:
+              final.append(buff.strip())
+              if keep_operators:
+                final.append(nx)
+              buff = ''
+              continue
+          
+          buff+=s   
+          i+=1
+          nx=''
+        return final
 
     def parse_alarms(self, formula):
         """
@@ -963,6 +991,8 @@ class AlarmAPI(fandango.SingletonMap):
         #Returns the result of evaluation on formula
         #Both result and attribute values are kept!, be careful to not generate memory leaks
         try:
+            if formula.strip().lower() in ('and','or'):
+                return None
             if device and not fandango.check_device(device):
                 device = None
             if device and device in self.devices:
