@@ -1,0 +1,64 @@
+<h1>PANIC Application</h1>
+<h2>Description</h2>
+<p>
+Panic is an application for controlling and managing alarms.<br/>
+It allows the user to visualize existing alarms in a clear form and adding/editing/deleting alarms.<br/>
+In edit mode user can change name, move alarm to another device, change severity, description and modify formula.<br/>
+Additional widgets in which the app is equipped allows alarm history viewing, phonebook editing and device settings manipulation.
+</p>
+<p>Application can be downloaded from <a href="#">here</a></p>
+
+<h2>Program</h2>
+<img src="panicimg/panicwrapper.png"/>
+<p>1, 2, 3, 4. Buttons for starting additional <a href="panicdoc.html#widgets">widgets</a></p>
+<p>5. View selection drop-down list - three views [<a href="panicimg/panicwrapper.png" target="new">Alarms</a> view, <a href="panicimg/receivers_view.png" target="new">Receivers</a> view, 
+<a href="panicimg/devices_view.png" target="new">Devices</a> view]</p>
+<p>6. Refresh button (available too in a context menu over the alarm list)</p>
+<p>7. <a href="panicimg/new_alarm.png" target="new">New</a> alarm button</p>
+<p>8. Delete alarm button (available too in a context menu over the alarm list)</p>
+<p>9. Details button (if active the web page with the details of alarm will be displayed)</p>
+<p>10. Reset alarm button - after clicking <a href="panicimg/reset_dialog.png" target="new">Reset</a> dialog appeares (available too in a context menu over the alarm list)</p>
+<p>11. Acknowledge alarm button (available too in a context menu over the alarm list)</p>
+<p>12. Add receiver button (active while editing an alarm - <a href="panicimg/add_receiver.png" target="new">receiver widget</a> will appear with the list of receivers)</p>
+<p>13. <a href="panicimg/edit_alarm.png" target="new">Edit</a> alarm button (available too in a context menu over the alarm list or when double-clicking on the alarm)</p>
+<p>14. Preview actual values button (starts a <a href="panicdoc.html#preview">preview widget</a> with actual values of attributes present in alarm formula)</p>
+<p>15. Save alarm button (active while editing an alarm)</p>
+<p>16. Cancel button (active while editing an alarm)</p>
+<p>17. Close application button</p>
+
+<h2 id="widgets">Widgets</h2>
+<ul>
+<li>
+<p>Phonebook widget</p>
+<p>1. Add a person button</p>
+<p>2. Remove a selected person button</p>
+<p>3. Refresh list button</p>
+<p>Double click on the contact enables to edit its information</p>
+</li>
+<li>
+<p>Device attribute changer</p>
+<img src="panicimg/devattrchange.png"/><br/><br/>
+<p>1. Device drop-down list</p>
+<p>2. Refresh list button</p>
+<p>Double click on the attribute value field enables to change it</p>
+</li>
+<li>
+<p>Alarm attribute changer</p>
+<img src="panicimg/alarmattrchange.png"/><br/><br/>
+<p>1. Alarm drop-down list</p>
+<p>2. Refresh list button</p>
+<p>Double click on the attribute value field enables to change it</p>
+</li>
+<li>
+<p>History viewer</p>
+<img src="panicimg/history.png"/><br/><br/>
+<p>1. Alarm drop-down list</p>
+<p>2. Open selected snapshot - starts the <a href="snapdoc.html">Snap</a> application with current snapshot selected (available too in a context menu over the snapshots list)</p>
+<p>3. Refresh list button</p>
+<p>Double click on a snapshot starts the preview widget (available too in a context menu over the alarm list)</p>
+</li>
+<li>
+<p id="preview">Preview widget</p>
+<img src="panicimg/preview.png"/>
+</li>
+</ul>
