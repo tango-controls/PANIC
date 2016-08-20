@@ -575,12 +575,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         self.info('checking %s actions ... %s'%(message,action_receivers))
                         for ac in action_receivers:
                             try:
-                                self.trigger_action(alarm_obj,ac)
+                                self.trigger_action(alarm_obj,ac,message)
                             except:
                                 self.warning( 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc())
                         
                     try:
-                        self.SendMail(self.GenerateReport(tag_name,self.parse_receivers(tag_name,'@',receivers),message=message or 'RESET',user_comment=comment))
+                        mail_receivers = self.parse_receivers(tag_name,'@',receivers)
+                        if mail_receivers:
+                            self.SendMail(self.GenerateReport(tag_name,mail_receivers,message=message or 'RESET',user_comment=comment))
                     except Exception,e:
                         self.warning( 'PyAlarm.SendMail crashed with exception:\n%s' % traceback.format_exc())
                       
@@ -647,7 +649,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                             self.info('checking %s actions ... %s'%(message,action_receivers))
                             for ac in action_receivers:
                                 try:
-                                    self.trigger_action(self.Alarms[tag_name],ac)
+                                    self.trigger_action(self.Alarms[tag_name],ac,message)
                                 except:
                                     self.warning( 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc())                      
                         if mail_receivers: 
@@ -721,7 +723,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         finally:
             self.lock.release()
 
-    def trigger_action(self, alarm, args):
+    def trigger_action(self, alarm, args, message=''):
         """  
         Executing a command on alarm/disable/reset/acknowledge: 
             ACTION(alarm:command,mach/alarm/beep/play_sequence,$DESCRIPTION)
@@ -729,6 +731,16 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         The syntax allow both attribute/command execution and the usage of multiple typed arguments: 
             ACTION(alarm:command,mach/dummy/motor/move,int(1),int(10))
             ACTION(reset:attribute,mach/dummy/motor/position,int(0))
+            
+        Accepted keywords are:
+        
+            $ALARM : Alarm name
+            $DESCRIPTION : Description text
+            $VALUES : last values stored for that alarm
+            $REPORT : full report sent when the alarm was raised
+            $DATETIME : current time as YYYYMMDD_hhmm
+            $MESSAGE : type of alarm event (RESET,ALARM,REMINDER,...)
+            
         """
         if fun.isString(alarm): alarm = self.Alarms[alarm]
         action = args if fun.isSequence(args) else re.split('[,:;]',args)
@@ -736,23 +748,52 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if action[0] in ('command','attribute'):
             try:
                 dev = action[1].rsplit('/',1)[0]
+                
+                dp = PyTango.DeviceProxy(dev)
+                if not fandango.tango.check_device(dev):
+                  exc = '%s receiver is not running!'%dev
+                  self.error(exc)
+                  raise Exception(exc)
+                
                 cmd = [action[1].rsplit('/',1)[1]]+action[2:]
-                cmd = [c.replace('$ALARM',alarm.tag
-                    ).replace('$DESCRIPTION',alarm.description
-                    ).replace('$alarm',alarm.tag
-                    ).replace('$description',alarm.description
-                    ) for c in cmd]
-                try: #This eval will allow to pass numeric/float arguments
-                    arg = eval(cmd[1]) if len(cmd)==2 else [eval(c) for c in cmd[1:]]
+                keywords = {
+                    '\$ALARM':alarm.tag,
+                    '\$DESCRIPTION':alarm.description,
+                    '\$MESSAGE':message,
+                    '\$DATETIME':fun.time2str(cad='%Y%m%d_%H%M%S')
+                    }
+                print keywords
+                for k,v in keywords.items():
+                  print cmd,k,v
+                  cmd = [fun.clsub(k,v,c,lower=0) for c in cmd]
+                print cmd
+                
+                if fun.clsearch('\$values',str(cmd)):
+                    values = str(self.PastValues.get(alarm.tag))
+                    cmd = [fun.clsub('\$values',values,c,lower=0) for c in cmd]
+
+                if fun.clsearch('\$report',str(cmd)):
+                    report = '\n'.join(self.GenerateReport(alarm.tag,message=message))
+                    cmd = [fun.clsub('\$report',report,c,lower=0) for c in cmd]
+
+                try: #This eval will try to pass numeric/float arguments
+                    arg = [eval(c) for c in cmd[1:]]
                 except: 
-                    arg = cmd[1] if len(cmd)==2 else cmd[1:]
+                    arg = [s.strip("' ") for s in cmd[1:]]
+
+                if arg and len(arg)==1:
+                  if action[0] == 'command':
+                    t = str(dp.command_query(cmd[0]).in_type)
+                  else:
+                    t = str(dp.attribute_query(cmd[0]).data_format)
+                  if not fun.clsearch('array|spectrum|image',t):
+                    arg = arg[0]
                     
                 if action[0] == 'command':
                     self.info('\tlaunching: %s / %s (%s)' % (dev,cmd[0],cmd[1:]))
                     cargs = [cmd[0],arg] if arg else [cmd[0]]
-                    val = PyTango.DeviceProxy(dev).command_inout(*cargs)
+                    val = dp.command_inout(*cargs)
                     self.info('\t'+str(val))
-                    
                 else:
                     self.info('\tlaunching: %s / %s = %s' % (dev,cmd[0],cmd[1:]))
                     val = PyTango.DeviceProxy(dev).write_attribute(cmd[0],arg)
