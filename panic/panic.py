@@ -842,11 +842,20 @@ class AlarmAPI(fandango.SingletonMap):
     def parse_phonebook(self,receivers):
         """
         Replaces phonebook entries in a receivers list
+        
+        The behavior of phonebook parsing is dependent on using '%' to mark phonebook entries.
+        
         """
         result,receivers = [],[s.strip() for s in receivers.split(',')]
         for r in receivers:
-            if r in self.phonebook: result.append(self.phonebook[r])
-            else: result.append(r)
+          if r in self.phonebook: 
+            r = self.phonebook[r]
+          elif '%' in r:
+            for p in self.phonebook:
+              #re.split used to discard partial matches
+              if p in re.split('[,:;/\)\(]',p):
+                r = r.replace(p,self.phonebook[p])
+          result.append(r)
         return ','.join(result)
 
     def remove_phonebook(self, tag):
