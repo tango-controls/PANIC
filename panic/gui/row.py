@@ -181,7 +181,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 
                 if  value!=bool(self.alarm.active) or quality!=self.quality or disabled!=self.alarmDisabled or acknowledged!=self.alarmAcknowledged:
                     if not self.changed: 
-                        print '%s : %s.emitValueChanged(%s)'%(fandango.time2str(),self.alarm.tag,value)
+                        #print '%s : %s.emitValueChanged(%s)'%(fandango.time2str(),self.alarm.tag,value)
                         self.qtparent.emitValueChanged()
                     self.changed = True #This flag is set here, and set to False after updating row style
                 

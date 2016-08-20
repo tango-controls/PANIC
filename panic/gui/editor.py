@@ -12,8 +12,6 @@ from fandango.excepts import Catched
 
 try:
     from alarmhistory import *
-    from PyTangoArchiving import snap
-    SNAP_ALLOWED=True
 except Exception,e:
     #print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',str(e)
     SNAP_ALLOWED=False

@@ -20,8 +20,6 @@ OPEN_WINDOWS = []
 
 try:
     from alarmhistory import *
-    from PyTangoArchiving import snap
-    SNAP_ALLOWED=True
 except Exception,e:
     #print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',str(e)
     SNAP_ALLOWED=False
@@ -446,7 +444,7 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
 
     def findListSource(self, dev=None):
         combo1, combo2 = str(self._ui.contextComboBox.currentText()), str(self._ui.comboBoxx.currentText())
-        print "findListSource(%s,%s), filtering ..."%(combo1,combo2)
+        #print "findListSource(%s,%s), filtering ..."%(combo1,combo2)
         self.timeSortingEnabled=None
         self.source = combo1
         alarms = self.getAlarms()

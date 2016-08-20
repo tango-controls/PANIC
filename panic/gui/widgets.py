@@ -17,7 +17,6 @@ def get_user():
 
 try:
     from alarmhistory import *
-    SNAP_ALLOWED=True
 except Exception,e:
     print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',traceback.format_exc()
     SNAP_ALLOWED=False
@@ -415,7 +414,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
         print '\n'.join(map(str,zip('obj device formula test'.split(),(self.obj,self.device,formula,self.test.formula))))
         if formula:
             try:
-                result = '%s: %s'%(self.device,self.api.evaluate(formula if self.device else self.test.formula,device=self.device,_locals=self._locals))
+                result = '%s: %s'%(self.device,self.api.evaluate(formula if self.device else self.test.formula,device=self.device,timeout=10000,_locals=self._locals))
             except Exception,e: 
                 result = '%s: %s: %s' % (self.device,type(e).__name__,e)
                 print result

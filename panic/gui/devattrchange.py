@@ -1,4 +1,3 @@
-print 'loading devattrchange ...'
 from PyQt4 import Qt, QtCore, QtGui
 from taurus.qt.qtgui.resource import getThemeIcon
 import panic, fandango
@@ -114,8 +113,6 @@ class devattrchangeForm(iLDAPValidatedWidget,object):
             Qt.QMessageBox.warning(self.Form,"Warning",'Exception: %s'%e)
         finally:
             self.buildList()
-        
-print '__main__ ...'
 
 if __name__ == "__main__":
     import sys

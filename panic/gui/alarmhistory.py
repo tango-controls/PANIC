@@ -7,9 +7,13 @@ from operator import itemgetter
 try:
   from PyTangoArchiving import snap
   from PyTangoArchiving.widget.snaps import *
+  db = fandango.get_database()
+  assert list(db.get_device_exported_for_class('SnapManager'))
+  SNAP_ALLOWED = True
 except:
-  print 'PyTangoArchiving.snap not available'
+  print 'PyTangoArchiving.Snaps not available!'
   snap = None
+  SNAP_ALLOWED = False
 
 class ahWidget(QtGui.QWidget):
     def __init__(self,parent=None,container=None):
