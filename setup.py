@@ -19,11 +19,11 @@ package_data = {'': ['VERSION']}
 
 scripts = ['./panic/ds/PyAlarm',]
 
-#entry_points = {
-        #'console_scripts': [
-            #'PyAlarm = panic.ds.PyAlarm:main',
-        #],
-#}
+entry_points = {
+        'console_scripts': [
+            'panic-gui=panic.gui.gui:main_gui',
+        ],
+}
 
 
 setup(
@@ -32,7 +32,7 @@ setup(
     packages=find_packages(),
     package_data=package_data,
     install_requires=install_requires,
-    #entry_points=entry_points,
+    entry_points=entry_points,
     scripts=scripts,
 )
 
