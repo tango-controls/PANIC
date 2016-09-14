@@ -1,5 +1,5 @@
 
-Fandango is Free Software by the CELLS / ALBA Synchrotron, Barcelona, Spain
+Panic is Free Software by the CELLS / ALBA Synchrotron, Barcelona, Spain
 
 SECTION 0: WARRANTY
 ===================
@@ -19,7 +19,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 SECTION 1: GENERAL LICENSE FOR FANDANGO SOURCE CODE
 =================================================
 
-The files in Fandango, except for the cases described in SECTION 2
+The files in Panic, except for the cases described in SECTION 2
 are distributed under the GNU Lesser General Public License as published by
 the Free Software Foundation, either version 3 of the License, or 
 (at your option) any later version.
