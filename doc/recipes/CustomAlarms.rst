@@ -53,6 +53,7 @@ Then, configure the device properties to react every second for both activation 
 .. code-block:: python
 
  dtest = alarms.devices['test/pyalarm/clock']
+ dtest.get_config()
  dtest.config['Enabled'] = 1
  dtest.config['AutoReset'] = 1
  dtest.config['AlarmThreshold'] = 1
