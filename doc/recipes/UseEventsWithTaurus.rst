@@ -49,7 +49,7 @@ Taurus will take care of subscribing to events and update cached values.
 
 .. code-block:: python
 
-dtest = alarms.devices['test/pyalarm/events']
+ dtest = alarms.devices['test/pyalarm/events']
  dtest.config['UseTaurus'] = True
  dtest.config['AutoReset'] = 0.05
  dtest.config['Enabled'] = 10
@@ -57,7 +57,7 @@ dtest = alarms.devices['test/pyalarm/events']
  dtest.config['PollingPeriod'] = 0.05
  alarms.put_db_properties(dtest.name,dtest.config)
  
- This is the result you can expect when showing both alarm attributes (test/pyalarm/clock/clock and test/pyalarm/events/events) in a taurustrend:
+This is the result you can expect when showing both alarm attributes (test/pyalarm/clock/clock and test/pyalarm/events/events) in a taurustrend:
  
  .. image:: clock-events.png
    :height: 100px
