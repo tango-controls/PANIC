@@ -249,7 +249,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         self.info(str(_locals))
                 else: 
                     self.Eval.update_locals(_locals)
-                    if check:
+                    if check and self.Alarms.keys():
                         if self.get_name()+'/'+self.Alarms.keys()[0] not in self.Eval.attributes:
                           self.Eval.attributes.update(dict((str(n).lower(),fandango.tango.CachedAttributeProxy(n,fake=True))
                             for n in (self.get_name()+'/'+k for k in self.Alarms) ))
