@@ -216,20 +216,28 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.DynamicAttributes.append(new_attr_name)
         return new_attr_name
         
-    def update_locals(self,_locals=None,check=True,update=False):
+    def update_locals(self,_locals=None,check=True,update=True):
+        """
+        This method is used to override _locals variables passed to TangoEval object.
+        
+        If check is True, It will also check which alarms are enabled and update their values accordingly.
+        
+        If update is False it will perform a dry run; without updating the cached values.
+         
+        """
         if _locals is None: _locals = {}
         try:
             _locals.update(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
             _locals.update({'DEVICE':self.get_name(),'ALARMS':self.Alarms.keys(),'PANIC':self.Panic,'SELF':self})
-            _locals.update({'t':time.time() - (self.TStarted+self.StartupDelay)})
+            _locals['t'] = time.time() - (self.TStarted + self.StartupDelay)
             if not check: update = True #If check is True locals will be updated only if necessary or forced
             if check:
                 for k,v in self.Alarms.items():
                     val = v.active if not self.CheckDisabled(k) else False
                     if _locals.get(k,None)!=val: update = True
                     _locals[k] = val
+            self.debug('In PyAlarm.update_locals(%s)'%update)
             if update:
-                self.debug('In PyAlarm.update_locals(...)')
                 if self.worker:
                     try:
                         self.worker.send('update_locals',
@@ -241,10 +249,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         self.info(str(_locals))
                 else: 
                     self.Eval.update_locals(_locals)
-                    if self.get_name()+'/'+self.Alarms.keys()[0] not in self.Eval.attributes:
-                        self.Eval.attributes.update(dict((str(n).lower(),fandango.tango.CachedAttributeProxy(n,fake=True))
+                    if check:
+                        if self.get_name()+'/'+self.Alarms.keys()[0] not in self.Eval.attributes:
+                          self.Eval.attributes.update(dict((str(n).lower(),fandango.tango.CachedAttributeProxy(n,fake=True))
                             for n in (self.get_name()+'/'+k for k in self.Alarms) ))
-                    [self.Eval.attributes[self.get_name()+'/'+k].set_cache(_locals[k]) for k in self.Alarms]
+                        [self.Eval.attributes[self.get_name()+'/'+k].set_cache(_locals[k]) for k in self.Alarms]
+
         except:
             self.warning(traceback.format_exc())
         return _locals
@@ -389,7 +399,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if not self.worker.isAlive(): self.worker.start()
             self.event.wait(self.PollingPeriod)
         #Initializing alarm values used in formulas
-        _locals = self.update_locals()
+        _locals = self.update_locals(check=True)
             
         while not self.event.isSet():
             try:
@@ -410,11 +420,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 try:
                     self.lock.acquire()
                     timewait = float(self.PollingPeriod)/(len(self.Alarms) or 1.)
-                    self.info( 'updateAlarms(): timewait between polling is %f s'%timewait)
+                    self.debug( 'updateAlarms(): timewait between polling is %f s'%timewait)
                     myAlarms = sorted(a for a in self.Alarms.items() if not self.CheckDisabled(a[0])) #copied without disabled alarms
                 finally: 
                     self.lock.release()
-                self.info('\n\n'+
+                self.info('\n'+
                     'Enabled alarms to process in next %d s cycle (UseProcess=%s): %s ' % (self.PollingPeriod,self.UseProcess,[a[0] for a in myAlarms])
                     +'\n'+'#'*80)
                 if not self.get_enabled(force=True): self.info( 'ALARM SENDING IS DISABLED!!')
@@ -447,6 +457,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.debug('\n\n'+'%s: Reading alarm tag %s; formula: %s'%(now,tag_name,alarm.formula)+'\n'+'-'*80)
                     variables = {}
                     VALUE = self.EvaluateFormula(alarm.formula,tag_name=tag_name,as_string=False,lock=True,_locals=_locals,variables=variables)
+                    self.info('\t%s = %s' % (tag_name,VALUE))
                         
                     #Wait moved out of try/except to avoid locked waits.
                     if VALUE is None and tag_name in self.FailedAlarms:
@@ -461,7 +472,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         if WAS_OK:
                             #Alarm counters are not increased above Threshold
                             alarm.counter+=1
-                        self.info('Alarm %s triggered for %d/%d cycles'%(tag_name,alarm.counter,self.AlarmThreshold))
+                        
+                        (self.info if WAS_OK else self.debug)(
+                          'Alarm %s triggered for %d/%d cycles'%(tag_name,alarm.counter,self.AlarmThreshold))
 
                         if alarm.counter>=self.AlarmThreshold:
                             # Sending ALARM
@@ -1040,7 +1053,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         use_tau=False
                         )
                     [self.Eval.add_macro(*m) for m in self.Panic.macros]
-                    self.update_locals()
+                    self.update_locals(check=True,update=True)
                     self.Eval.set_timeout(self.EvalTimeout)
                 if hasattr(self.Eval,'clear'): self.Eval.clear()
                 
@@ -2136,17 +2149,21 @@ def main(args=None):
     try:
         py = PyTango.Util(args)
         py.add_TgClass(PyAlarmClass,PyAlarm,'PyAlarm')
-        import sys
-        from fandango.device import DDebug
-        DDebug.addToServer(py,'PyAlarm',args[1])
+        try:
+          import sys
+          from fandango.device import DDebug          
+          DDebug.addToServer(py,'PyAlarm',args[1])
+        except Exception,e:
+          print('Unable to add DDebug class to PyAlarm: ',e)
+
         U = PyTango.Util.instance()
         U.server_init()
         U.server_run()
 
     except PyTango.DevFailed,e:
-        print '-------> Received a DevFailed exception:',e
+        print '-------> Received a DevFailed exception:',traceback.format_exc()
     except Exception,e:
-        print '-------> An unforeseen exception occured....',e    
+        print '-------> An unforeseen exception occured....',traceback.format_exc()
   
 if __name__ == '__main__':
     main(sys.argv)
