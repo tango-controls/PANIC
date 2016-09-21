@@ -24,7 +24,7 @@ Special keys used in Alarm formulas
 Clock: Alarm triggered by time
 ------------------------------
 
-This alarm will be enabled disabled every 5 seconds (if AutoReset=1)
+This alarm will be enabled/disabled every 5 seconds.
 
 First, create a new PyAlarm device:
 
