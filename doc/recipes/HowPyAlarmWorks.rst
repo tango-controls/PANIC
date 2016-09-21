@@ -6,10 +6,12 @@ A full explanation of alarm syntax and each property is available in the PyAlarm
 but here I provide a summary for convenience.
 
 The device server behaviour relies on three python objects: AlarmAPI, updateAlarms thread and TangoEval.
+
 Each alarm is independent in terms of formula and receivers; but all alarms within the same PyAlarm device
 will share a common evaluation environment determined by PyAlarm properties.
 
-.. toctree::
+.. contents::
+  
 
 The AlarmAPI
 ------------
