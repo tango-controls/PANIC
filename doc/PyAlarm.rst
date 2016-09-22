@@ -77,7 +77,8 @@ It's a bit hackish
 
 .. code-block:: python
 
-  PERIODIC:(FrontEnds/VC/Elotech-01/Temperature and FrontEnds/VC/VGCT-01/P1 and (1920<(now%3600)<3200)) or (ResetAlarm('PERIODIC') and False)
+  PERIODIC:(FrontEnds/VC/Elotech-01/Temperature and FrontEnds/VC/VGCT-01/P1 \ 
+    and (1920<(now%3600)<3200)) or (ResetAlarm('PERIODIC') and False)
 
 Enabling search, expression matching and list comprehensions
 ------------------------------------------------------------
