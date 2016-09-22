@@ -15,10 +15,8 @@ Its focused on notifying Alarms by log files, Mail, SMS and (some day in the fut
 
 You can acknowledge these alarms by a proper command.
 
-.. contents::
-
 Internal Structure
-------------------
+==================
 
 The device server behaviour relies on three python objects: AlarmAPI, updateAlarms thread and TangoEval.
 
