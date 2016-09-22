@@ -2,7 +2,7 @@
 # http://www.tango-controls.org/community/projects/panic
 # https://svn.code.sf.net/p/tango-ds/code/DeviceClasses/SoftwareSystem/PyAlarm/tags/latest
 
-PANIC IS SUPPORTED ON LINUX ONLY, WINDOWS IS NO LONGER SUPPORTED (At least for the current and next release)
+PANIC IS SUPPORTED ON LINUX ONLY, WINDOWS IS NOT SUPPORTED (At least for the current and next release)
 
 Panic package contains the python AlarmAPI for managing the PyAlarm device servers from a client 
 application or a python shell. The panic module is used by PyAlarm, Panic Toolbar and Panic GUI.
