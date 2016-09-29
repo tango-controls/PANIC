@@ -19,12 +19,12 @@ package_data = {'': ['VERSION']}
 
 scripts = [
   './bin/PyAlarm',
-  './bin/panic',
+  './bin/panic-gui',
   ]
 
 entry_points = {
         'console_scripts': [
-            'panic-gui=panic.gui.gui:main_gui',
+            #'panic-gui=panic.gui.gui:main_gui',
         ],
 }
 
