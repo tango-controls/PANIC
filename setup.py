@@ -19,7 +19,7 @@ package_data = {'': ['VERSION']}
 
 scripts = [
   './bin/PyAlarm',
-  './bin/panic',
+  './bin/panic-gui',
   ]
 
 entry_points = {
