@@ -3,11 +3,15 @@ import time,traceback
 from PyQt4 import Qt, QtCore, QtGui
 import taurus,fandango,fandango.qt
 from taurus.qt.qtgui.base import TaurusBaseWidget
+from taurus.qt.qtgui.container import TaurusWidget
 from taurus.qt.qtgui import resource
+from taurus.core.util  import Logger
 
 import panic
 from panic.widgets import AlarmValueLabel
 import getpass
+
+dummies = []
 
 def get_user():
     try:
@@ -28,11 +32,19 @@ def print_clean(s):
     print(clean_str(s))
 
 TRACE_LEVEL = -1
-def trace(msg,head='',level=0,clean=False):
+def trace(msg,head='',level=0,clean=False,use_taurus=False):
     if level > TRACE_LEVEL: return
     if type(head)==int: head,level = '',head
-    (print_clean if clean else fandango.printf)(
-        fandango.time2str()+':'+str(head)+('\t'*level or ' ')+str(msg))
+    msg = fandango.time2str()+':'+str(head)+('\t'*level or ' ')+str(msg)
+    if use_taurus:
+        if not dummies: 
+            dummies.append(Logger())
+            dummies[0].setLogLevel('INFO')
+        print dummies[0]
+        dummies[0].info(msg)
+        dummies[0].error(msg)
+    else:
+        (print_clean if clean else fandango.printf)(msg)
     return
 
 def get_bold_font(points=8):

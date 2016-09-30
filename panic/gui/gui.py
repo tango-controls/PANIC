@@ -119,6 +119,7 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
         self.setSecondCombo()
         self._ui.infoLabel0_1.setText(self._ui.contextComboBox.currentText())
         self.updateStatusLabel()
+        print('__init__ done')
         
         #if not SNAP_ALLOWED:
             #Qt.QMessageBox.critical(self,"Unable to load SNAP",'History Viewer Disabled!', QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
@@ -233,6 +234,7 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
         self.updateStatusLabel()
 
     def connectAll(self):
+        trace('connecting')
         #QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
         if self.USE_EVENT_REFRESH: QtCore.QObject.connect(self,QtCore.SIGNAL("valueChanged"),self.hurry)
         #Qt.QObject.connect(self._ui.actionExpert,Qt.SIGNAL("changed()"),self.setExpertView)
@@ -261,6 +263,7 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
         
         #QtCore.QObject.connect(self._ui.listWidget, QtCore.SIGNAL("currentRowChanged(int)"), self.setAlarmData)
         QtCore.QObject.connect(self._ui.buttonClose,QtCore.SIGNAL("clicked()"), self.close)
+        trace('all connected')
 
     def printRows(self):
         for row in self._ui.listWidget.selectedItems():
@@ -304,26 +307,35 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
     @Catched
     def onReload(self):
         # THIS METHOD WILL NOT MODIFY THE LIST IF JUST FILTERS HAS CHANGED; TO UPDATE FILTERS USE onRefresh INSTEAD
-        trace('onReload(%s)'%self.RELOAD_TIME)
-        print '+'*80
-        now = time.time()
-        trace('%s -> AlarmGUI.onReload() after %f seconds'%(now,now-self.last_reload))
-        self.last_reload=now
-        self.api.load()
-        AlarmRow.TAG_SIZE = 1+max(len(k) for k in self.api.keys())
-        #Removing deleted/renamed alarms
-        for tag in self.AlarmRows.keys():
-            if tag not in self.api:
-                self.removeAlarmRow(tag)
-        #Updating the alarm list
-        self.buildList(changed=False)
-        if self.changed: self.showList()
-        #Triggering refresh timers
-        self.reloadTimer.setInterval(self.RELOAD_TIME)
-        self.refreshTimer.setInterval(self.REFRESH_TIME)
-        if not self._connected:
-            self._connected = True
-            self.connectAll()
+        try:
+            trace('onReload(%s)'%self.RELOAD_TIME)
+            print '+'*80
+            now = time.time()
+            trace('%s -> AlarmGUI.onReload() after %f seconds'%(now,now-self.last_reload))
+            self.last_reload=now
+            self.api.load()
+            
+            if self.api.keys():
+                AlarmRow.TAG_SIZE = 1+max(len(k) for k in self.api.keys())
+                
+            #Removing deleted/renamed alarms
+            for tag in self.AlarmRows.keys():
+                if tag not in self.api:
+                    self.removeAlarmRow(tag)
+                    
+            #Updating the alarm list
+            self.buildList(changed=False)
+            if self.changed: self.showList()
+            
+            #Triggering refresh timers
+            self.reloadTimer.setInterval(self.RELOAD_TIME)
+            self.refreshTimer.setInterval(self.REFRESH_TIME)
+
+            if not self._connected:
+                self._connected = True
+                self.connectAll()
+        except:
+            trace(traceback.format_exc())
     
     @Catched
     def onRefresh(self):
@@ -701,14 +713,21 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
         return self.onEdit(edit=False)
         
     def onNew(self):
-        trace('onNew()')
-        if self._ui.listWidget.currentItem():
-            self._ui.listWidget.currentItem().setSelected(False)
-        form = AlarmForm(self.parent())
-        form.connect(form,Qt.SIGNAL('valueChanged'),self.hurry)
-        form.onNew()
-        form.show()
-        return form
+        try:
+            trace('onNew()')
+            if not self.api.devices:
+                v = Qt.QMessageBox.warning(self,'Warning','You should create a PyAlarm device first (using jive or config panel)!',Qt.QMessageBox.Ok)
+                return
+            if self._ui.listWidget.currentItem():
+                self._ui.listWidget.currentItem().setSelected(False)
+            form = AlarmForm(self.parent())
+            trace('form')
+            form.connect(form,Qt.SIGNAL('valueChanged'),self.hurry)
+            form.onNew()
+            form.show()
+            return form
+        except:
+            traceback.print_exc()
         
     def onConfig(self):
         self.dac = dacWidget(device=self.getCurrentAlarm().device)
@@ -915,15 +934,19 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
 def main(args=[]):
     import widgets
     from taurus.qt.qtgui import resource
-#    print os.getenv('TANGO_HOST')
-    print '='*80
-    trace(' Launching Panic ...')
-    print '='*80
+    from taurus.qt.qtgui.application import TaurusApplication
+
     opts = [a for a in args if a.startswith('--')]
     args = [a for a in args if not a.startswith('--')]
     URL = 'http://www.cells.es/Intranet/Divisions/Computing/Controls/Help/Alarms/panic'
     
-    uniqueapp = Qt.QApplication([])
+    #uniqueapp = Qt.QApplication([])
+    uniqueapp = TaurusApplication(opts)
+    
+    print '='*80
+    trace(' Launching Panic ...')
+    print '='*80
+    
     if '--calc' in opts:
         args = args or ['']
         form = AlarmPreview(*args)
