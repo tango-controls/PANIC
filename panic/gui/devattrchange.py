@@ -40,6 +40,9 @@ class devattrchangeForm(iLDAPValidatedWidget,object):
         self.refreshButton = QtGui.QPushButton(Form)
         self.refreshButton.setObjectName("refreshButton")
         self.GridLayout.addWidget(self.refreshButton, 2, 0, 1, 1)
+        self.newDevice = QtGui.QPushButton(Form)
+        self.newDevice.setObjectName("newDevice")
+        self.GridLayout.addWidget(self.newDevice, 3, 0, 1, 1)
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
@@ -48,10 +51,15 @@ class devattrchangeForm(iLDAPValidatedWidget,object):
         self.refreshButton.setText(QtGui.QApplication.translate("Form", "Refresh", None, QtGui.QApplication.UnicodeUTF8))
         self.refreshButton.setIcon(getThemeIcon("view-refresh"))
         self.refreshButton.setToolTip("Refresh list")
+        self.newDevice.setText(QtGui.QApplication.translate("Form", "Create New", None, QtGui.QApplication.UnicodeUTF8))
+        self.newDevice.setIcon(getThemeIcon("new"))
+        self.newDevice.setToolTip("Add a new PyAlarm device")        
+        
 
         QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("itemChanged(QTableWidgetItem *)"), self.onEdit)
         QtCore.QObject.connect(self.deviceCombo, QtCore.SIGNAL("currentIndexChanged(QString)"), self.buildList)
         QtCore.QObject.connect(self.refreshButton, QtCore.SIGNAL("clicked()"), self.buildList)
+        QtCore.QObject.connect(self.newDevice, QtCore.SIGNAL("clicked()"), self.onNew)
         Form.resize(430, 600)
 
     def setDevCombo(self,device=None):
@@ -75,7 +83,10 @@ class devattrchangeForm(iLDAPValidatedWidget,object):
         else:
             self.deviceCombo.setCurrentIndex(index)
         device = str(device)
-        data=self.api.devices[device].get_config(True) #get_config() already manages extraction and default values replacement
+        if self.api.devices:
+            data=self.api.devices[device].get_config(True) #get_config() already manages extraction and default values replacement
+        else:
+            data = {}
         print '%s properties: %s' % (device,data)
         rows=len(data)
         self.tableWidget.setColumnCount(2)
@@ -93,6 +104,34 @@ class devattrchangeForm(iLDAPValidatedWidget,object):
                 self.tableWidget.setItem(row, col, item)
         self.tableWidget.resizeColumnsToContents()
         self.tableWidget.blockSignals(False)
+        
+    def onNew(self):
+        w = Qt.QDialog(self.Form)
+        w.setWindowTitle('Add New PyAlarm Device')
+        w.setLayout(Qt.QGridLayout())
+        server,device = Qt.QLineEdit(w),Qt.QLineEdit(w)
+        server.setText('TEST')
+        device.setText('test/pyalarm/1')
+        w.layout().addWidget(Qt.QLabel('Server Instance'),0,0,1,1)
+        w.layout().addWidget(server,0,1,1,1)
+        w.layout().addWidget(Qt.QLabel('Device Name'),1,0,1,1)
+        w.layout().addWidget(device,1,1,1,1)
+        doit = Qt.QPushButton('Apply')
+        w.layout().addWidget(doit,2,0,2,2)
+        def create(s=server,d=device,p=w):
+            try:
+                s,d = str(s.text()),str(d.text())
+                if '/' not in s: s = 'PyAlarm/%s'%s
+                import fandango.tango as ft
+                ft.add_new_device(s,'PyAlarm',d)
+                print('%s - %s: created!'%(s,d))
+            except:
+                traceback.print_exc()
+            self.api.load()
+            p.close()
+        QtCore.QObject.connect(doit, QtCore.SIGNAL("clicked()"), create)
+        w.exec_()
+        self.setDevCombo()
 
     def onEdit(self):
         try:
