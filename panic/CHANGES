@@ -1,5 +1,9 @@
-ONGOING
+ONGOING 6.0
 ---------------------
+
+ * Alarm Qualities will change to reflect alarm life cycle instead of severity.
+ * Alarm may be declared in its own class/free property; instead of using Alarm* device properties.
+ * Alarm collections will be used to manage different sets of alarms in GUI>
 
 Package refactored to build valid system/PIP/rpm packages
 
