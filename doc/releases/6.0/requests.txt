@@ -1,0 +1,8 @@
+File to summarize requests by different users:
+
+F.Becheri:
+
+ - Failed alarms should be easy to spot from panic gui
+ - Users to be alerted if the PyAlarm is dead or idle
+
+
