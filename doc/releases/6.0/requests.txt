@@ -1,31 +1,199 @@
 File to summarize requests by different users:
 
-ALBA:
+ALBA
+----
 
  - Failed alarms and servers should be easy to spot from panic gui
  - Users to be alerted if the PyAlarm is dead or idle
  - Taurus pop-ups on alarms
+ - set alarms when the readback is different from the last user input in a given attribute.
+ - protect againts using "is" in formulas; should be replaced by "=="
+ - add a command to get last traceback stack in case of Failed alarm.
+ - persistent disable after restart (via Enabled property!?)
+ - asynchronous alarm evaluation from Panic GUI preview
+ - 
  
-MAXIV:
+ESRF
+----
+
+ - Guide to deploy PANIC/PyAlarm on an empty Debian system
+ 
+MAXIV
+-----
 
  - Kibana Integration
- - Optimize groups of alarms
- - Merge Paul Bell branch: https://sourceforge.net/p/tango-ds/code/HEAD/tree/DeviceClasses/SoftwareSystem/PyAlarm/branches/MAXIV
+ - Optimize groups of alarms against host-down exceptions.
+ - Merge Paul Bell & Johan Forsberg branches: (PRJ/Alerts/branches/maxiv/app-dev-pyalarm.tgz)
  
- SOLEIL:
+ SOLEIL
+ ------
  
   - Integration with Vacca
-  - Integration with the AlarmDB (documents by Katy Saintin).
+  - Integration with the AlarmDB (see document by Katy Saintin).
   
-Elettra:
+TCS
+---
 
- - 
+ - Implement multi-tango_host in all queries / formulas. Multiple-host alarm support is one of the important requirement of project.
+ - Is script execution possible on alarm action ?  ACTION(script,path,args)  (It should be accompanied of an AllowScripts property and a list of valid script receptors; to prevent a harmful usage of this kind of tool).
+ - >1500 alarms performance issues (see issues log at the end)
+
+ - Is there any way to write the rule by reading attribute name and device name from custom database ? It means that in defining above rule, I don't have to manually write rule for all parameters. It will read the device and attribute name from database and write the rule accordingly. ===> SEE ALIASES
+ - ALIASES: The rule must also be configurable, Suppose if Speed1 becomes Speed111, then rule will also be l/m/n/Speed111.quality==ATTR
+_ALARM
+ - set action if alarms recovers in AlarmReceiver.  RECOVER(command,...)
+ - set the action to set the alarm status as "Alarm reset". RECOVER(attribute,a/b/c/alarmstatus,'All Ok')
+ 
+ - GUI: I have around 150 alarms in my list. When I try to disable single/multiple alarms, its not disabling the selected alarms but when the alarm number is less, then I am able to perform the disable action. Same problem is with acknowledging single/multiple alarms.
+ 
+ - GUI+CSV: I am trying to import from .csv file. It has around 150 alarms, so the window which opens which says"Choose alarms to import" doesn't have scrollbar attached and I am unable to browse through the lower alarms. Similarly, the problem is with disable and delete button. If you try to delete and disable around 150 alarms, the scrollbar doesnt come. So you couldnt see ok button. I have attached the screenshot of the same problem
+ 
+ - ACTION(alarm:command, LMC1:10000/lmc/c01/gab/systemCmd,1,2,3). But it is not working.
+ - command when alarm occurs without providing arguments is not working.
+ - Multiple-host snap is not working. This is very important requirement for me. But Panic doesnt support getting snaps from multiple-hosts.
+ - Does Panic support user specific login ? As of now anyone can open the Panic-Gui, but need user login here. Can it be done ? Also have to disable the rule editing/acknowledgement/disable/enable button for some specific user. It means that some user have read only permission and some will have both read-write permission? Can it be done user specific ?
+ - If Alarm comes, can i snooze it for some time ?
+ 
+1.) When alarm comes at CMC, it should archive it in CMC Snap database. 
+    Suppose in one rule around 1350 attributes conditions have been written like this type:
+
+LMC1:10000/LMC/C01/GAB/Ch01.quality==ATTR_ALARM or LMC2:10000/LMC/C02/GAB/Ch01.quality==ATTR_ALARM or LMC3:10000/LMC/C03/GAB/Ch01.quality==ATTR_ALARM or LMC4:10000/LMC/C04/GAB/Ch01.quality==ATTR_ALARM
+
+If alarm occurs due to 1 attribute, can that attribute name and value be stored in snap database ? 
+ 
+2.) When one or two LMC's/ TangoHost are not available, CMC Panic shouldn't slow down. Presently it is happening. 
+  Currently I have defined the condition in CMC for 3 LMC i.e for around 1350 attributes in one rule, it is getting very slow and also gets closed due to segmentation fault.
+System shouldn't slow down if any of the device is unreachable.
+
+3.) Writing condition for 1350 attribute in 1 rules is very tedious, It would be helpful if the grouping works. I will send you the result of the code you sent once we completely migrate to Ubuntu.
+
+1.) Panic GUI becomes very slow when LMC gets disconnected. There are performance issues.
+2.) Is folder-ds released, which would help in logging alarm for multiple hosts as per your below mail
+3.) The wild card pattern sometimes doesn't support. I am using it for as many as 1200 attributes.
+4.) Is user authentication supported in Panic ?
+
+Actually i need Panic-GUI login regardless of OS User Login. There will be set of users, for them there will be specific permissions, such as some user would be able to acknowledge the alarm, some won't, some users should be able to edit the rule, some wont have permission to do so. Also I need User log, like, who has acknowledged the alarms, who has added the new alarm, who has edited the rule, i.e. every user activity to be logged. Is this possible ?
+
+
   
-SKA:
+Elettra
+-------
 
- - An statement on PANIC and IEC 62682 compliance
- - 
+ - Common API/Specification for Tango properties usage.
+ - Having the same Alarm in 2 different Pyalarm instances !?!? (G.Scalamera)
+ - Notify opened clients when there are changes in an alarm configuration.
+  
+SKA/INAF
+--------
+
+ - An statement on PANIC and IEC 62682 compliance (e.g. incorporating PANIC as redundant level)
+ - Install fandango/PANIC via PIP (Neilen Marais)
+ - Fast Alarms triggered by single attribute events.
  
 
+----
+
+PERFORMANCE ISSUES
+------------------
+
+<pre>
+I have one Central-Monitoring-Control (cmc:10000) and three lmc's which are LMC1 (LMC1:10000), LMC2(LMC2:10000), LMC3(LMC3:10000).
+
+LMC1 have 5 devices such as: LMC/C01/GAB, LMC/C01/FPS, LMC/C01/FECB, LMC/C01/SERVO, LMC/C01/OFCSNT)
+LMC2 have 5 devices such as: LMC/C02/GAB, LMC/C02/FPS, LMC/C02/FECB, LMC/C02/SERVO, LMC/C02/OFCSNT)
+LMC3 have 5 devices such as: LMC/C03/GAB, LMC/C03/FPS, LMC/C03/FECB, LMC/C03/SERVO, LMC/C03/OFCSNT)
+Each device have around 70 attributes.
+So one LMC have around 70*5=350 attributes.
+
+Now I have to define a rule for all the attributes of LMCs in CMC. I tried the easier way by grouping.
+
+I tried to define rule as:
+
+any([t==ATTR_ALARM for t in FIND(LMC1:10000/LMC/C01/*/*.quality)]) or any([t==ATTR_ALARM for t in FIND(LMC2:10000/LMC/C02/*/*.quality)]) or any([t==ATTR_ALARM for t in FIND(LMC3:10000/LMC/C03/*/*.quality)])
+
+But the result is:
+
+test/alarms/1: DevFailed[
+
+DevError[
+
+desc = TRANSIENT CORBA system exception: TRANSIENT_CallTimedout
+
+origin = Connection::command_inout()
+
+reason = API_CorbaException
+
+severity = ERR]
 
 
+DevError[
+
+desc = Timeout (500 mS) exceeded on device test/alarms/1, command evaluateFormula
+
+origin = Connection::command_inout()
+
+reason = API_DeviceTimedOut
+
+severity = ERR]
+
+]
+
+Then I tried the long way which is individually defining the rule for all the attributes of all LMCs.
+
+For example, below is the rule:
+
+LMC1:10000/LMC/C01/GAB/ch1.quality==ATTR_ALARM or
+LMC2:10000/LMC/C02/GAB/ch1.quality==ATTR_ALARM or
+LMC3:10000/LMC/C03/GAB/ch1.quality==ATTR_ALARM or
+LMC1:10000/LMC/C01/GAB/ch2.quality==ATTR_ALARM or
+LMC2:10000/LMC/C02/GAB/ch2.quality==ATTR_ALARM or
+LMC3:10000/LMC/C03/GAB/ch2.quality==ATTR_ALARM or
+LMC1:10000/LMC/C01/GAB/ch3.quality==ATTR_ALARM or
+LMC2:10000/LMC/C02/GAB/ch3.quality==ATTR_ALARM or
+LMC3:10000/LMC/C03/GAB/ch3.quality==ATTR_ALARM
+
+Like the above I typed for around all LMCs attributes 750 times which was very tedious.
+
+and the result is same as above which is:
+
+test/alarms/1: DevFailed[
+
+DevError[
+
+desc = TRANSIENT CORBA system exception: TRANSIENT_CallTimedout
+
+origin = Connection::command_inout()
+
+reason = API_CorbaException
+
+severity = ERR]
+
+
+DevError[
+
+desc = Timeout (500 mS) exceeded on device test/alarms/1, command evaluateFormula
+
+origin = Connection::command_inout()
+
+reason = API_DeviceTimedOut
+
+severity = ERR]
+
+]
+
+Because of the above error, rule becomes true and is in alarm condition even if it is not.
+
+Ideally it shouldn't happen, because my future requirement is like , I
+would be having 30 LMCs, so it would be very tedious job to configure the
+rules for all the lmcs unless grouping works.
+
+Secondly, the GUI-tool has become very slow and hangs and then gets closed and provides segmentation fault. Also the alarm device server is using too much memory, which slows down the system.
+
+Thirdly, Can i Take action from CMC to any LMC command or LMC attribute ? Below is the syntax i tried:
+
+ACTION(alarm:command, LMC1:10000/lmc/c01/gab/systemCmd,1,2,3). But it is not working.
+
+Fourth, Executing command when alarm occurs without providing arguments is not working.
+
+Fifth, Multiple-host snap  is not working. This is very important requirement for me. But Panic doesnt support getting snaps from multiple-hosts.
+</pre>
