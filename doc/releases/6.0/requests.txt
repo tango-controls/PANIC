@@ -1,8 +1,31 @@
 File to summarize requests by different users:
 
-F.Becheri:
+ALBA:
 
- - Failed alarms should be easy to spot from panic gui
+ - Failed alarms and servers should be easy to spot from panic gui
  - Users to be alerted if the PyAlarm is dead or idle
+ - Taurus pop-ups on alarms
+ 
+MAXIV:
+
+ - Kibana Integration
+ - Optimize groups of alarms
+ - Merge Paul Bell branch: https://sourceforge.net/p/tango-ds/code/HEAD/tree/DeviceClasses/SoftwareSystem/PyAlarm/branches/MAXIV
+ 
+ SOLEIL:
+ 
+  - Integration with Vacca
+  - Integration with the AlarmDB (documents by Katy Saintin).
+  
+Elettra:
+
+ - 
+  
+SKA:
+
+ - An statement on PANIC and IEC 62682 compliance
+ - 
+ 
+
 
 
