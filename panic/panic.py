@@ -145,10 +145,10 @@ ALARM_ARCHIVE = {
 ALARM_LOGS = {
     'LogFile':
         [PyTango.DevString,
-        "File where alarms are logged, like /tmp/alarm_$NAME.log\n
+        """File where alarms are logged, like /tmp/alarm_$NAME.log\n
         Keywords are $DEVICE,$ALARM,$NAME,$DATE\n
         From version 6.0 a FolderDS-like device can be used for remote logging:\n
-        \ttango://test/folder/01/$ALARM_$DATE.log",
+        \ttango://test/folder/01/$ALARM_$DATE.log""",
         [ "" ] ], 
     'HtmlFolder':
         [PyTango.DevString,
