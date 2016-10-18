@@ -12,7 +12,7 @@
 #
 # project :     TANGO Device Server
 #
-# $Author:  sergi_rubio at cells$
+# $Author:  srubio at cells$
 #
 # $Revision:  $
 #
@@ -183,7 +183,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug('PyAlarm(%s).read_alarm_attribute(%s) is %s; Active Alarms: %s' % (self.get_name(),tag_name,value,self.get_active_alarms()))
         
         self.quality=PyTango.AttrQuality.ATTR_WARNING
-        if(self.Alarms[tag_name].severity=='DEBUG'):
+        if tag_name in self.FailedAlarms or self.CheckDisabled(tag_name):
+            self.quality=PyTango.AttrQuality.ATTR_INVALID
+        elif(self.Alarms[tag_name].severity=='DEBUG'):
             self.quality=PyTango.AttrQuality.ATTR_VALID
         elif(self.Alarms[tag_name].severity=='WARNING'):
             self.quality=PyTango.AttrQuality.ATTR_WARNING
@@ -1152,6 +1154,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     status+='%s:%s:\n\t%s\n\tSeverity:%s\n\tSent to:%s\n' % (time.ctime(date),tag_name,self.Alarms[tag_name].description,self.Alarms[tag_name].severity,self.Alarms[tag_name].receivers)
                 if self.FailedAlarms:
                     status+='\n%d alarms couldnt be evaluated:\n%s'%(len(self.FailedAlarms),','.join(str(t) for t in self.FailedAlarms.items()))
+                    if float(len(self.FailedAlarms))/len(self.Alarms) > 0.1:
+                      self.set_state(PyTango.DevState.FAULT)
                 if self.Uncatched:
                     status+='\nUncatched exceptions:\n%s'%self.Uncatched
                 status += '\n\n' + 'EvalTimes are: \n %s\n'%(self.EvalTimes)
