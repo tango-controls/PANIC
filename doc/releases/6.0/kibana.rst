@@ -1,6 +1,6 @@
 http://www.tango-controls.org/community/forum/post/1123/
 
-MAXIV: we've added a tiny feature to PyAlarm which pushes each alarm event as a JSON document to a simple "logger" device (using a command), which in turn stores the event in elasticsearch. The historical data can then be viewed through the kibana web UI, where users can do various filtering and also set up specific views. So far it has been pretty solid, with very low maintenance.
+we've added a tiny feature to PyAlarm which pushes each alarm event as a JSON document to a simple "logger" device (using a command), which in turn stores the event in elasticsearch. The historical data can then be viewed through the kibana web UI, where users can do various filtering and also set up specific views. So far it has been pretty solid, with very low maintenance.
 
 I'm attaching a kibana screenshot from our controlroom. The UI is a bit strange but powerful once you get used to it. However, the main benefit is that we're not developing it ourselves :)
 
@@ -126,4 +126,7 @@ with
 That's it!
 
 /Johan
+<<<<<<< HEAD
 
+=======
+>>>>>>> 071b37fbdbbfd8ca5d0f69166f5cf3b45e316f50
