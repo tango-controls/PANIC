@@ -197,4 +197,3 @@ Fourth, Executing command when alarm occurs without providing arguments is not w
 
 Fifth, Multiple-host snap  is not working. This is very important requirement for me. But Panic doesnt support getting snaps from multiple-hosts.
 </pre>
-
