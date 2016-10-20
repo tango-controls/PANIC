@@ -1,0 +1,130 @@
+#
+# Resource backup , created Tue Oct 18 17:41:31 CEST 2016
+#
+
+#---------------------------------------------------------
+# SERVER PyAlarm/test, DDebug device declaration
+#---------------------------------------------------------
+
+PyAlarm/test/DEVICE/DDebug: "sys/DDebug/PyAlarm_Test"
+
+
+#---------------------------------------------------------
+# CLASS DDebug properties
+#---------------------------------------------------------
+
+
+#---------------------------------------------------------
+# SERVER PyAlarm/test, PyAlarm device declaration
+#---------------------------------------------------------
+
+PyAlarm/test/DEVICE/PyAlarm: "test/alarms/alarms-sim",\ 
+                             "test/pyalarm/logfile"
+
+
+# --- test/alarms/alarms-sim properties
+
+test/alarms/alarms-sim->AlertOnRecovery: True
+test/alarms/alarms-sim->AutoReset: 60
+test/alarms/alarms-sim->CreateNewContexts: True
+test/alarms/alarms-sim->PollingPeriod: 5
+test/alarms/alarms-sim->__SubDevices: "sys/database/2",\ 
+                                      "archiving/snapmanager/1",\ 
+                                      "archiving/snaparchiver/1",\ 
+                                      "archiving/snapextractor/1"
+
+# --- test/pyalarm/logfile properties
+
+test/pyalarm/logfile->AlarmList: TEST:True
+test/pyalarm/logfile->AlarmReceivers: srubio@cells.es
+test/pyalarm/logfile->AlarmThreshold: 3
+test/pyalarm/logfile->Enabled: 5
+test/pyalarm/logfile->LogFile: "tango://controls02:10000/test/folder/tmp-folderds/$ALARM_$DATE.log"
+test/pyalarm/logfile->PollingPeriod: 3
+test/pyalarm/logfile->StartupDelay: 5
+
+#---------------------------------------------------------
+# CLASS PyAlarm properties
+#---------------------------------------------------------
+
+CLASS/PyAlarm->PanicAdminUsers: ""
+CLASS/PyAlarm->Phonebook: #CONTROLS,\ 
+                          "%FLOOR:floorcoordinators@cells.es,SMS:+34608018721",\ 
+                          "",\ 
+                          "%CTRLMV:oncall@cells.es,SMS:+34669264304",\ 
+                          "%CTRL2:oncall@cells.es,SMS:+34638420276",\ 
+                          "%CONTROL:oncall@cells.es,SMS:+34669264304",\ 
+                          %CTRLEPS:SMS:+34638420276,\ 
+                          "%ANTONIO:amilan@cells.es,SMS:+34680885870",\ 
+                          "%SRUBIO:srubio@cells.es,SMS:+34606330920",\ 
+                          "%LOTHAR:lkrause@cells.es,SMS:+34606864961",\ 
+                          "%LKRAUSE:lkrause@cells.es,SMS:+34606864961",\ 
+                          "%MAREK:mgrabski@cells.es,SMS:+34693358058",\ 
+                          "%FULVIO:fbecheri@cells.es,SMS:+34649283471",\ 
+                          "%ZBIGNIEW:zreszela@cells.es,SMS:+34638404618",\ 
+                          "%DFERNANDEZ:dfernandez@cells.es,SMS:+34647649053",\ 
+                          %SBLANCH:sblanch@cells.es,\ 
+                          %JVILLANUEVA:jvillanueva@cells.es,\ 
+                          %MANOLO:mbroseta@cells.es,\ 
+                          %TEST:%TEST2,\ 
+                          %TEST1:SMS:+34606330920,\ 
+                          %TEST2:srubio@cells.es,\ 
+                          "",\ 
+                          "%SENDMAIL:ACTION(alarm:command,lab/ct/alarms/SendMail,$DESCRIPTION,$ALARM,srubio@cells.es)",\ 
+                          "",\ 
+                          #VACUUM,\ 
+                          "%VACUUM:vacuum@cells.es,SMS:+34669267453,SMS:+34646260812",\ 
+                          "%VACMV:vacuum@cells.es,SMS:+34669267453,SMS:+34646260812",\ 
+                          "%LLUIS:lgines@cells.es,SMS:+34657045092",\ 
+                          "%LGINES:lgines@cells.es,SMS:+34648465913",\ 
+                          "%NOESHRAQ:eshraq@cells.es,SMS:+34699282557",\ 
+                          %ROGER:rfos@cells.es,\ 
+                          "%MAREK:mgrabski@cells.es,SMS:+34693358058",\ 
+                          "%JNAVARRO:jnavarro@cells.es,SMS:+34670247608",\ 
+                          "%AURELIEN:alacroix@cells.es,SMS:+33623872876",\ 
+                          "",\ 
+                          #FRONTENDS:,\ 
+                          "%JMARCOS:jmarcos@cells.es,SMS:+34670825949",\ 
+                          "%JOEL:jpasquaud@cells.es,SMS:+34651436676",\ 
+                          "",\ 
+                          #BEAMLINES:,\ 
+                          %ABARLA:abarla@cells.es,\ 
+                          "%MVALVIDARES:mvalvidares@cells.es,SMS:+34663695459",\ 
+                          "%IGOR:isics@cells.es,SMS:+34653579972",\ 
+                          "%AGNETA:svensson@cells.es,SMS:+34654605721",\ 
+                          "%KLEMENTIEV:kklementiev@cells.es,SMS:+34634852597",\ 
+                          "%LUCIA:laballe@cells.es,SMS:+34617564624",\ 
+                          "%ERIC:epellegrin@cells.es,SMS:+34637029542",\ 
+                          "%MVLUCIA:laballe@cells.es,SMS:+34617564624",\ 
+                          "%JUANHUIX:juanhuix@cells.es,SMS:+34655123696",\ 
+                          "%JBENACH:jbenach@cells.es,SMS:+34608107080",\ 
+                          "%SILVIA:sforcat@cells.es,SMS:+34659311242",\ 
+                          "%GEMMA:gguilera@cells.es,SMS:+34646662234",\ 
+                          "%MARIA:mbrzhezinskaya@cells.es ,SMS:+34600736091",\ 
+                          "%EVA:epereiro@cells.es,SMS:+34630115585",\ 
+                          "%VIRGINIA:vperez@cells.es,SMS:+34689452160",\ 
+                          "%INMA:iperal@cells.es,SMS:+34678021620",\ 
+                          "%MICHAEL:mknapp@cells.es,SMS:+34672065901",\ 
+                          "%NICO:josep.nicolas@cells.es,SMS:+34669012168",\ 
+                          %FRANCOIS:ffauth@cells.es,\ 
+                          "%MARION:mkuhlmann@cells.es,SMS:+34652583204",\ 
+                          "",\ 
+                          "# On Call",\ 
+                          "%OC_VC:jpasquaud@cells.es,SMS:+34651436676,jnavarro@cells.es,SMS:+34670247608",\ 
+                          "%OC_CT:srubio@cells.es,SMS:+34606330920",\ 
+                          "",\ 
+                          "# RF",\ 
+                          "%BEA:bbravo@cells.es,SMS:+34608595343",\ 
+                          "%ANGELA:asalom@cells.es,SMS:+34620076431",\ 
+                          "%JESUS:jocampo@cells.es,SMS:+34696037994",\ 
+                          "%CONTROLROOM:,SMS:+34646291497",\ 
+                          "%DCALDERON:659850116,SMS:659850116"
+CLASS/PyAlarm->SMSConfig: controls@cells:cells.cells
+
+
+# --- dserver/PyAlarm/test properties
+
+dserver/PyAlarm/test->__SubDevices: "dserver/snapextractor/1",\ 
+                                    "dserver/snapmanager/1",\ 
+                                    "dserver/snaparchiver/1",\ 
+                                    "test/sim/test-00"

@@ -17,11 +17,14 @@ install_requires = ['taurus',
 
 package_data = {'': ['VERSION']}
 
-scripts = ['./panic/ds/PyAlarm',]
+scripts = [
+  './bin/PyAlarm',
+  './bin/panic-gui',
+  ]
 
 entry_points = {
         'console_scripts': [
-            'panic-gui=panic.gui.gui:main_gui',
+            #'panic-gui=panic.gui.gui:main_gui',
         ],
 }
 
