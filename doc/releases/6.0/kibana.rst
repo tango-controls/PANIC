@@ -126,7 +126,3 @@ with
 That's it!
 
 /Johan
-<<<<<<< HEAD
-
-=======
->>>>>>> 071b37fbdbbfd8ca5d0f69166f5cf3b45e316f50
