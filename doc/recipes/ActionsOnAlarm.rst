@@ -9,26 +9,42 @@ Here you have some more examples:
 
 .. code::
 
-  %SENDMAIL:ACTION(alarm:command,lab/ct/alarms/SendMail,$DESCRIPTION,$ALARM,srubio@cells.es)
-  %RESET:ACTION(alarm:command,test/pyalarm/logfile/resetalarm,'TEST','$NAME_$DATE_$DESCRIPTION') #DONT USE [] TO CONTAIN ARGUMENTS!
-  %INIT:ACTION(alarm:command,test/pyalarm/sim/init)  
-  %INITLOG:ACTION(alarm:command,test/pyalarm/logfile/init)
-  %WRITE:ACTION(alarm:attribute,sys/tg_test/1/string_scalar,'$NAME_$DATE_$VALUES')
-  %LOG:ACTION(alarm:command,controls02:10000/test/folder/tmp-folderds/SaveText,'$NAME_$DATE_$MESSAGE.txt','$REPORT')
+  # Send an email (equivalent to just %MAIL:address@mail.com)
+  %SENDMAIL:ACTION(alarm:command,lab/ct/alarms/SendMail,$DESCRIPTION,$ALARM,address@mail.com)
   
-Then declare the AlarmReceivers like:
+  # Reset another alarm
+  %RESET:ACTION(alarm:command,test/pyalarm/logfile/resetalarm,'TEST','$NAME_$DATE_$DESCRIPTION') #DONT USE [] TO CONTAIN ARGUMENTS!
+  
+  # Reload another device
+  %INITLOG:ACTION(alarm:command,test/pyalarm/logfile/init)
+  
+  # Write a tango attribute
+  %WRITE:ACTION(alarm:attribute,sys/tg_test/1/string_scalar,'$NAME_$DATE_$VALUES')
+  
+  # Execute a command in another tango host
+  %LOG:ACTION(alarm:command,controls02:10000/test/folder/tmp-folderds/SaveText,'$NAME_$DATE_$MESSAGE.txt','$REPORT')
 
- 
+Then declare the AlarmReceivers like::
 
-Available keywords are:
+  ACTION(alarm:command,mach/dummy/motor/move,int(1),int(10))
+  ACTION(reset:attribute,mach/dummy/motor/position,int(0)) 
+  
+The first field is one of each PyAlarm.MESSAGE_TYPES::
 
-  $TAG / $NAME
+  ALARM
+  ACKNOWLEDGED
+  RECOVERED
+  REMINDER
+  AUTORESET
+  RESET
+  DISABLED
+
+Available keywords (managed by PyAlarm.parse_devices()) in ACTION are::
+
+  $TAG / $NAME / $ALARM
   $DEVICE
-  $DATE
-  +
+  $DATE / $DATETIME
   $MESSAGE
   $VALUES
-  $DATETIME
-  $ALARM
   $REPORT
   $DESCRIPTION
