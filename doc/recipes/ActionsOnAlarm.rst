@@ -12,8 +12,8 @@ Here you have some more examples:
   # Send an email (equivalent to just %MAIL:address@mail.com)
   %SENDMAIL:ACTION(alarm:command,lab/ct/alarms/SendMail,$DESCRIPTION,$ALARM,address@mail.com)
   
-  # Reset another alarm
-  %RESET:ACTION(alarm:command,test/pyalarm/logfile/resetalarm,'TEST','$NAME_$DATE_$DESCRIPTION') #DONT USE [] TO CONTAIN ARGUMENTS!
+  # Reset another alarm, DONT USE [] TO CONTAIN ARGUMENTS!
+  %RESET:ACTION(alarm:command,test/pyalarm/logfile/resetalarm,'TEST','$NAME_$DATE_$DESCRIPTION')
   
   # Reload another device
   %INITLOG:ACTION(alarm:command,test/pyalarm/logfile/init)
