@@ -409,7 +409,10 @@ class AlarmDS(object):
             try:
                 tag,formula = line.split(':',1)
                 self.alarms[tag] = {'formula':formula}
-                try: self.alarms[tag]['receivers'] = fun.first(r for r in props['AlarmReceivers'] if r.startswith(tag+':')).split(':',1)[-1]
+                try: 
+                  local_receivers = fun.first(r for r in props['AlarmReceivers'] if r.startswith(tag+':')).split(':',1)[-1]
+                  global_receivers = self.api.get_global_hooks(tag)
+                  self.alarms[tag]['receivers'] = ','.join((local_receivers,global_receivers))
                 except: self.alarms[tag]['receivers'] = ''
                 try: self.alarms[tag]['description'] = fun.first(r for r in props['AlarmDescriptions'] if r.startswith(tag+':')).split(':',1)[-1]
                 except: self.alarms[tag]['description'] = ''
@@ -754,6 +757,15 @@ class AlarmAPI(fandango.SingletonMap):
         self.put_class_property('PyAlarm','Phonebook',new_prop)
         self.phonebook = None #Force to reload
         return new_prop
+      
+    def get_global_hooks(self,tag=''):
+        prop = self.get_class_property('PyAlarm','GlobalHooks')
+        if not tag:
+          return prop
+        else:
+          masks = (p.split(':',1) for p in prop)
+          rows = (val for mask,val in masks if fun.clmatch(mask,tag))
+          return ','.join(rows)
     
     GROUP_EXP = fandango.tango.TangoEval.FIND_EXP.replace('FIND','GROUP')
     
