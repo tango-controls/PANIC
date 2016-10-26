@@ -1889,143 +1889,9 @@ class PyAlarmClass(PyTango.DeviceClass):
 
     #    Class Properties
     class_property_list = PANIC_PROPERTIES
-        #'PhoneBook':
-            #[PyTango.DevVarStringArray,
-            #"List of alarms declared like:. User:user@accelerator.es;SMS:+34666555666",
-            #[] ],
-        #'SMSConfig':
-            #[PyTango.DevString,
-            #"Arguments for sendSMS command",
-            #[ ":" ] ],
-        #'FromAddress':
-            #[PyTango.DevString,
-            #"Address that will appear as Sender in mail and SMS",
-            #[ "oncall" ] ],
-        #'AllowedActions':
-            #[PyTango.DevVarStringArray,
-            #"List of OS commands that alarms are able to execute.",
-            #[] ],
-        #'StartupDelay':
-            #[PyTango.DevLong,
-            #"Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
-            #[ 0 ] ],
-        #}
 
     #    Device Properties
     device_property_list = DEVICE_PROPERTIES
-        ## Alarm Properties: This properties will be managed by API; DON'T ACCESS THEM WITH self.
-        #'AlarmList':
-            #[PyTango.DevVarStringArray,
-            #"List of alarms to be monitorized. The format is:\n<br>domain/family/member #It simply checks that dev is alive\n<br>domain/family/member/attribute > VALUE\n<br>domain/family/member/State == UNKNOWN\n<br>domain/family/*/Temperature > VALUE\n<br>\n<br>When using wildcards all slash / must be included",
-            #[] ],
-        #'AlarmReceivers':
-            #[PyTango.DevVarStringArray,
-            #"Users that will be notified for each alarm. The format is:\n<br>[TYPE]:[ADDRESS]:[attributes];...\n<br>\n<br>[TYPE]: MAIL / SMS\n<br>[ADDRESS] : operator@accelerator.es / +34666555444\n<br>[attributes]: domain/family/member/attribute;domain/family/*",
-            #[] ],
-        #'AlarmDescriptions':
-            #[PyTango.DevVarStringArray,
-            #"Description to be included in emails for each alarm. The format is:\n<br>TAG:AlarmDescription...",
-            #[] ],
-        #'AlarmConfigurations':
-            #[PyTango.DevVarStringArray,
-            #"Configuration customization appliable to each alarm. The format is:\n<br>TAG:PAR1=Value1;PAR2=Value2;...",
-            #[] ],
-        #'AlarmSeverities':
-            #[PyTango.DevVarStringArray,
-            #"ALARM:DEBUG/INFO/WARNING/ERROR #DEBUG alarms will not trigger messages",
-            #[] ],
-
-        ## Configuration Properties: This properties can be accessed as self.Property
-        ## NOTE THAT THE DEFAULT VALUES OF THESE PROPERTIES WILL BE OVERRIDEN BY panic.DefaultPyAlarmProperties !!!
-        #'LogFile':
-            #[PyTango.DevString,
-            #"File where alarms are logged, like /tmp/alarm_$NAME.log",
-            #[ "" ] ], #Overriden by panic.DefaultPyAlarmProperties
-        #'LogLevel':
-            #[PyTango.DevString,
-            #"stdout log filter",
-            #[ "INFO" ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'HtmlFolder':
-            #[PyTango.DevString,
-            #"File where alarm reports are saved",
-            #[ "htmlreports" ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'AlarmThreshold':
-            #[PyTango.DevLong,
-            #"Min number of consecutive Events/Pollings that must trigger an Alarm.",
-            #[ 3 ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'Enabled':
-            #[PyTango.DevString,
-            #"If False forces the device to Disabled state and avoids messaging; if INT then it will last only for N seconds after Startup; if a python formula is written it will be used to enable/disable the device",
-            #[ '120' ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'AlertOnRecovery':
-            #[PyTango.DevString,
-            #"It can contain 'email' and/or 'sms' keywords to specify if an automatic message must be sent in case of alarm returning to safe level.",
-            #[ "false" ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'FlagFile':
-            #[PyTango.DevString,
-            #"File where a 1 or 0 value will be written depending if theres active alarms or not.\n<br>This file can be used by other notification systems.",
-            #[ "/tmp/alarm_ds.nagios" ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'PollingPeriod':
-            #[PyTango.DevFloat,
-            #"Periode in SECONDS in which all attributes not event-driven will be polled; @TODO for convenience any value above 300 will be divided by 1000, it must be DEPRECATED in the future.",
-            #[ 15. ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'MaxMessagesPerAlarm':
-            #[PyTango.DevLong,
-            #"Max Number of messages to be sent each time that an Alarm is activated/recovered/reset.",
-            #[ 20 ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'FromAddress':
-            #[PyTango.DevString,
-            #"Address that will appear as Sender in mail and SMS",
-            #[ "oncall" ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'SMSConfig':
-            #[PyTango.DevString,
-            #"Arguments for sendSMS command",
-            #[ ":" ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'UseSnap':
-            #[PyTango.DevBoolean,
-            #"If false no snapshots will be trigered (unless specifically added to receivers)",
-            #[ True ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'CreateNewContexts':
-            #[PyTango.DevBoolean,
-            #"It enables PyAlarm to create new contexts for alarms if no matching context exists in the database.",
-            #[ False ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'Reminder':
-            #[PyTango.DevLong,
-            #"If a number of seconds is set, a reminder mail will be sent while the alarm is still active, if 0 no Reminder will be sent.",
-            #[ 0 ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'AutoReset':
-            #[PyTango.DevFloat,
-            #"If a number of seconds is set, the alarm will reset if the conditions are no longer active after the given interval.",
-            #[ 3600. ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'StartupDelay':
-            #[PyTango.DevLong,
-            #"Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
-            #[ 0 ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'EvalTimeout':
-            #[PyTango.DevLong,
-            #"Timeout for read_attribute calls, in milliseconds .",
-            #[ 500 ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'UseProcess':
-            #[PyTango.DevBoolean,
-            #"To create new OS processes instead of threads.",
-            #[ False ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'UseTaurus':
-            #[PyTango.DevBoolean,
-            #"Use Taurus to connect to devices instead of plain PyTango.",
-            #[ False ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'RethrowState':
-            #[PyTango.DevBoolean,
-            #"Whether exceptions in State reading will activate the Alarm.",
-            #[ True ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'RethrowAttribute':
-            #[PyTango.DevBoolean,
-            #"Whether exceptions in Attribute reading will activate the Alarm.",
-            #[ False ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #'IgnoreExceptions':
-            #[PyTango.DevString,
-            #"Value can be False/True/NaN to return Exception, None or NotANumber in case of read_attribute exception.",
-            #[ 'True' ] ],#Overriden by panic.DefaultPyAlarmProperties
-        #}
 
     #    Command definitions
     cmd_list = {
@@ -2134,7 +2000,7 @@ class PyAlarmClass(PyTango.DeviceClass):
             PyTango.SPECTRUM,
             PyTango.READ, 512],
             {
-                'description':"Returns the content of the AlarmReceivers property",
+                'description':"Returns the list of Receivers for each Alarm",
             } ],
         'PhoneBook':
             [[PyTango.DevString,
