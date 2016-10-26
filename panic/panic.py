@@ -7,7 +7,7 @@
 ##
 ## http://www.tango-controls.org/
 ##
-## (copyleft) Sergi Rubio Manrique / CELLS / ALBA Synchrotron, Bellaterra, Spain
+## Author: Sergi Rubio Manrique
 ##
 ## This is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -48,9 +48,9 @@
 import traceback,re,time,os,sys
 import fandango
 import fandango.functional as fun
-from fandango.tango import CachedAttributeProxy
-import PyTango
+from fandango.tango import CachedAttributeProxy,PyTango
 
+from .properties import *
 
 _TANGO = PyTango.Database()
 
@@ -65,142 +65,7 @@ The _proxies object allows to retrieve either DeviceProxy or DeviceServer object
 
 """
 
-###############################################################################
-# PyAlarm Device Default Properties
 
-ALARM_TABLES = {
-    # Alarm Properties: This properties will be managed by API; DON'T ACCESS THEM WITH self.
-    'AlarmList':
-        [PyTango.DevVarStringArray,
-        "List of alarms to be monitorized. The format is:\n<br>domain/family/member #It simply checks that dev is alive\n<br>domain/family/member/attribute > VALUE\n<br>domain/family/member/State == UNKNOWN\n<br>domain/family/*/Temperature > VALUE\n<br>\n<br>When using wildcards all slash / must be included",
-        [] ],
-    'AlarmReceivers':
-        [PyTango.DevVarStringArray,
-        "Users that will be notified for each alarm. The format is:\n<br>[TYPE]:[ADDRESS]:[attributes];...\n<br>\n<br>[TYPE]: MAIL / SMS\n<br>[ADDRESS] : operator@accelerator.es / +34666555444\n<br>[attributes]: domain/family/member/attribute;domain/family/*",
-        [] ],
-    'AlarmDescriptions':
-        [PyTango.DevVarStringArray,
-        "Description to be included in emails for each alarm. The format is:\n<br>TAG:AlarmDescription...",
-        [] ],
-    'AlarmConfigurations':
-        [PyTango.DevVarStringArray,
-        "Configuration customization appliable to each alarm. The format is:\n<br>TAG:PAR1=Value1;PAR2=Value2;...",
-        [] ],
-    'AlarmSeverities':
-        [PyTango.DevVarStringArray,
-        "ALARM:DEBUG/INFO/WARNING/ERROR #DEBUG alarms will not trigger messages",
-        [] ],
-    }
-        
-ALARM_CYCLE = {
-    'Enabled':
-        [PyTango.DevString,
-        "If False forces the device to Disabled state and avoids messaging; if INT then it will last only for N seconds after Startup; if a python formula is written it will be used to enable/disable the device",
-        [ '120' ] ],#Overriden by panic.DefaultPyAlarmProperties
-    'AlarmThreshold':
-        [PyTango.DevLong,
-        "Min number of consecutive Events/Pollings that must trigger an Alarm.",
-        [ 3 ] ],
-    'AlertOnRecovery':
-        [PyTango.DevString,
-        "It can contain 'email' and/or 'sms' keywords to specify if an automatic message must be sent in case of alarm returning to safe level.",
-        [ "false" ] ],
-    'PollingPeriod':
-        [PyTango.DevFloat,
-        "Periode in seconds in which all attributes not event-driven will be polled.",
-        [ 15. ] ],
-    'Reminder':
-        [PyTango.DevLong,
-        "If a number of seconds is set, a reminder mail will be sent while the alarm is still active, if 0 no Reminder will be sent.",
-        [ 0 ] ],
-    'AutoReset':
-        [PyTango.DevFloat,
-        "If a number of seconds is set, the alarm will reset if the conditions are no longer active after the given interval.",
-        [ 3600. ] ],
-    'RethrowState':
-        [PyTango.DevBoolean,
-        "Whether exceptions in State reading will be rethrown.",
-        [ True ] ],
-    'RethrowAttribute':
-        [PyTango.DevBoolean,
-        "Whether exceptions in Attribute reading will be rethrown.",
-        [ False ] ],
-    'IgnoreExceptions':
-        [PyTango.DevString,
-        "Value can be False/True/NaN to return Exception, None or NotANumber in case of read_attribute exception.",
-        [ 'True' ] ],#Overriden by panic.DefaultPyAlarmProperties
-    }
-        
-ALARM_ARCHIVE = {
-    'UseSnap':
-        [PyTango.DevBoolean,
-        "If false no snapshots will be trigered (unless specifically added to receivers)",
-        [ True ] ],
-    'CreateNewContexts':
-        [PyTango.DevBoolean,
-        "It enables PyAlarm to create new contexts for alarms if no matching context exists in the database.",
-        [ False ] ],
-    }
-
-ALARM_LOGS = {
-    'LogFile':
-        [PyTango.DevString,
-        """File where alarms are logged, like /tmp/alarm_$NAME.log\n
-        Keywords are $DEVICE,$ALARM,$NAME,$DATE\n
-        From version 6.0 a FolderDS-like device can be used for remote logging:\n
-        \ttango://test/folder/01/$ALARM_$DATE.log""",
-        [ "" ] ], 
-    'HtmlFolder':
-        [PyTango.DevString,
-        "File where alarm reports are saved",
-        [ "htmlreports" ] ],
-    'FlagFile':
-        [PyTango.DevString,
-        "File where a 1 or 0 value will be written depending if theres active alarms or not.\n<br>This file can be used by other notification systems.",
-        [ "/tmp/alarm_ds.nagios" ] ],
-    'MaxMessagesPerAlarm':
-        [PyTango.DevLong,
-        "Max Number of messages to be sent each time that an Alarm is activated/recovered/reset.",
-        [ 20 ] ],
-    'FromAddress':
-        [PyTango.DevString,
-        "Address that will appear as Sender in mail and SMS",
-        [ "oncall" ] ],
-    }
-    
-DEVICE_CONFIG = {
-    'LogLevel':
-        [PyTango.DevString,
-        "stdout log filter",
-        [ "INFO" ] ],
-    'SMSConfig':
-        [PyTango.DevString,
-        "Arguments for sendSMS command",
-        [ ":" ] ],
-    'StartupDelay':
-        [PyTango.DevLong,
-        "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
-        [ 0 ] ],
-    'EvalTimeout':
-        [PyTango.DevLong,
-        "Timeout for read_attribute calls, in milliseconds .",
-        [ 500 ] ],
-    'UseProcess':
-        [PyTango.DevBoolean,
-        "To create new OS processes instead of threads.",
-        [ False ] ],
-    'UseTaurus':
-        [PyTango.DevBoolean,
-        "Use Taurus to connect to devices instead of plain PyTango.",
-        [ False ] ],
-    }
-    
-ALARM_CONFIG = ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()+ALARM_LOGS.keys()+DEVICE_CONFIG.keys()
-PyAlarmDefaultProperties = dict(fun.join(d.items() for d in (ALARM_CYCLE,ALARM_ARCHIVE,ALARM_LOGS,DEVICE_CONFIG)))
-ALARM_SEVERITIES = ['ERROR','ALARM','WARNING','DEBUG']
-
-# End of PyAlarm properties
-###############################################################################
 
 ###############################################################################
 #@todo: These methods and AlarmAPI.setAlarmDeviceProperty should be moved to AlarmDS
