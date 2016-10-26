@@ -309,6 +309,17 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             keys['$VALUES'] = str(self.PastValues.get(obj.tag))
           if '$REPORT' in str(argin):
             keys['$REPORT'] = '\n'.join(self.GenerateReport(obj.tag,message=message))
+          if '$JSON' in str(argin):
+            try:
+              import json
+              obj.get_active()
+              obj.get_acknowledged()
+              dct = fandango.obj2dict(obj)
+              dct['values'] = self.PastValues.get(obj.tag)
+              dct['message'] = message
+              keys['$JSON'] = json.dumps(dct)
+            except:
+              self.error(traceback.format_exc())
         else:
           keys['$DESCRIPTION'] = keys['$VALUES'] = keys['$REPORT'] = ''
             
@@ -324,7 +335,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
         return argin
     
-    def parse_receivers(self,tag_name='',filtre=False,receivers=None):
+    def parse_receivers(self,tag_name='',filtre=False,receivers=None,message=''):
         '''
         Filters the Alarm receivers matching tag_name; also replaces addresses entered in the PhoneBook 
         This method is called from free_alarm and send_alarm.
@@ -333,7 +344,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if receivers is None:
             raw_receivers = self.Alarms[tag_name].receivers.split('#')[0]
             receivers = self.Alarms.parse_phonebook(raw_receivers)
-            receivers = self.parse_defines(receivers,tag_name)
+            receivers = self.parse_defines(receivers,tag_name,message=message)
             self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
         else: receivers = ','.join(receivers)
         receivers = [r for r in receivers.split(',') if not filtre or filtre in r]
@@ -604,7 +615,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.lock.acquire()
             result = False
             alarm_obj = self.Alarms[tag_name]
-            receivers = self.parse_receivers(tag_name)
+            receivers = self.parse_receivers(tag_name,message=message)
             was_active = alarm_obj.active
             self.info('-'*80),self.info('In free_alarm(%s,%s,%s,%s,%s)'%(tag_name,comment,message,notify,was_active))
             if message=='RESET' and self.CheckDisabled(tag_name): 
@@ -625,7 +636,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.lock.release()
         try: #NOTIFICATION SHOULD NOT BE WITHIN THE LOCK
             if was_active:
-                mail_receivers = self.parse_receivers(tag_name,'@',receivers)
+                mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
                 report = self.GenerateReport(tag_name,mail_receivers,message=message or 'RESET',user_comment=comment)
 
                 if self.get_enabled() and notify:
@@ -654,7 +665,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         self.warning( 'PyAlarm.trigger_snapshot crashed with exception:\n%s' % traceback.format_exc())
                     
                     try:
-                        if self.parse_receivers(tag_name,'HTML',receivers):
+                        if self.parse_receivers(tag_name,'HTML',receivers,message=message):
                             self.info('>'*80+'\n'+'saving html report for alarm:'+tag_name)
                             self.SaveHtml(self.GenerateReport(tag_name,message=message or 'RESET',user_comment=comment, html=True))
                     except Exception, e:
@@ -695,9 +706,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if message in ('ALARM','REMINDER') or self.AlertOnRecovery:
                 try:
                     self.lock.acquire()
-                    receivers = self.parse_receivers(tag_name)
-                    mail_receivers = self.parse_receivers(tag_name,'@',receivers)
-                    sms_receivers = self.parse_receivers(tag_name,'SMS',receivers)
+                    receivers = self.parse_receivers(tag_name,message=message)
+                    mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
+                    sms_receivers = self.parse_receivers(tag_name,'SMS',receivers,message=message)
                     action_receivers = self.parse_action_receivers(tag_name,message,receivers)
                     self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers)))
                 finally:
@@ -730,14 +741,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                             except:
                                 self.debug('-'*80)
                                 self.warning('Exception sending sms!: %s' % traceback.format_exc())
-                        if self.parse_receivers(tag_name,'HTML',receivers):
+                        if self.parse_receivers(tag_name,'HTML',receivers,message=message):
                             try:
                                 self.info('saving html report for alarm:'+tag_name)
                                 self.SaveHtml(self.GenerateReport(tag_name,message=message,values=values, html=True))
                             except Exception, e:
                                 self.warning('PyAlarm.saveHtml crashed with exception:\n%s' % traceback.format_exc())
                         if (message in ('ALARM','ACKNOWLEDGED','RESET') or self.AlertOnRecovery and message=='RECOVERED') \
-                                and SNAP_ALLOWED and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers)):
+                                and SNAP_ALLOWED and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers,message=message)):
                             try:
                                 self.info('<'*80+'\n'+'triggering snapshot for alarm:'+tag_name)
                                 if (self.Alarms[tag_name].severity!='DEBUG'): self.trigger_snapshot(tag_name,message)
@@ -1655,6 +1666,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         #if (maillist or (not maillist and html)):
         report = 'TAG: %s'%tag_name
+        report += '\n%s at %s\n'%(message,fun.time2str())
         actives = self.get_active_alarms()
         subject = '%s %s'%(tag_name,message)
         values = values or self.PastValues.get(tag_name,None)
@@ -1663,16 +1675,16 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             first_row = ''
             if self.Alarms[tag_name].active:
                 if self.Alarms[tag_name].recovered:
-                    first_row += '\n\t' + 'Alarm conditions recovered at %s'%(time.ctime(self.Alarms[tag_name].recovered))
-                first_row += '\n\t' + 'Alarm ACTIVE since %s'%(time.ctime(self.Alarms[tag_name].active or self.PastAlarms.get(tag_name,0)))
+                    first_row += '\n\t' + 'Alarm conditions recovered at %s'%(fun.time2str(self.Alarms[tag_name].recovered))
+                first_row += '\n\t' + 'Alarm ACTIVE since %s'%(fun.time2str(self.Alarms[tag_name].active or self.PastAlarms.get(tag_name,0)))
             else:
                 first_row = '\n\t' + 'The alarm is not active.'
         elif message in ('ALARM','REMINDER'):
-            first_row = '\n\t' + 'Alarm active since %s'%(time.ctime(self.Alarms[tag_name].active or self.PastAlarms.get(tag_name,0)))
+            first_row = '\n\t' + 'Alarm active since %s'%(fun.time2str(self.Alarms[tag_name].active or self.PastAlarms.get(tag_name,0)))
         elif message in ('RECOVERED','AUTORESET'):
-            first_row = '\n\t' + '%s at %s' %(message,time.ctime())
+            first_row = '\n\t' + '%s at %s' %(message,fun.time2str())
         elif message in ('ACKNOWLEDGED','RESET','DETAILS','DISABLED'):
-            first_row = '\n\t' + '%s at %s' %(message,time.ctime())
+            first_row = '\n\t' + '%s at %s' %(message,fun.time2str())
             first_row += '\n\tDetails -> %s'%user_comment
         elif message not in self.MESSAGE_TYPES:
             first_row = '\n\t%s'%message
@@ -1701,11 +1713,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if maillist and len(maillist)>1:
             report += '\n\n' + 'Alarm receivers are: ' + '\n\t'.join([''] + maillist)
         if len(actives) > 1:
-            try: report+= '\n\n' + 'Other Active Alarms are:' + '\n\t'.join([''] + sorted(['%s:%s:%s'%(k,time.ctime(v.active),self.Alarms[k].formula) for k,v in self.Alarms.items() if v.active]))
+            try: report+= '\n\n' + 'Other Active Alarms are:' + '\n\t'.join([''] + sorted(['%s:%s:%s'%(k,fun.time2str(v.active),self.Alarms[k].formula) for k,v in self.Alarms.items() if v.active]))
             except: pass
         if self.PastAlarms:
             self.info( self.PastAlarms)
-            report+= '\n\n' + 'Past Alarms were:' + '\n\t'.join([''] + ['%s:%s'%(','.join(k),time.ctime(d)) for d,k in self.PastAlarms.items()])
+            report+= '\n\n' + 'Past Alarms were:' + '\n\t'.join([''] + ['%s:%s'%(','.join(k),fun.time2str(d)) for d,k in self.PastAlarms.items()])
         if html:
             result = [report, subject]
         else:
