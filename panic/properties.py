@@ -57,7 +57,7 @@ PANIC_PROPERTIES = {
         [PyTango.DevLong,
         "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
         [ 0 ] ],
-    'GlobalHooks':
+    'GlobalReceivers':
         [PyTango.DevVarStringArray,
         "Receivers to be applied globally to all alarms\n\
         Declared as FILTER:receiver,ACTION(MESSAGE:...) like\n\

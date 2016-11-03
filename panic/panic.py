@@ -411,7 +411,7 @@ class AlarmDS(object):
                 self.alarms[tag] = {'formula':formula}
                 try: 
                   local_receivers = fun.first(r for r in props['AlarmReceivers'] if r.startswith(tag+':')).split(':',1)[-1]
-                  global_receivers = self.api.get_global_hooks(tag)
+                  global_receivers = self.api.get_global_receivers(tag)
                   self.alarms[tag]['receivers'] = ','.join((local_receivers,global_receivers))
                 except: self.alarms[tag]['receivers'] = ''
                 try: self.alarms[tag]['description'] = fun.first(r for r in props['AlarmDescriptions'] if r.startswith(tag+':')).split(':',1)[-1]
@@ -758,8 +758,8 @@ class AlarmAPI(fandango.SingletonMap):
         self.phonebook = None #Force to reload
         return new_prop
       
-    def get_global_hooks(self,tag=''):
-        prop = self.get_class_property('PyAlarm','GlobalHooks')
+    def get_global_receivers(self,tag=''):
+        prop = self.get_class_property('PyAlarm','GlobalReceivers')
         if not tag:
           return prop
         else:
