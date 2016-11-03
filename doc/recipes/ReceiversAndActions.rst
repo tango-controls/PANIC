@@ -1,5 +1,28 @@
+===========================
+PANIC Receivers and Actions
+===========================
+
+.. contents::
+
+Alarm Receivers
+---------------
+
+Allowed receivers are email, sms, action and shell commands.
+
+Global Receivers
+----------------
+
+The PyAlarm class property "GlobalReceivers" allows to set receivers that 
+will be applied to all Alarms; independently of the device that is managing them.
+
+The syntax is::
+
+  GlobalReceivers
+    {regexp}:{receivers}
+    .*:oncall@facility.dom
+
 Triggering Actions from PyAlarm
-===============================
+-------------------------------
 
 See basic details on the user guide:
 
