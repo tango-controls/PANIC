@@ -5,6 +5,7 @@ ALBA
 
  - Failed alarms and servers should be easy to spot from panic gui
  - Users to be alerted if the PyAlarm is dead or idle
+ - Run "silent panic" on Taskbar.
  - Taurus pop-ups on alarms
  - set alarms when the readback is different from the last user input in a given attribute.
  - protect againts using "is" in formulas; should be replaced by "=="
