@@ -57,6 +57,10 @@ PANIC_PROPERTIES = {
         [PyTango.DevLong,
         "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
         [ 0 ] ],
+    'PanicAdminUsers':
+        [PyTango.DevVarStringArray,
+        "Users authorized to modify the Alarms (apart of receivers) ",
+        [ ] ],
     'GlobalReceivers':
         [PyTango.DevVarStringArray,
         "Receivers to be applied globally to all alarms\n\
