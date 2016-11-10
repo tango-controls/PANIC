@@ -44,7 +44,7 @@ if any of the alarm changes to active state (.delta) or matches a given conditio
 
 **NOTE**: BY DEFAULT IS NOT LIKE any(FIND(*)); it will react only on change, not if already active!
 
-**NOTE2**: you must tune your PyAlarm device to have AlarmThreshold = 1 and AutoRest <= 3 to take profit of this feature.
+**NOTE2**: you must tune your PyAlarm properties to have AlarmThreshold = 1 and AutoReset <= 3 to take profit of this feature.
 
 It uses the read_attribute schema from TangoEval, thus using .delta to keep track of which values has changed. 
 For example, GROUP(test/alarms/*/TEST_[ABC]) will be replaced by::
