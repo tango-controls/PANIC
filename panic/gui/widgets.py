@@ -141,7 +141,7 @@ def multiline2line(lines):
 
 ###############################################################################
 
-class iLDAPValidatedWidget(object):
+class iValidatedWidget(object):
     """
     This class assumes that you have a self.api=PanicAPI() member in your subclass 
     
@@ -151,26 +151,53 @@ class iLDAPValidatedWidget(object):
             return
     """
     
-    def init_ldap(self,tag=''):
-        try:
-            from ldap_login import LdapLogin
-        except:
-            print('LdapLogin module not found')
-            return None
+    def init(self,tag=''):
         if not hasattr(self,'validator'):
-            self.validator = LdapLogin()
-            log = (self.api.get_class_property('PyAlarm','PanicLogFile') or [''])[0]
-            if log: self.validator.setLogging(True,log)
-            users = self.api.get_admins_for_alarm(tag)
-            self.validator.setAllowedUsers(users)
-        return True
+          self.UserValidator,self.validator = '',None
+          try:
+              props = self.api.servers.db.get_class_property('PyAlarm',['UserValidator','PanicAdminUsers'])
+              self.UserValidator = fandango.first(props['UserValidator'],'')
+              self.AdminUsers = list(props['PanicAdminUsers'])
+              if self.UserValidator:
+                mod,klass = self.UserValidator.rsplit('.',1)
+                mod = fandango.objects.loadModule(mod)
+                klass = getattr(mod,klass)
+                self.validator = klass()
+                log = (self.api.get_class_property('PyAlarm','PanicLogFile') or [''])[0]
+                if log: self.validator.setLogging(True,log)
+          except:
+              print('iValidateWidget: %s module not found'%(self.UserValidator or 'PyAlarm.UserValidator'))
+              return -1
+
+        if not self.AdminUsers and not self.UserValidator:
+          #passwords not available
+          return None
+        users = self.api.get_admins_for_alarm(tag)
+        if not users: 
+          #Not using passwords for this alarm
+          return None
+        elif self.validator is None:
+          #Failed to initialize
+          return -1
+        else:
+          self.validator.setAllowedUsers(users)
+          return self.validator
         
     def setAllowedUsers(self,users):
-        if self.init_ldap() is None: return
+        if self.init() is None: return
         self.validator.setAllowedUsers(users)
         
     def validate(self,msg='',tag=''):
-        if self.init_ldap(tag) is None: return True
+        err = self.init(tag)
+        if err is None: 
+          return True
+        if err == -1:
+          Qt.QMessageBox.critical(None,
+              "Error!",
+              "%s module not found"%(self.UserValidator or 'PyAlarm.UserValidator'),
+              QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
+          return False
+        
         self.validator.setLogMessage('AlarmForm(%s).Validate(%s): %s'%(tag,msg,tag and self.api[tag].to_str()))
         #print('LdapValidUsers %s'%self.validator.getAllowedUsers())
         return self.validator.exec_() if self.validator.getAllowedUsers() else True

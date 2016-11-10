@@ -771,18 +771,9 @@ class AlarmAPI(fandango.SingletonMap):
     
     def group_macro(self,match):
         """
-        For an expression matching multiple ALARM attributes returns a new formula that will evaluate to True
-        if any of the alarm changes to active state (.delta). NOTE, THIS IS NOT any(FIND(*)); it will react only
-        on change, not if already active!
+        For usage details:
         
-        It uses the read_attribute schema from TangoEval, thus using .delta to keep track of which values has changed.
-        For example, GROUP(test/alarms/*/TEST_[ABC]) will be replaced by:
-            any([t.delta>0 for d in FIND(test/alarms/*/TEST_[ABC].all)])
-            
-        By default GROUP is active if any .delta is >0. It can be modified if the formula contains a semicolon ";" and 
-        a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm
-            GROUP(bl09/vc/vgct-*/p[12];x>1e-5) => [x>1e-5 for x in FIND(bl09/vc/vgct-*/p[12])]
-            
+        see: https://github.com/tango-controls/PANIC/new/documentation/doc/recipes
         """
         match,cond = match.split(';',1) if ';' in match else (match,'')
         #if '/' not in match and self._eval._locals.get('DEVICE',None): 
@@ -805,7 +796,6 @@ class AlarmAPI(fandango.SingletonMap):
           cond = 'x > 0'
 
         exp = 'any([%s for x in [ %s ]])'%(cond,' , '.join(attrs))
-        print exp
         return exp
       
     def split_formula(self,formula,keep_operators=False):

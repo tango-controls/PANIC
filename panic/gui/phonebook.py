@@ -1,7 +1,7 @@
 import sys, panic, traceback
 from PyQt4 import Qt, QtCore, QtGui
 from taurus.qt.qtgui.resource import getThemeIcon
-from widgets import iLDAPValidatedWidget
+from widgets import iValidatedWidget
 
 class PhoneBook(QtGui.QWidget):
     def __init__(self,parent=None,container=None):
@@ -17,7 +17,7 @@ class PhoneBook(QtGui.QWidget):
     def show(self):
         QtGui.QWidget.show(self)
 
-class PhoneBookEntry(iLDAPValidatedWidget,object):
+class PhoneBookEntry(iValidatedWidget,object):
     def __init__(self, phoneBook):
         self.pB = phoneBook
         self.api = self.pB.api

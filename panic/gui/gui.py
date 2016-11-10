@@ -25,7 +25,7 @@ except Exception,e:
     SNAP_ALLOWED=False
 
 PARENT_CLASS = QtGui.QWidget
-class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
+class AlarmGUI(PARENT_CLASS,iValidatedWidget):
     REFRESH_TIME = 10000 #Default period between list order updates
     RELOAD_TIME = 60000 #Default period between database reloads
     MAX_REFRESH = 3 #Controls the new interval set by hurry()

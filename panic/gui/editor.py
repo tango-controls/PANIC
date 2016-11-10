@@ -5,7 +5,7 @@ from ui_data import Ui_Data,Ui_ReceiversLine
 from ui_data import uiBodyForm,uiRowForm
 from taurus.qt.qtgui.resource import getThemeIcon
 from widgets import AlarmValueLabel,setCheckBox,getAlarmReport,get_user,trace
-from widgets import AttributesPreview,AlarmPreview,iLDAPValidatedWidget
+from widgets import AttributesPreview,AlarmPreview,iValidatedWidget
 from fandango.excepts import Catched
 
 #AlarmFormula widget is added to the editor in the ui_data.py file
@@ -23,7 +23,7 @@ except Exception,e:
 
 FormParentClass = Qt.QDialog
 
-class AlarmForm(FormParentClass,iLDAPValidatedWidget): #(QtGui.QWidget):
+class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     
     __pyqtSignals__ = ("valueChanged",)
     

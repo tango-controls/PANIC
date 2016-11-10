@@ -61,6 +61,10 @@ PANIC_PROPERTIES = {
         [PyTango.DevVarStringArray,
         "Users authorized to modify the Alarms (apart of receivers) ",
         [ ] ],
+    'UserValidator':
+        [PyTango.DevString,
+         "Module.Class to be used to validate admin user/passwords.",
+         [ ] ],
     'GlobalReceivers':
         [PyTango.DevVarStringArray,
         "Receivers to be applied globally to all alarms\n\
