@@ -7,6 +7,10 @@ Hierarchies In Alarms
 TOP/BOTTOM
 ==========
 
+The TOP/BOTTOM just provides a filter for finding alarms where the value of another
+alarm is used directly in the formula. It is case sensitive, so you can use lower/upper
+case to show/hide alarms in these filters.
+
 To use hierarchies, alarms shall be written using the result of previous ones::
 
   GAB1 = any([t >5 for t in FIND(tc1:10000/LMC/C01/GAB/*)])
