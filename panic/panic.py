@@ -781,28 +781,31 @@ class AlarmAPI(fandango.SingletonMap):
             
         By default GROUP is active if any .delta is >0. It can be modified if the formula contains a semicolon ";" and 
         a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm
-            GROUP(bl09/vc/vgct-*/p[12],x>1e-5) => [x>1e-5 for x in FIND(bl09/vc/vgct-*/p[12])]
+            GROUP(bl09/vc/vgct-*/p[12];x>1e-5) => [x>1e-5 for x in FIND(bl09/vc/vgct-*/p[12])]
+            
         """
-        match,cond = match.split(';',1) if ';' in match else (match,'x>0')
-        if '/' not in match and self._eval._locals.get('DEVICE',None): match = self._eval._locals['DEVICE']+'/'+match
-        matches = []
-        if '/' in match:
-            matches = [d+'/'+a for dev,attr in [match.rsplit('/',1)] for d,dd in self.devices.items() for a in dd.alarms if fun.matchCl(dev,d) and fun.matchCl(attr,a)]
-        else:
-            matches = [self[a].get_attribute(full=True) for a in self if fun.matchCl(match,a)]
-        if not cond: matches = [m+'.delta' for m in matches]
-        exp = 'any([%s for x in [ %s ]])'%(cond,' , '.join(matches))
+        match,cond = match.split(';',1) if ';' in match else (match,'')
+        #if '/' not in match and self._eval._locals.get('DEVICE',None): 
+          #match = self._eval._locals['DEVICE']+'/'+match
+
+        exps = match.split(',')
+        attrs = []
+        for e in exps:
+          if '/' in e:
+              attrs.extend(d+'/'+a 
+                  for dev,attr in [e.rsplit('/',1)] 
+                  for d,dd in self.devices.items() 
+                  for a in dd.alarms 
+                  if fun.matchCl(dev,d) and fun.matchCl(attr,a))
+          else:
+              attrs.extend(self[a].get_attribute(full=True) for a in self if fun.matchCl(e,a))
+              
+        if not cond: 
+          attrs = [m+'.delta' for m in attrs]
+          cond = 'x > 0'
+
+        exp = 'any([%s for x in [ %s ]])'%(cond,' , '.join(attrs))
         print exp
-        #if not cond: #It just tries to find DELTA in all variables matching the condition
-            ##By default, summarize which attributes has changed
-            #exp = "any([t.delta>0 for t in FIND(%s.all) if PANIC.has_tag(t.name)])"%(match)
-            #if '/' not in match: #Trying to match alarm names instead of attributes
-                #matches = [a for a in self.alarms if fun.matchCl(match+'$',a)]
-                #if matches:
-                    #attrs = sorted(set(self.alarms[a].get_attribute(full=True) for a in self.alarms if fun.matchCl(match+'$',a)))
-                    #exp = '('+'any([d>0 for d in [ %s ] ])'%' , '.join(s+'.delta' for s in attrs) + ' and [ %s ])'%' , '.join(attrs)
-        #else:
-            #exp = '(any([%s for x in FIND(%s)]))'%(cond,match)
         return exp
       
     def split_formula(self,formula,keep_operators=False):
