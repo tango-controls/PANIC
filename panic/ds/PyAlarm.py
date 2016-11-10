@@ -379,14 +379,16 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 return
             else: del self.updateThread
         self.info( 'Thread Starting')
-        self.event.clear()
+        self.kill.clear()
+        self.pause.clear()
         self.updateThread = threading.Thread(None,self.updateAlarms,'PyAlarm')
         self.updateThread.setDaemon(True)
         self.updateThread.start()
 
     def stop(self):
         self.info( 'In PyAlarm.stop() ...')
-        self.event.set()
+        self.kill.set()
+        self.pause.set()
         self.updateThread.join(self.PollingPeriod)
         if self.updateThread.isAlive():
             self.warning( 'Thread '+self.updateThread.getName()+' doesn''t Stop!')
@@ -442,20 +444,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     
     def updateAlarms(self):
         self.info( 'In PyAlarm::updateAlarms ...')
-        self.event.clear()
+        self.pause.clear()
+        self.kill.clear()
         polled_attrs = []
         #Alarms will not start evaluation until StartupDelay seconds has passed.
         if time.time()<(self.TStarted+self.StartupDelay):
             self.info('Alarms evaluation not started yet, waiting StartupDelay=%d seconds.'%self.StartupDelay)
-            self.event.wait(self.StartupDelay-(time.time()-self.TStarted))
+            self.pause.wait(self.StartupDelay-(time.time()-self.TStarted))
         #Checking that the background test process is running
         if self.worker:
             if not self.worker.isAlive(): self.worker.start()
-            self.event.wait(self.PollingPeriod)
+            self.pause.wait(self.PollingPeriod)
         #Initializing alarm values used in formulas
         _locals = self.update_locals(check=True)
             
-        while not self.event.isSet():
+        while not self.kill.isSet():
+            self.pause.clear()
             try:
                 try:
                     #self.Alarms.servers.db.get_info()
@@ -466,7 +470,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     ## This wait is here just to prevent the loop to spin continuously
                     # The update_locals command will not allow background process to die
                     for k in self.Alarms.servers:
-                        self.event.wait(self.PollingPeriod/len(self.Alarms.servers))
+                        self.pause.wait(self.PollingPeriod/len(self.Alarms.servers))
                         if self.worker: _locals = self.update_locals(_locals,update=True)
                     continue
 
@@ -515,7 +519,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         
                     #Wait moved out of try/except to avoid locked waits.
                     if VALUE is None and tag_name in self.FailedAlarms:
-                        self.event.wait(timewait)
+                        self.pause.wait(timewait)
                         continue
 
                     if VALUE:
@@ -575,8 +579,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.Alarms[tag_name]=alarm
                     self.lock.release()
                     ######################################################################################################################
-                    self.event.wait(timewait)
-                if not myAlarms: self.event.wait(timewait)
+                    self.pause.wait(timewait)
+                if not myAlarms: self.pause.wait(timewait)
                 self.Uncatched=''
 
             except Exception,e:
@@ -584,7 +588,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 tr=format_exc()
                 self.error( 'Uncatched exception in PyAlarm::updateAlarmsThread:\n%s'%tr + '\n' + '='*80)
                 self.Uncatched+=tr+'\n'
-                self.event.wait(timewait)
+                self.pause.wait(timewait)
         self.info( 'In updateAlarms(): Thread finished')
         return
 
@@ -1012,7 +1016,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         self.worker = None
         self.lock=threading.RLock();
-        self.event=threading.Event();
+        self.kill=threading.Event();
+        self.pause=threading.Event();
         self.threadname=name
         self.updateThread = None
         self.last_attribute_check = 0
@@ -1033,6 +1038,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
     def delete_device(self,allow=False):
         self.warning( "0[Device delete_device method] for device %s"%self.get_name())
+        self.pause.set()
         if allow:
             self.set_state(PyTango.DevState.INIT)
             self.stop()
@@ -1149,6 +1155,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.start()
             self.info( 'Ready to accept request ...'+'<'*40)
             self.setLogLevel(self.LogLevel)
+            self.pause.clear()
+            self.kill.clear()
         except Exception,e:
             self.info( 'Exception in PyAlarm.init_device(): \n%s'%traceback.format_exc())
             self.set_state(PyTango.DevState.FAULT)
