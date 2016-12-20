@@ -46,6 +46,8 @@
 """
 
 import traceback,re,time,os,sys
+from uuid import uuid4
+
 import fandango
 import fandango.functional as fun
 from fandango.tango import CachedAttributeProxy,PyTango
@@ -202,11 +204,19 @@ class Alarm(object):
             config = {}
         return config
 
+    def get_failed(self):
+        try: return self.get_ds().get().CheckFailed(self.tag)
+        except: return None
+
     def get_enabled(self):
         try: 
                 self.disabled = self.get_ds().get().CheckDisabled(self.tag)
                 return not self.disabled
         except: return None
+
+    def activate(self):
+        self.active = time.time()
+        self.instance = str(uuid4())
 
     def enable(self):
         """ Enables alarm evaluation """
@@ -540,7 +550,9 @@ class AlarmAPI(fandango.SingletonMap):
         tcheck = time.time()
         #Loading phonebook
         self.get_phonebook(load=True)
-        
+        #Loading variables
+        self.get_variables(load=True)
+
         #Verifying that previously loaded alarms still exist
         for k in self.alarms.keys()[:]:
             if not any(k in vals for vals in all_alarms.values()):
@@ -694,7 +706,13 @@ class AlarmAPI(fandango.SingletonMap):
     def put_class_property(self,klass,prop,value):
         if not fun.isSequence(value): value = [value]
         self.servers.db.put_class_property(klass,{prop:value})
-        
+
+    def remove_class_properties(self,klass):
+        """ PJB remove all class properties """
+        proplist = self.servers.db.get_class_property_list(klass)
+        propdict = dict((key,0) for key in proplist) #values are ignored
+        self.servers.db.delete_class_property(klass,propdict)
+
     def get_phonebook(self,load=True):
         """ gets the phonebook, returns a list """        
         if load or not getattr(self,'phonebook',None):
@@ -709,7 +727,9 @@ class AlarmAPI(fandango.SingletonMap):
                         if s==x: ph[k] = v.replace(s,w)
             self.phonebook = ph
         return self.phonebook
-        
+
+
+
     def parse_phonebook(self,receivers):
         """
         Replaces phonebook entries in a receivers list
@@ -756,6 +776,45 @@ class AlarmAPI(fandango.SingletonMap):
         """ Saves a new phonebook in the database """
         self.put_class_property('PyAlarm','Phonebook',new_prop)
         self.phonebook = None #Force to reload
+        return new_prop
+
+    def get_variables(self, load=True):
+        """ gets variables, returns a dict """
+        if load or not getattr(self, 'variables', None):
+            vs, prop = {}, self.get_class_property('PyAlarm', 'Variables')
+            for line in prop:
+                line = line.split('#', 1)[0]
+                if line:
+                    vs[line.split(':', 1)[0]] = line.split(':', 1)[-1]
+            self.variables = vs
+        return self.variables
+
+    def remove_variable(self, name):
+        """ Removes a variable """
+        prop = self.get_class_property('PyAlarm', 'Variables')
+        if name not in str(prop):
+            raise Exception('NotFound:%s' % name)
+        self.save_variables([p for p in prop if not p.split(':', 1)[0] == name])
+
+    def edit_variables(self, name, value):
+        """ Adds a variable """
+        prop = self.get_class_property('PyAlarm', 'Variables')
+        value = '%s:%s' % (name, value)
+        lines = [line.strip().split(':', 1)[0].upper() for line in prop]
+        if name in lines:
+            index = lines.index(name)
+            print 'AlarmAPI.edit_variables(%s,%s), replacing at [%d]' % (name, value, index)
+            prop = prop[:index] + [value] + prop[index + 1:]
+        else:
+            index = len(lines)
+            print 'AlarmAPI.edit_variables(%s,%s), adding at [%d]' % (name, value, index)
+            prop = prop + [value]
+        self.save_variables(prop)
+
+    def save_variables(self, new_prop):
+        """ Saves a set of variables in the database"""
+        self.put_class_property('PyAlarm', 'Variables', new_prop)
+        self.variables = None #Force to reload
         return new_prop
       
     def get_global_receivers(self,tag=''):
@@ -826,6 +885,43 @@ class AlarmAPI(fandango.SingletonMap):
           nx=''
         return final
 
+    def parse_variables(self, formula):
+        """
+        Searches for variables used in the formula
+        """
+        alnum = '(?:^|[^/a-zA-Z0-9-_])([a-zA-Z0-9-_]+)'
+        var = re.findall(alnum, formula)
+        #print '\tparse_alarms(%s): %s'%(formula,var)
+
+        return [a for a in self.variables.keys() if a in var]
+
+    def replace_variables(self, formula):
+        """
+        Replaces variables by its equivalent device/alarm attributes
+        """
+        try:
+            var = self.parse_variables(formula)
+            if var:
+                for v in reversed(var):
+                    x = '(?:^|[^/a-zA-Z0-9-_])(%s)(?:$|[^/a-zA-Z0-9-_])' % v
+                    exp = '(' + self.variables[v] + ')'
+                    m, new_formula = True, ''
+                    while m:
+                        m = re.search(x, formula)
+                        if m:
+                            start, end = m.start(), m.end()
+                            if not formula.startswith(v):
+                                start += 1
+                            if not formula.endswith(v):
+                                end -= 1
+                            new_formula += formula[:start] + exp
+                            formula = formula[end:]
+                    formula = new_formula + formula
+            return formula
+        except:
+            print('Exception in replace_variables():%s' % traceback.format_exc())
+            return formula
+
     def parse_alarms(self, formula):
         """
         Searches for alarm tags used in the formula
@@ -892,7 +988,9 @@ class AlarmAPI(fandango.SingletonMap):
                 self._eval.set_timeout(timeout)
                 self._eval.update_locals({'PANIC':self})
                 if _locals: self._eval.update_locals(_locals)
-                return self._eval.eval(self.replace_alarms(formula))
+                formula = self.replace_alarms(formula)
+                formula = self.replace_variables(formula)
+                return self._eval.eval(formula)
         except Exception,e:
             return e
 
