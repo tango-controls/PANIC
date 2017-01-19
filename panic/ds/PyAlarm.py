@@ -294,6 +294,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             $REPORT : full report sent when the alarm was raised
             $DATE/$DATETIME : current time as YYYYMMDD_hhmm
             $MESSAGE : type of alarm event (RESET,ALARM,REMINDER,...)
+            $JSON : all the previous fields in a JSON dictionary
+            
         """
         keys = {}
         keys['$ALARM'] = keys['$TAG'] = keys['$NAME'] = tag
@@ -577,9 +579,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     if tag_name in self.FailedAlarms: self.FailedAlarms.pop(tag_name)
                     self.lock.acquire()
                     self.Alarms[tag_name]=alarm
+                    self._lastupdate = time.time()
                     self.lock.release()
                     ######################################################################################################################
                     self.pause.wait(timewait)
+                    
                 if not myAlarms: self.pause.wait(timewait)
                 self.Uncatched=''
 
@@ -589,6 +593,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.error( 'Uncatched exception in PyAlarm::updateAlarmsThread:\n%s'%tr + '\n' + '='*80)
                 self.Uncatched+=tr+'\n'
                 self.pause.wait(timewait)
+                
         self.info( 'In updateAlarms(): Thread finished')
         return
 
@@ -1012,6 +1017,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.EvalTimes = {}
         self.Uncatched = ''
         self.DynamicAttributes = []
+        self._lastupdate = 0
         self._initialized = False #Enabled once dyn_attr has finished
 
         self.worker = None
@@ -1373,6 +1379,17 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             attr_SentSMS_read.append(str(value))
         self.debug( 'SentSMS are: %s'%attr_SentSMS_read)
         attr.set_value(attr_SentSMS_read, 2, len(attr_SentSMS_read)/2)
+        
+    def getMemUsage(self):
+        return fandango.linos.get_memory()/1e3
+    
+    def read_MemUsage(self, attr):
+        self.debug("In read_MemUsage()")
+        attr.set_value(self.getMemUsage())
+        
+    def read_LastUpdate(self, attr):
+        self.debug("In read_LastUpdate()")
+        attr.set_value(self._lastupdate)        
 
 
 #==================================================================
@@ -2046,6 +2063,14 @@ class PyAlarmClass(PyTango.DeviceClass):
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 512]],
+        'MemUsage':
+            [[PyTango.DevDouble,
+            PyTango.SCALAR,
+            PyTango.READ]],
+        'LastUpdate':
+            [[PyTango.DevDouble,
+            PyTango.SCALAR,
+            PyTango.READ]],
         }
 
     def dyn_attr(self,dev_list):
