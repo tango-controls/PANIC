@@ -45,6 +45,7 @@ Here you have some more examples:
   %WRITE:ACTION(alarm:attribute,sys/tg_test/1/string_scalar,'$NAME_$DATE_$VALUES')
   
   # Execute a command in another tango host
+  # in this example a FolderDS saves the alarm log
   %LOG:ACTION(alarm:command,controls02:10000/test/folder/tmp-folderds/SaveText,'$NAME_$DATE_$MESSAGE.txt','$REPORT')
 
 Then declare the AlarmReceivers like::
