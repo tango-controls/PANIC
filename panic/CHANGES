@@ -1,6 +1,39 @@
 ONGOING 6.0
 ---------------------
 
+alpha 6.0.4
+
+Solve bug on AlarmAPI.put_db_properties (Wrote to device instead of free property)
+
+alpha 6.0.3 (January 2017)
+
+PyAlarm:
+
+Properties definition moved to panic.properties
+Add invalid quality to disabled alarms
+Add FAULT state when many alarms are failed
+Add LastUpdate and MemUsage attributes
+Avoid update_locals to reread attributes if check=False
+Add receiver defines: $ALARM/TAG/NAME/DEVICE/DESCRIPTION/VALUES/REPORT/DATE/JSON
+Implement Pause() command and kill/pause methods for thread management.
+LogFiles capable of saving remotely using fandango.device.FolderDS 
+Solved bugs on trigger_action (see documentation on github)
+
+API:
+
+Properties definition moved to panic.properties
+Added global receivers property
+Solved bug on phonebook parsing
+Group macro refactored (see documentation/recipes)
+Add api.split_formula()
+Change api.evaluate() timeout and checks
+
+GUI:
+
+New panic Icon
+
+alpha 1 (April 2016)
+
  * Alarm Qualities will change to reflect alarm life cycle instead of severity.
  * Alarm may be declared in its own class/free property; instead of using Alarm* device properties.
  * Alarm collections will be used to manage different sets of alarms in GUI>
