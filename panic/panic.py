@@ -805,14 +805,24 @@ class AlarmAPI(fandango.SingletonMap):
         return self.servers.proxies[dev]
     
     def get_db_properties(self,ref,props):
-        return self.servers.db.get_device_property(ref,props)
+        if '/' not in ref:
+          return self.servers.db.get_property(ref,props)
+        elif ref.count('/')>=2:
+          return self.servers.db.get_device_property(ref,props)
+        else:
+          raise Exception,'Unknown %s'%ref      
      
     def get_db_property(self,ref,prop):
         return list(self.get_db_properties(ref,[prop])[prop])
     
     def put_db_properties(self,ref,props):
-        self.servers.db.put_device_property(ref,props)
-        
+        if '/' not in ref:
+          self.servers.db.put_property(ref,props)
+        elif ref.count('/')>=2:
+          self.servers.db.put_device_property(ref,props)
+        else:
+          raise Exception,'Unknown %s'%ref
+    
     def put_db_property(self,ref,prop,value):
         if not fun.isSequence(value): value = [value]
         self.put_db_properties(ref,{prop:value})
