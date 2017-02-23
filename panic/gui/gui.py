@@ -14,19 +14,16 @@ from row import AlarmRow
 from widgets import *
 from editor import FormulaEditor,AlarmForm
 from core import Ui_AlarmList
-#from htmlview import *
-
+from alarmhistory import *
+    
 OPEN_WINDOWS = []
 
-try:
-    from alarmhistory import *
-except Exception,e:
-    #print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',str(e)
-    SNAP_ALLOWED=False
+import widgets
+widgets.TRACE_LEVEL = 0
 
 PARENT_CLASS = QtGui.QWidget
 class AlarmGUI(PARENT_CLASS,iValidatedWidget):
-    REFRESH_TIME = 10000 #Default period between list order updates
+    REFRESH_TIME = 5000 #Default period between list order updates
     RELOAD_TIME = 60000 #Default period between database reloads
     MAX_REFRESH = 3 #Controls the new interval set by hurry()
     MAX_ALARMS = 30 #AlarmRow.use_list will be enabled only if number of alarms is higher than this number
@@ -34,7 +31,7 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
     __pyqtSignals__ = ("valueChanged",)
     
     def __init__(self, parent=None, filters='*', options=None, mainwindow=None):
-        print '>'*80
+        trace('>>>> AlarmGUI()')
         options = options or {}
         if not fandango.isDictionary(options):
             options = dict((o.replace('--','').split('=')[0],o.split('=',1)[-1]) for o in options)
@@ -57,7 +54,7 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
             self.splash = QtGui.QSplashScreen(px)
             self.splash.showMessage('initializing application...')
             self.splash.show()
-            print 'showing splash ... %s'%px.size()
+            trace('showing splash ... %s'%px.size())
         except: print traceback.format_exc()
 
         self._message = QtGui.QMessageBox(self)
@@ -78,13 +75,8 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
             #self.mainwindow.setWindowTitle(str(os.getenv('TANGO_HOST')).split(':',1)[0]+' Alarm Widget (%s)'%self.filters)
             self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(self.filters or self.regEx or '',str(os.getenv('TANGO_HOST')).split(':',1)[0]))
             
-        try:
-            assert SNAP_ALLOWED
-            self.snapi=snap.SnapAPI()
-            self.ctx_names=[c.name for c in self.snapi.get_contexts().values()]
-        except:
-            self.snapi = None
-            self.ctx_names = []
+        self.snapi = None
+        self.ctx_names = []
 
         if not self.api.keys(): trace('NO ALARMS FOUND IN DATABASE!?!?')
         AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
@@ -100,6 +92,7 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
             self.severities.remove('debug')
         if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
 
+        trace('Set Models thread ...')
         #self.connectAll()
         #self.buildList()
         self._connected = False
@@ -111,15 +104,16 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
         self.refreshTimer = QtCore.QTimer()
         QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
         QtCore.QObject.connect(self.reloadTimer, QtCore.SIGNAL("timeout()"), self.onReload)
-        self.reloadTimer.start(5000.)
-        self.refreshTimer.start(2*self.REFRESH_TIME)
+        self.reloadTimer.start(self.REFRESH_TIME/2.)
+        self.refreshTimer.start(self.REFRESH_TIME)
         
+        trace('Setting combos ...')
         self.source = "" #Value in first comboBox
         self.setFirstCombo()
         self.setSecondCombo()
         self._ui.infoLabel0_1.setText(self._ui.contextComboBox.currentText())
         self.updateStatusLabel()
-        print('__init__ done')
+        trace('AlarmGUI(): done')
         
         #if not SNAP_ALLOWED:
             #Qt.QMessageBox.critical(self,"Unable to load SNAP",'History Viewer Disabled!', QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
@@ -492,7 +486,11 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
             elif stateFilter=='FAILED':
                 if a.tag not in self.AlarmRows or (str(self.AlarmRows[a.tag].quality) == 'ATTR_INVALID'): result.append(a)
             elif stateFilter=='HISTORY':
-                if SNAP_ALLOWED and a.tag in self.ctx_names: result.append(a)
+                if not self.snapi: 
+                  self.snapi = self.get_snap_api()
+                if self.snapi:
+                  self.ctx_names = [c.name for c in self.snapi.get_contexts().values()]
+                  if SNAP_ALLOWED and a.tag in self.ctx_names: result.append(a)
             else:
                 result.append(a)
         trace('filterByState(%d): %d alarms returned'%(len(source),len(result)))
@@ -655,9 +653,9 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
             lambda s=self:WindowManager.addWindow(s.showAlarmPreview()))
         act.setEnabled(len(items)==1)
         self.popMenu.addAction(getThemeIcon("view-refresh"), "Sort/Update List",self.onSevFilter)
-        if SNAP_ALLOWED and row.get_alarm_tag() in self.ctx_names:
-            act = self.popMenu.addAction(getThemeIcon("office-calendar"), "View History",self.viewHistory)
-            act.setEnabled(len(items)==1)
+
+        act = self.popMenu.addAction(getThemeIcon("office-calendar"), "View History",self.viewHistory)
+        act.setEnabled(SNAP_ALLOWED and len(items)==1) # and row.get_alarm_tag() in self.ctx_names)
             
         sevMenu = self.popMenu.addMenu('Change Severity')
         for S in ('ERROR','ALARM','WARNING','DEBUG'):
@@ -773,10 +771,24 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
     ###############################################################################
 
     def viewHistory(self):
-        self.ahApp = ahWidget()
-        self.ahApp.show()
-        #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.currentItem().text().split('|')[0]).strip(' '))
-        self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.currentItem().get_alarm_tag()))
+        alarm = str(self._ui.listWidget.currentItem().get_alarm_tag())
+
+        if SNAP_ALLOWED and not self.snapi: 
+          self.snapi = get_snap_api()
+
+        if self.snapi:
+          self.ctx_names=[c.name for c in self.snapi.get_contexts().values()]
+
+        if alarm in self.ctx_names: 
+          self.ahApp = ahWidget()
+          self.ahApp.show()
+          #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.currentItem().text().split('|')[0]).strip(' '))
+          self.ahApp.setAlarmCombo(alarm=alarm)
+        else:
+          v = QtGui.QMessageBox.warning(None,'Not Archived', \
+              'This alarm has not recorded history',QtGui.QMessageBox.Ok)
+          return
+        
         
     def showAlarmPreview(self):
         form = AlarmPreview(tag=self.getCurrentAlarm(),parent=self.parent())

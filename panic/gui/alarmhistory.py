@@ -1,39 +1,32 @@
 import panic, fandango
+from widgets import *
 from PyQt4 import Qt, QtCore, QtGui
 from taurus.qt.qtgui.resource import getThemeIcon
 from taurus.qt.qtgui.panel import TaurusForm
 from operator import itemgetter
 
-try:
-  from PyTangoArchiving import snap
-  from PyTangoArchiving.widget.snaps import *
-  db = fandango.get_database()
-  assert list(db.get_device_exported_for_class('SnapManager'))
-  SNAP_ALLOWED = True
-except:
-  print 'PyTangoArchiving.Snaps not available!'
-  snap = None
-  SNAP_ALLOWED = False
-
 class ahWidget(QtGui.QWidget):
     def __init__(self,parent=None,container=None):
         QtGui.QWidget.__init__(self,parent)
         self._ah = alarmhistoryForm()
-        self._ah.alarmhistorySetupUi(self)
         self._kontainer = container
-        self.setAlarmCombo()
+        self._ah.alarmhistorySetupUi(self)
 
     def setAlarmCombo(self, alarm=None):
         self._ah.setAlarmCombo(alarm=alarm or 'All')
 
     def show(self):
+        #self._ah.alarmhistorySetupUi(self)
         QtGui.QWidget.show(self)
-        self._ah.setAlarmCombo(alarm='All')
+        self.setAlarmCombo(alarm='All')
         
 class snapWidget(QtGui.QWidget):
+  
     def __init__(self,parent=None,container=None):
+        print('>>>> snapWidget()')
         QtGui.QWidget.__init__(self,parent)
-        self._swi=SnapForm()
+        import PyTangoArchiving.widget.snaps as snaps
+        self._swi = snaps.SnapForm()
         self._swi.setupUi(self,load=False)
         self._kontainer=container
 
@@ -47,13 +40,17 @@ class snapWidget(QtGui.QWidget):
         QtGui.QWidget.show(self)
 
 class alarmhistoryForm(object):
+  
     def __init__(self,alarm_api=None,snap_api=None):
+
+        print('>>>> alarmhistoryForm()')
+        self._ready = False
         if not hasattr(alarmhistoryForm,'panicApi'):
-            alarmhistoryForm.panicApi=alarm_api or panic.AlarmAPI()
-            alarmhistoryForm.snapApi=snap_api or snap.SnapAPI()
-        pass
+            alarmhistoryForm.panicApi = alarm_api or panic.AlarmAPI()
+            alarmhistoryForm.snapApi = None #snap_api or get_snap_api()
 
     def alarmhistorySetupUi(self, Form):
+        if self._ready: return
         self._Form=Form
         Form.setObjectName("Form")
         self.GridLayout=QtGui.QGridLayout(Form)
@@ -78,8 +75,10 @@ class alarmhistoryForm(object):
         #self._Form.resize(self._Form.sizeHint().width()+150, 500)
         self._Form.setFixedWidth(800) #, 500)
         self._Form.setFixedHeight(600)
+        self._ready = True
 
     def retranslateUi(self, Form):
+      
         Form.setWindowTitle(QtGui.QApplication.translate("Form", "Alarm History Viewer", None, QtGui.QApplication.UnicodeUTF8))
         self.refreshButton.setText(QtGui.QApplication.translate("Form", "Refresh", None, QtGui.QApplication.UnicodeUTF8))
         self.refreshButton.setIcon(getThemeIcon("view-refresh"))
@@ -113,6 +112,13 @@ class alarmhistoryForm(object):
     def buildList(self):
         self.tableWidget.blockSignals(True)
         try:
+            if SNAP_ALLOWED and self.snapApi is None:
+              self.snapApi = get_snap_api()
+            if not self.snapApi:
+              v = QtGui.QMessageBox.warning(None,'Snap!', \
+                'Snaps not available',QtGui.QMessageBox.Ok)
+              return
+              
             alarm=str(self.alarmCombo.currentText())
             if (alarm=='All'):
                 ctxs=[]

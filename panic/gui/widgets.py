@@ -18,12 +18,6 @@ def get_user():
         return getpass.getuser()
     except:
         return ''
-
-try:
-    from alarmhistory import *
-except Exception,e:
-    print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',traceback.format_exc()
-    SNAP_ALLOWED=False
     
 def clean_str(s):
     return ' '.join(str(s).replace('\r',' ').replace('\n',' ').split())
@@ -259,6 +253,27 @@ class CleanMainWindow(Qt.QMainWindow,WindowManager):
 
 ###############################################################################
 
+global SNAP_ALLOWED
+SNAP_ALLOWED = True
+
+def get_snap_api():
+    trace('get_snap_api()',level=-1)
+    global SNAP_ALLOWED
+    if SNAP_ALLOWED is True:
+      try:
+          from PyTangoArchiving import snap
+          from PyTangoArchiving.widget.snaps import *
+          db = fandango.get_database()
+          assert list(db.get_device_exported_for_class('SnapManager'))
+          SNAP_ALLOWED = snap.SnapAPI()
+          
+      except Exception,e:
+          trace('PyTangoArchiving.Snaps not available: HISTORY VIEWER DISABLED: '+traceback.format_exc(),'WARNING',-1)
+          SNAP_ALLOWED = None
+    
+    trace('get_snap_api(): %s'%SNAP_ALLOWED,level=-1)
+    return SNAP_ALLOWED
+
 from taurus.qt.qtgui.plot import TaurusTrend
 
 def get_archive_trend(models=None,length=4*3600,show=False):
@@ -293,6 +308,7 @@ def get_archive_trend(models=None,length=4*3600,show=False):
 ###############################################################################
         
 class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
+  
     def __init__(self,model=None,parent=None,device=None,_locals=None,allow_edit=False):
         Qt.QWidget.__init__(self,parent)
         self.api = panic.current() #Singletone, reuses existing object ... Sure? What happens if filters apply?
