@@ -144,6 +144,7 @@ class iValidatedWidget(object):
         if not self.validate('onDisable/Enable(%s,%s)'%(checked,[a.get_alarm_tag() for a in items])):
             return
     """
+    KEEP = 300
     
     def init(self,tag=''):
         if not hasattr(self,'validator'):
@@ -182,6 +183,9 @@ class iValidatedWidget(object):
         self.validator.setAllowedUsers(users)
         
     def validate(self,msg='',tag=''):
+        if getattr(self,'last_valid',0) > time.time()-self.KEEP:
+          return True
+        
         err = self.init(tag)
         if err is None: 
           return True
@@ -194,7 +198,9 @@ class iValidatedWidget(object):
         
         self.validator.setLogMessage('AlarmForm(%s).Validate(%s): %s'%(tag,msg,tag and self.api[tag].to_str()))
         #print('LdapValidUsers %s'%self.validator.getAllowedUsers())
-        return self.validator.exec_() if self.validator.getAllowedUsers() else True
+        r = self.validator.exec_() if self.validator.getAllowedUsers() else True
+        if r: self.last_valid = time.time()
+        return r
 
 class WindowManager(fandango.objects.Singleton):
     WINDOWS = []
