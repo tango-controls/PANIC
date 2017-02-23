@@ -347,9 +347,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             return []
           else:
             receivers = self.Alarms[tag_name].receivers.split('#')[0]
-            
+        
         if '%' in str(receivers) or '$' in str(receivers):
-          raw_receivers = receivers
+          raw_receivers = ','.join(receivers) if isSequence(receivers) else receivers
           receivers = self.Alarms.parse_phonebook(raw_receivers)
           receivers = self.parse_defines(receivers,tag_name,message=message)
           self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
@@ -1191,8 +1191,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if self._initialized: self.dyn_attr()
 
             #Get SnapConfig
-            #if SNAP_ALLOWED and self.UseSnap:
-            if SNAP_ALLOWED:
+            if SNAP_ALLOWED and (self.UseSnap or any('SNAP' in str(a.receivers) 
+                      for a in self.Alarms.values())):
                 try:
                     self.snap = snap.SnapAPI()
                 except Exception,e: self.warning('SnapConfig failed: %s'%e)
