@@ -3,13 +3,11 @@ from taurus.qt.qtgui.resource import getThemeIcon
 from taurus.qt.qtgui.panel import TaurusForm
 
 import panic, fandango, taurus
-from alarmhistory import snap,SNAP_ALLOWED
 
 class htmlviewForm(object):
-    def __init__(self,alarm_api=None,snap_api=None):
+    def __init__(self,alarm_api=None):
         if not hasattr(htmlviewForm,'panicApi'):
             htmlviewForm.panicApi=alarm_api or panic.AlarmAPI()
-            htmlviewForm.snapApi=SNAP_ALLOWED and (snap_api or snap.SnapAPI())
         pass
 
     def htmlviewSetupUi(self, Form):
