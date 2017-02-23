@@ -9,12 +9,7 @@ from widgets import AttributesPreview,AlarmPreview,iValidatedWidget
 from fandango.excepts import Catched
 
 #AlarmFormula widget is added to the editor in the ui_data.py file
-
-try:
-    from alarmhistory import *
-except Exception,e:
-    #print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',str(e)
-    SNAP_ALLOWED=False
+from widgets import SNAP_ALLOWED,get_snap_api
 
 #get_next_index = lambda d: max([0]+list(d))+1
 
@@ -381,7 +376,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             if SNAP_ALLOWED:
                 try:
                     print('\tRenaming Alarm context %s to %s'%(old_name,tag))
-                    snapi = snap.snapAPI()
+                    snapi = get_snap_api()
                     self.ctx_list = snapi.get_contexts()
                     for cid in self.ctx_list:
                         if (self.ctx_list[cid].name.lower()==old_name.lower() and self.ctx_list[cid].reason=='ALARM'):
