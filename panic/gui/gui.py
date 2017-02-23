@@ -487,7 +487,7 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
                 if a.tag not in self.AlarmRows or (str(self.AlarmRows[a.tag].quality) == 'ATTR_INVALID'): result.append(a)
             elif stateFilter=='HISTORY':
                 if not self.snapi: 
-                  self.snapi = self.get_snap_api()
+                  self.snapi = get_snap_api()
                 if self.snapi:
                   self.ctx_names = [c.name for c in self.snapi.get_contexts().values()]
                   if SNAP_ALLOWED and a.tag in self.ctx_names: result.append(a)
