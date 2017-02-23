@@ -4,6 +4,7 @@ from PyQt4 import Qt, QtCore, QtGui
 import taurus,fandango,fandango.qt
 from taurus.qt.qtgui.base import TaurusBaseWidget
 from taurus.qt.qtgui.container import TaurusWidget
+from taurus.qt.qtgui.panel import TaurusForm
 from taurus.qt.qtgui import resource
 from taurus.core.util  import Logger
 
@@ -175,15 +176,19 @@ class iValidatedWidget(object):
         if not self.AdminUsers and not self.UserValidator:
           #passwords not available
           return None
-        users = self.api.get_admins_for_alarm(tag)
+        users = sorted(self.api.get_admins_for_alarm(tag))
         if not users: 
           #Not using passwords for this alarm
+          self.last_users = None
           return None
         elif self.validator is None:
           #Failed to initialize
           return -1
         else:
+          if users != getattr(self,'last_users',[]):
+            self.last_valid = 0
           self.validator.setAllowedUsers(users)
+          self.last_users = users
           return self.validator
         
     def setAllowedUsers(self,users):
@@ -191,7 +196,6 @@ class iValidatedWidget(object):
         self.validator.setAllowedUsers(users)
         
     def validate(self,msg='',tag=''):
-        # User validation will be kept for a while if the user keeps doing modifications.
         if getattr(self,'last_valid',0) > time.time()-self.KEEP:
           r = True
           
