@@ -140,13 +140,21 @@ class iValidatedWidget(object):
     This class assumes that you have a self.api=PanicAPI() member in your subclass 
     
     Typical usage:
+    
         self.setAllowedUsers(self.api.get_admins_for_alarm(len(items)==1 and items[0].get_alarm_tag()))
         if not self.validate('onDisable/Enable(%s,%s)'%(checked,[a.get_alarm_tag() for a in items])):
             return
+            
+    This class requires PanicAdminUsers and UserValidator PyAlarm properties to be declared.
+    
+      PanicAdminUsers : [root, tester]
+      UserValidator : user_login.TangoLoginDialog
+    
     """
-    KEEP = 300
+    KEEP = 60
     
     def init(self,tag=''):
+      
         if not hasattr(self,'validator'):
           self.UserValidator,self.validator = '',None
           try:
@@ -183,22 +191,25 @@ class iValidatedWidget(object):
         self.validator.setAllowedUsers(users)
         
     def validate(self,msg='',tag=''):
+        # User validation will be kept for a while if the user keeps doing modifications.
         if getattr(self,'last_valid',0) > time.time()-self.KEEP:
-          return True
-        
-        err = self.init(tag)
-        if err is None: 
-          return True
-        if err == -1:
-          Qt.QMessageBox.critical(None,
-              "Error!",
-              "%s module not found"%(self.UserValidator or 'PyAlarm.UserValidator'),
-              QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
-          return False
-        
-        self.validator.setLogMessage('AlarmForm(%s).Validate(%s): %s'%(tag,msg,tag and self.api[tag].to_str()))
-        #print('LdapValidUsers %s'%self.validator.getAllowedUsers())
-        r = self.validator.exec_() if self.validator.getAllowedUsers() else True
+          r = True
+          
+        else:
+          err = self.init(tag)
+          if err is None: 
+            return True
+          if err == -1:
+            Qt.QMessageBox.critical(None,
+                "Error!",
+                "%s module not found"%(self.UserValidator or 'PyAlarm.UserValidator'),
+                QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
+            return False
+          
+          self.validator.setLogMessage('AlarmForm(%s).Validate(%s): %s'%(tag,msg,tag and self.api[tag].to_str()))
+          #print('LdapValidUsers %s'%self.validator.getAllowedUsers())
+          r = self.validator.exec_() if self.validator.getAllowedUsers() else True
+          
         if r: self.last_valid = time.time()
         return r
 
