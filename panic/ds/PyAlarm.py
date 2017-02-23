@@ -342,15 +342,21 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         Filters the Alarm receivers matching tag_name; also replaces addresses entered in the PhoneBook 
         This method is called from free_alarm and send_alarm.
         '''
-        if tag_name not in self.Alarms: return []
-        if receivers is None:
-            raw_receivers = self.Alarms[tag_name].receivers.split('#')[0]
-            receivers = self.Alarms.parse_phonebook(raw_receivers)
-            receivers = self.parse_defines(receivers,tag_name,message=message)
-            self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
-        else: receivers = ','.join(receivers)
-        receivers = [r for r in receivers.split(',') if not filtre or filtre in r]
-        self.debug( 'In parse_receivers(%s): receivers added: %s' % (tag_name,receivers))
+        if not receivers:
+          if tag_name not in self.Alarms:
+            return []
+          else:
+            receivers = self.Alarms[tag_name].receivers.split('#')[0]
+            
+        if '%' in str(receivers) or '$' in str(receivers):
+          raw_receivers = receivers
+          receivers = self.Alarms.parse_phonebook(raw_receivers)
+          receivers = self.parse_defines(receivers,tag_name,message=message)
+          self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
+
+        if not isSequence(receivers): receivers = receivers.split(',')
+        receivers = [r for r in receivers if not filtre or filtre in r]
+        self.info( 'parse_receivers(%s,%s): %s' % (tag_name,filtre,receivers))
         return receivers
         
     def parse_action_receivers(self,tag_name,message,receivers):
@@ -360,14 +366,16 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         '''
         actions = []
         re_arglist = '(?:'+'(?:[^()]*)'+'|'+'(?:[^()]*\([^()]*\)[^()]*)'+')'
-        if fun.isSequence(receivers): receivers = ','.join(receivers)
+        if isSequence(receivers): receivers = ','.join(receivers)
         action_receivers = re.findall('ACTION\('+re_arglist+'\)',receivers)
+
         for ac in action_receivers:
             t = {'DISABLED':'disable','ACKNOWLEDGED':'acknowledge'}.get(message,message.lower())
             #rm = re.search(t.lower()+':((?:.*?)|(?:.*[\(].*[\)].*))'+'[\;\)]',ac)
             #rm = re.search(t.lower()+':('+re_arglist+')[\;\)]',ac)
             rm = re.search('(?:'+t.lower()+'|[*]):'+'('+re_arglist+')[\;\)]',ac)
             if rm: actions.append(rm.group(1))
+
         self.info('parse_action_receivers(%s,%s): %s'%(tag_name,message,actions))
         return actions
 
@@ -693,7 +701,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     ##@name Alarm Sending
     #@{
 
-    def send_alarm(self,tag_name,message='',values=None):
+    def send_alarm(self,tag_name,message='',values=None,receivers=None):
         """
         This method parses receivers and:
          - Sends email/SMS for alarms
@@ -705,75 +713,107 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         self.info('-'*80)
         self.info(shortstr('In PyAlarm.send_alarm(%s,%s,%s)'%(tag_name,message,values),255))
+        alarm = (self.Alarms.get(tag=tag_name) or [None])[0]
         try:
-            if self.MaxMessagesPerAlarm and self.Alarms[tag_name].sent >= self.MaxMessagesPerAlarm: 
-                #This counter is reset calling .clear() from free_alarm()
-                self.debug('*'*80)
-                self.warning('Too many alarms (%d) already sent for %s!!!' % (self.Alarms[tag_name].sent, tag_name))
-                self.debug('*'*80)
-                return
-            if message in ('ALARM','REMINDER') or self.AlertOnRecovery:
+          if alarm and self.MaxMessagesPerAlarm and self.Alarms[tag_name].sent >= self.MaxMessagesPerAlarm: 
+              #This counter is reset calling .clear() from free_alarm()
+              self.debug('*'*80)
+              self.warning('Too many alarms (%d) already sent for %s!!!' % (self.Alarms[tag_name].sent, tag_name))
+              self.debug('*'*80)
+              return
+            
+          try:
+              self.lock.acquire()
+              receivers = self.parse_receivers(tag_name,receivers=receivers,message=message)
+              mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
+              sms_receivers = self.parse_receivers(tag_name,'SMS',receivers,message=message)
+              action_receivers = self.parse_action_receivers(tag_name,message,receivers)
+              self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers)))
+          finally:
+              self.lock.release()
+              
+          if message not in ('ALARM','REMINDER') and not self.AlertOnRecovery:
+              mail_receivers = sms_receivers = []
+
+          if alarm and mail_receivers:
+            report = self.GenerateReport(tag_name,mail_receivers,message=message,values=values)
+          else: 
+            #result = [report, subject, ','.join(maillist)]
+            report = [message, tag_name+'-'+message,','.join(mail_receivers)]
+
+          if self.get_enabled():
+              
+            if alarm and self.Alarms[tag_name].severity=='DEBUG':
+              self.info('%s Alarm with severity==DEBUG do not trigger actions, messages or snapshot'%tag_name)
+              
+            else:
+              ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
+              if action_receivers:
+                self.info('checking %s actions ... %s'%(message,action_receivers))
+                for ac in action_receivers:
+                  try:
+                    self.trigger_action(tag_name,ac,message=message)
+                  except:
+                    msg = 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc()
+                    self.debug('-'*80),self.warning(msg)
+                    report[0] += '\n'+'-'*80+'\n'+msg
+
+              #Disabling sms message for those messages not related to new alarms
+              if sms_receivers and message in ('ALARM',) or 'sms' in str(self.AlertOnRecovery).lower(): 
                 try:
-                    self.lock.acquire()
-                    receivers = self.parse_receivers(tag_name,message=message)
-                    mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
-                    sms_receivers = self.parse_receivers(tag_name,'SMS',receivers,message=message)
-                    action_receivers = self.parse_action_receivers(tag_name,message,receivers)
-                    self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers)))
-                finally:
-                    self.lock.release()
+                  self.SendSMS(tag_name,sms_receivers,message=message,values=values)
+                except:
+                  msg = 'Exception sending sms!: %s' % traceback.format_exc()
+                  self.debug('-'*80),self.warning(msg)
+                  report[0] += '\n'+'-'*80+'\n'+msg
 
-                report = self.GenerateReport(tag_name,mail_receivers,message=message,values=values)
+              # SNAP ARCHIVING
+              if (message in ('ALARM','ACKNOWLEDGED','RESET') or self.AlertOnRecovery and message=='RECOVERED') \
+                    and SNAP_ALLOWED and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers,message=message)):
+                try:
+                  self.info('<'*80+'\n'+'triggering snapshot for alarm:'+tag_name)
+                  if (self.Alarms[tag_name].severity!='DEBUG'): self.trigger_snapshot(tag_name,message)
+                except Exception, e:
+                  msg = 'PyAlarm.trigger_snapshot crashed with exception:\n%s' % traceback.format_exc()
+                  self.debug('-'*80),self.warning(msg)
+                  report[0] += '\n'+'-'*80+'\n'+msg
+            
+            # html logs
+            if self.parse_receivers(tag_name,'HTML',receivers,message=message):
+              try:
+                self.info('saving html report for alarm:'+tag_name)
+                self.SaveHtml(self.GenerateReport(tag_name,message=message,values=values, html=True))
+              except Exception, e:
+                msg = 'PyAlarm.saveHtml crashed with exception:\n%s' % traceback.format_exc()
+                self.debug('-'*80),self.warning(msg)
+                report[0] += '\n'+'-'*80+'\n'+msg
+              
+            # emails
+            if mail_receivers: 
+              try:
+                self.SendMail(report)
+              except:
+                self.debug('-'*80)
+                self.warning('Exception sending email!: %s' % traceback.format_exc())
 
-                if self.get_enabled():
-                    if self.Alarms[tag_name].severity=='DEBUG':
-                        self.info('%s Alarm with severity==DEBUG do not trigger actions, messages or snapshot'%tag_name)
-                    else:
-                        ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
-                        if action_receivers:
-                            self.info('checking %s actions ... %s'%(message,action_receivers))
-                            for ac in action_receivers:
-                                try:
-                                    self.trigger_action(self.Alarms[tag_name],ac,message=message)
-                                except:
-                                    self.warning( 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc())                      
-                        if mail_receivers: 
-                            try:
-                                self.SendMail(report)
-                            except:
-                                self.debug('-'*80)
-                                self.warning('Exception sending email!: %s' % traceback.format_exc())
-                        #Disabling sms message for those messages not related to new alarms
-                        if sms_receivers and message in ('ALARM',) or 'sms' in str(self.AlertOnRecovery).lower(): 
-                            try:
-                                self.SendSMS(tag_name,sms_receivers,message=message,values=values)
-                            except:
-                                self.debug('-'*80)
-                                self.warning('Exception sending sms!: %s' % traceback.format_exc())
-                        if self.parse_receivers(tag_name,'HTML',receivers,message=message):
-                            try:
-                                self.info('saving html report for alarm:'+tag_name)
-                                self.SaveHtml(self.GenerateReport(tag_name,message=message,values=values, html=True))
-                            except Exception, e:
-                                self.warning('PyAlarm.saveHtml crashed with exception:\n%s' % traceback.format_exc())
-                        if (message in ('ALARM','ACKNOWLEDGED','RESET') or self.AlertOnRecovery and message=='RECOVERED') \
-                                and SNAP_ALLOWED and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers,message=message)):
-                            try:
-                                self.info('<'*80+'\n'+'triggering snapshot for alarm:'+tag_name)
-                                if (self.Alarms[tag_name].severity!='DEBUG'): self.trigger_snapshot(tag_name,message)
-                            except Exception, e:
-                                self.warning('PyAlarm.trigger_snapshot crashed with exception:\n%s' % traceback.format_exc())
+          else:
+            self.info('=============> ALARM SENDING DISABLED!!')
 
-                else:
-                    self.info('=============> ALARM SENDING DISABLED!!')
-
-                self.update_log_file(tag=tag_name,report=report,message=message or '')
-                self.Alarms[tag_name].sent += 1
-                self.Alarms[tag_name].last_sent = time.time()
+          try:
+            self.update_log_file(tag=tag_name,report=report,message=message or '')
+          except:
+            self.warning(traceback.format_exc())
+            
+          if alarm:
+            self.Alarms[tag_name].sent += 1
+            self.Alarms[tag_name].last_sent = time.time()
+                
+          return report
+              
         except Exception,e:
             self.warning('PyAlarm.send_alarm crashed with exception:\n%s' % traceback.format_exc())
         self.info('-'*80)
-        return
+        return ''
 
     def update_flag_file(self):
         ''' If there's Active Alarms writes a 1 to the file specified by FlagFile property, else writes 0 '''
@@ -832,10 +872,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
         see full description at doc/recipes/ActionsOnAlarm.rst
         """
-        if fun.isString(alarm): alarm = self.Alarms[alarm]
+        if fun.isString(alarm): tag = alarm
+        else: tag,alarm = alarm.tag,alarm
+          
         action = args if fun.isSequence(args) else re.split('[,;]',args)
         self.info('-'*80)
-        self.info('In PyAlarm.trigger_action(%s,%s)'%(alarm.tag,args))
+        self.info('In PyAlarm.trigger_action(%s,%s)'%(tag,args))
         if action[0] in ('command','attribute'):
             try:
                 dev = action[1].rsplit('/',1)[0]
@@ -847,7 +889,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                   raise Exception(exc)
                 
                 cmd = [action[1].rsplit('/',1)[1]]+action[2:]
-                cmd = self.parse_defines(cmd,alarm.tag,message=message)
+                cmd = self.parse_defines(cmd,tag,message=message)
 
                 try: #This eval will try to pass numeric/float arguments
                     arg = [eval(c) for c in cmd[1:]]
@@ -1778,6 +1820,41 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             return -1        
         ctx=self.snap.create_context('AlarmAPP',tag_name,'ALARM',self.Alarms[tag_name].formula,existingAttrsAllowed)
         return ctx.ID
+      
+#------------------------------------------------------------------
+#    SendAlarm command:
+#
+#    Description: Testing Alarm receivers
+#
+#    argin:  DevVarStringArray    ALARM/Formula/True,[receivers, ...]
+#    argout: DevString
+#------------------------------------------------------------------
+
+    def SendAlarm(self, argin):
+        """
+        Arguments: ALARM or Formula, receivers to test
+        """
+        try:
+            argin = toSequence(argin)
+            alarm = argin[0]
+            receivers = argin[1:]
+
+            if alarm not in self.Alarms:
+                v = self.EvaluateFormula(alarm)
+                if not v:
+                  report = str(v)
+                alarm = 'SendAlarmCommand'
+
+            else:
+                receivers = receivers or self.Alarms[alarm].receivers
+            
+            report = self.send_alarm(alarm,message='ALARM',receivers=receivers)
+            
+            return 'DONE'
+        except Exception,e:
+            msg = traceback.format_exc()
+            self.info( 'Exception in PyAlarm.SendAlarm(): \n%s'%msg)
+            return msg
 
 #------------------------------------------------------------------
 #    SendMail command:
@@ -1854,7 +1931,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         if not receivers and hasattr(tag,'__iter__'):
             tag,receivers = tag[0],tag[1:]
-        alarm = self.Alarms.get(tag,None)
+        alarm = (self.Alarms.get(tag) or [None])[0]
 
         self.info( 'In SendSMS(%s,%s,%s,%s)'%(tag,receivers,message,values))
         if not SMS_ALLOWED or not 'smslib' in globals():
@@ -1968,6 +2045,9 @@ class PyAlarmClass(PyTango.DeviceClass):
         'CreateAlarmContext':
             [[PyTango.DevVarStringArray, "tag,attributes,..."],
             [PyTango.DevLong,"new context ID"]],
+        'SendAlarm':
+            [[PyTango.DevVarStringArray, "alarm/formula/True,receivers,..."],
+            [PyTango.DevString,""]],
         'SendMail':
             [[PyTango.DevVarStringArray, "message,subject,receivers"],
             [PyTango.DevString,""]],
