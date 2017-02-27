@@ -1,13 +1,18 @@
 server	class	device	property	value
-SimulatorDS/alarmtest	SimulatorDS	test/alarms/sim-01	KeepTime	100
+PyAlarm	PyAlarm	#CLASS	PhoneBook	%SRUBIO:srubio@cells.es
+PyAlarm/panic-tests	PyAlarm	test/panic/alarms-01		
+SimulatorDS/panic-tests	SimulatorDS	test/panic/sim-01	KeepTime	100
 			DynamicAttributes	T=S and (now()-S)%60
 				R=RW
 				S=GET('Start',default=0)
 				RW=VAR('rwattr',default=10.,WRITE=True)
-			DynamicCommands	Start=str(SET('Start',now()))
-				Stop=str(SET('Start',0))
 			DynamicStates	FAULT=ATTR('S') and ATTR('T')>45
 				RUNNING=ATTR('S')
 				ON=1
+			polled_attr	s
+				3000.0
+				t
+				200.0
+			DynamicCommands	Start=str(SET('Start',now()))
+				Stop=str(SET('Start',0))
 			KeepAttributes	Yes
-				
