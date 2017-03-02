@@ -1,10 +1,9 @@
 import panic, sys, re, os, traceback, time
 import PyTango, fandango, taurus, taurus.qt.qtgui.base
-from PyQt4 import QtCore, QtGui, Qt
+from widgets import QtCore, QtGui, Qt
 from taurus.core import TaurusEventType
 from taurus.qt.qtgui.base import TaurusBaseComponent
-from taurus.qt.qtgui.resource import getThemeIcon
-from widgets import getAlarmTimestamp,trace,clean_str
+from widgets import getAlarmTimestamp,trace,clean_str,getThemeIcon
 #from htmlview import *
 
 REFRESH_TIME = 10000
@@ -81,7 +80,8 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 if not getattr(self,'ack_attr',None):
                     self.ack_attr = taurus.Attribute(self.device+'/AcknowledgedAlarms')
                     self.ack_attr.changePollingPeriod(REFRESH_TIME)
-                val = any([a==self.alarm.tag for a in (self.ack_attr.read().value or [])])
+                ack_val = getattr(self.ack_attr.read(),'rvalue','value')
+                val = any([a==self.alarm.tag for a in (ack_val or [])])
             else: 
                 val = taurus.Device(self.alarm.device).command_inout('CheckAcknowledged',self.alarm.tag)
                 if force: 
@@ -98,7 +98,8 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 if not getattr(self,'dis_attr',None):
                     self.dis_attr = taurus.Attribute(self.device+'/DisabledAlarms')
                     self.dis_attr.changePollingPeriod(REFRESH_TIME)
-                val = any(re.split('[: ,;]',a)[0]==self.alarm.tag for a in (self.dis_attr.read().value or []))
+                dis_val = getattr(self.dis_attr.read(),'rvalue','value')
+                val = any(re.split('[: ,;]',a)[0]==self.alarm.tag for a in (dis_val or []))
             else: 
                 val = taurus.Device(self.alarm.device).command_inout('CheckDisabled',self.alarm.tag)
                 if force: self.alarmDisabled = val
@@ -130,7 +131,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
             debug = 'debug' in str(evt_src).lower()
             now = fandango.time2str()
             evtype = str(TaurusEventType.reverseLookup[evt_type])
-            evvalue = getattr(evt_value,'value',None)
+            evvalue = getattr(evt_value,'rvalue',getattr(evt_value,'value',None))
             if debug: 
                 print '\n'
                 #trace('%s: In AlarmRow(%s).eventReceived(%s,%s,%s)'%(fandango.time2str(),self.alarm.tag,evt_src,evtype,evvalue),clean=True)
@@ -141,6 +142,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
             if evt_type==TaurusEventType.Config:
                 if debug: trace('%s: AlarmRow(%s).eventReceived(CONFIG): %s' % (now,self.alarm.tag,str(evt_value)[:20]),clean=True)
                 return
+
             #Filtering Error Events
             elif evt_type==TaurusEventType.Error or not hasattr(evt_value,'value'):
                 error = True
@@ -160,6 +162,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 else: 
                     if debug: trace('In AlarmRow(%s).eventReceived(%s,%s,%d/%d)' % (self.alarm.tag,evt_src,evtype,self.errors,self.MAX_ERRORS),clean=True)
                     pass
+
             #Change Events
             elif evt_type==TaurusEventType.Change or evt_type==TaurusEventType.Periodic:
                 self.errors = 0

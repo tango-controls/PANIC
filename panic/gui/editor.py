@@ -1,9 +1,9 @@
 import sys, re
 import panic
-from PyQt4 import QtCore, QtGui, Qt
+from widgets import QtCore, QtGui, Qt
 from ui_data import Ui_Data,Ui_ReceiversLine
 from ui_data import uiBodyForm,uiRowForm
-from taurus.qt.qtgui.resource import getThemeIcon
+from widgets import getThemeIcon
 from widgets import AlarmValueLabel,setCheckBox,getAlarmReport,get_user,trace
 from widgets import AttributesPreview,AlarmPreview,iValidatedWidget
 from fandango.excepts import Catched

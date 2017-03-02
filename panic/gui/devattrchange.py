@@ -1,7 +1,6 @@
-from PyQt4 import Qt, QtCore, QtGui
-from taurus.qt.qtgui.resource import getThemeIcon
 import panic, fandango
-from widgets import iValidatedWidget
+from widgets import Qt,QtCore,QtGui
+from widgets import iValidatedWidget,getThemeIcon
 
 
 class dacWidget(QtGui.QWidget):

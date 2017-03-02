@@ -1,7 +1,7 @@
-from PyQt4 import Qt, QtCore, QtGui
+from widgets import Qt, QtCore, QtGui
 import taurus
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui.resource import getThemeIcon
+from widgets import getThemeIcon
 
 class Ui_AlarmList(object):
     def setupUi(self, Form):
@@ -247,7 +247,7 @@ class Ui_AlarmList(object):
         self.buttonClose.setObjectName("buttonClose")
         self.buttonClose.setText(QtGui.QApplication.translate("Form", "Close", None, QtGui.QApplication.UnicodeUTF8))
         self.buttonClose.setToolTip(QtGui.QApplication.translate("Form", "Close Application", None, QtGui.QApplication.UnicodeUTF8))
-        self.icon_close = QtGui.QIcon(":/actions/process-stop.svg")
+        self.icon_close = getThemeIcon(":/actions/process-stop.svg")
         self.buttonClose.setIcon(self.icon_close)
         self.buttonClose.hide()
         self.horizontalLayout.addWidget(self.buttonClose)

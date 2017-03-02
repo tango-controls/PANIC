@@ -1,7 +1,5 @@
 import panic, fandango
 from widgets import *
-from PyQt4 import Qt, QtCore, QtGui
-from taurus.qt.qtgui.resource import getThemeIcon
 from taurus.qt.qtgui.panel import TaurusForm
 from operator import itemgetter
 

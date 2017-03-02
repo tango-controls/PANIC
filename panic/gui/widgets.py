@@ -1,15 +1,14 @@
-
 import time,traceback
-from PyQt4 import Qt, QtCore, QtGui
 import taurus,fandango,fandango.qt
+from fandango.qt import Qt, QtCore, QtGui
+
 from taurus.qt.qtgui.base import TaurusBaseWidget
 from taurus.qt.qtgui.container import TaurusWidget
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui import resource
 from taurus.core.util  import Logger
 
 import panic
-from panic.widgets import AlarmValueLabel
+from panic.widgets import AlarmValueLabel, getThemeIcon
 import getpass
 
 dummies = []
@@ -48,7 +47,7 @@ def get_bold_font(points=8):
     font.setWeight(75)
     font.setBold(True)
     return font
-    
+           
 def setCheckBox(cb,v):
     try:
         cb.blockSignals(True)
@@ -67,8 +66,8 @@ def getAlarmTimestamp(alarm,attr_value=None,use_taurus=True):
     #self.date = self.alarm.get_active()
     try:
         if attr_value is None and use_taurus:
-            attr_value = taurus.Attribute(alarm.device+'/ActiveAlarms').read().value 
-            #self.get_ds().get().read_attribute('ActiveAlarms').value
+            attr_value = taurus.Attribute(alarm.device+'/ActiveAlarms').read()
+            attr_value = getattr(attr_value,'rvalue','value')
         return alarm.get_time(attr_value=attr_value)
     except:
         print 'getAlarmTimestamp(%s/%s): Failed!'%(alarm.device,alarm.tag) #if fandango.check_device(alarm.device): print traceback.format_exc()
@@ -283,7 +282,7 @@ def get_snap_api():
     if SNAP_ALLOWED is True:
       try:
           from PyTangoArchiving import snap
-          from PyTangoArchiving.widget.snaps import *
+          #from PyTangoArchiving.widget.snaps import *
           db = fandango.get_database()
           assert list(db.get_device_exported_for_class('SnapManager'))
           SNAP_ALLOWED = snap.SnapAPI()
@@ -307,7 +306,7 @@ def get_archive_trend(models=None,length=4*3600,show=False):
                 #setattr(self,'_tuned',True)        
             #TaurusTrend.showEvent(self,event)
     
-    from PyQt4 import Qwt5
+    from taurus.external.qt import Qwt5
     tt = TaurusTrend()
     try:
         tt.setXDynScale(True)
@@ -381,12 +380,12 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
                 self.tf.setEnabled(False)
                 self.connect(self.editcb,Qt.SIGNAL('toggled(bool)'),self.onEdit)
                 upperPanel.layout().addWidget(self.editcb,0,4,1,1)
-                self.undobt.setIcon(resource.getThemeIcon('edit-undo'))
+                self.undobt.setIcon(getThemeIcon('edit-undo'))
                 self.undobt.setToolTip('Undo changes in formula')
                 self.undobt.setEnabled(True)
                 self.connect(self.undobt,Qt.SIGNAL('pressed()'),self.undoEdit)
                 upperPanel.layout().addWidget(self.undobt,0,5,1,1)
-                self.savebt.setIcon(resource.getThemeIcon('media-floppy'))
+                self.savebt.setIcon(getThemeIcon('media-floppy'))
                 self.savebt.setToolTip('Save Alarm Formula')
                 self.savebt.setEnabled(False)
                 upperPanel.layout().addWidget(self.savebt,0,6,1,1)
@@ -405,7 +404,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
             self.tb.setMinimumHeight(50)
             self.tb.setReadOnly(True)
             self.redobt = Qt.QPushButton()
-            self.redobt.setIcon(resource.getThemeIcon('view-refresh'))
+            self.redobt.setIcon(getThemeIcon('view-refresh'))
             self.redobt.setToolTip('Update result')
             self.connect(self.redobt,Qt.SIGNAL('pressed()'),self.updateResult)
             lowerPanel.layout().addWidget(self.redobt,row,6,1,1)
@@ -517,7 +516,7 @@ class AttributesPreview(Qt.QFrame):
         try:
             self.setLayout(Qt.QGridLayout())
             self.redobt = Qt.QPushButton()
-            self.redobt.setIcon(resource.getThemeIcon('view-refresh'))
+            self.redobt.setIcon(getThemeIcon('view-refresh'))
             self.redobt.setToolTip('Update result')
             self.taurusForm=TaurusForm()
             self.taurusForm.setWithButtons(False)
@@ -542,7 +541,7 @@ class AttributesPreview(Qt.QFrame):
         else: model = sorted(set('%s/%s'%(var[0],var[1]) for var in self.test.parse_variables(model or '')))
         self.model = model
         self.taurusForm.setModel(model)
-        [tvalue.setLabelConfig("attr_fullname") for tvalue in self.taurusForm.getItems()]
+        [tvalue.setLabelConfig("<attr_fullname>") for tvalue in self.taurusForm.getItems()]
         
     ###########################################################################
 

@@ -1,6 +1,6 @@
 import sys, panic, traceback
-from PyQt4 import Qt, QtCore, QtGui
-from taurus.qt.qtgui.resource import getThemeIcon
+from widgets import Qt, QtCore, QtGui
+from widgets import getThemeIcon
 from widgets import iValidatedWidget
 
 class PhoneBook(QtGui.QWidget):

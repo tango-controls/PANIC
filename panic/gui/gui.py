@@ -1,17 +1,23 @@
 import sys, re, os, traceback, time
-import threading
-from PyQt4 import QtCore, QtGui, Qt
+import threading, Queue
 
-import PyTango, fandango, taurus, taurus.qt.qtgui.base
-import panic,Queue,fandango.qt
+import PyTango, fandango
+import panic, fandango.qt
+from fandango.qt import QtCore, QtGui, Qt
 from fandango.excepts import Catched
+
+import taurus, taurus.qt.qtgui.base
 from taurus.qt.qtgui import container
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui.resource import getThemeIcon
-from taurus.core import AttributeNameValidator
+
+try:
+  from taurus.core.tango.tangovalidator import TangoAttributeNameValidator as AttributeNameValidator
+except:
+  #Taurus3
+  from taurus.core import AttributeNameValidator
 
 from row import AlarmRow
-from widgets import *
+from widgets import * #< getThemeIcon imported here
 from editor import FormulaEditor,AlarmForm
 from core import Ui_AlarmList
 from alarmhistory import *
@@ -571,7 +577,10 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
                     except Exception,e: trace('===> AlarmRow.setModel(%s) FAILED!: %s' %(alarm.tag,e))
                 else:
                     row = self.AlarmRows[alarm.tag]
-                    model = AttributeNameValidator().getParams(row.getModel())
+                    try:
+                        model = AttributeNameValidator().getParams(row.getModel())
+                    except:
+                        model = AttributeNameValidator().getUriGroups(row.getModel())
                     olddev = model['devicename'] if model else None
                     if alarm.device != olddev:
                         trace('\t%s device changed: %s => %s; changed = True'%(alarm.tag,alarm.device,olddev))
@@ -945,7 +954,6 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
 
 def main(args=[]):
     import widgets
-    from taurus.qt.qtgui import resource
     from taurus.qt.qtgui.application import TaurusApplication
 
     opts = [a for a in args if a.startswith('--')]
@@ -986,9 +994,9 @@ def main(args=[]):
     tmw.helpMenu.addAction(getThemeIcon("applications-system"),"Webpage",lambda : os.system('konqueror %s &'%URL))
     tmw.toolsMenu.addAction(getThemeIcon("applications-system"),"Jive",lambda : os.system('jive &'))
     tmw.toolsMenu.addAction(getThemeIcon("applications-system"),"Astor",lambda : os.system('astor &'))
-    tmw.fileMenu.addAction(resource.getIcon(":/designer/back.png"),"Export to CSV file",alarmApp.saveToFile)
-    tmw.fileMenu.addAction(resource.getIcon(":/designer/forward.png"),"Import from CSV file",alarmApp.loadFromFile)
-    tmw.fileMenu.addAction(resource.getIcon(":/designer/filereader.png"),"Use external editor",alarmApp.editFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/back.png"),"Export to CSV file",alarmApp.saveToFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/forward.png"),"Import from CSV file",alarmApp.loadFromFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/filereader.png"),"Use external editor",alarmApp.editFile)
     tmw.fileMenu.addAction(getThemeIcon("applications-system"),"Exit",tmw.close)
     tmw.viewMenu.connect(tmw.viewMenu,Qt.SIGNAL('aboutToShow()'),alarmApp.setViewMenu)
     
@@ -997,7 +1005,7 @@ def main(args=[]):
     tmw.toolsMenu.addAction(getThemeIcon("x-office-address-book"), "PhoneBook", alarmApp.tools['bookApp'].show)
     toolbar.addAction(getThemeIcon("x-office-address-book") ,"PhoneBook",alarmApp.tools['bookApp'].show)
     
-    trend_action = (resource.getIcon(":/designer/qwtplot.png"),
+    trend_action = (getThemeIcon(":/designer/qwtplot.png"),
         'Trend',
         lambda:WindowManager.addWindow(widgets.get_archive_trend(show=True))
         )
@@ -1028,7 +1036,9 @@ def main(args=[]):
   
 def main_gui():
     import sys
-    n = main(sys.argv[1:] or ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else [])).exec_()
+    app = main(sys.argv[1:] or ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else []))
+    print('app created')
+    n = app.exec_()
     sys.exit(n) 
     
 if __name__ == "__main__":

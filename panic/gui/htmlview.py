@@ -1,5 +1,4 @@
-from PyQt4 import Qt, QtCore, QtGui
-from taurus.qt.qtgui.resource import getThemeIcon
+from widgets import Qt, QtCore, QtGui, getThemeIcon
 from taurus.qt.qtgui.panel import TaurusForm
 
 import panic, fandango, taurus
