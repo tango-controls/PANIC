@@ -151,7 +151,7 @@ class iValidatedWidget(object):
       UserValidator : user_login.TangoLoginDialog
     
     """
-    KEEP = int(os.getenv('PANIC_USER_TIMEOUT',60))
+    KEEP = int(fandango.tango.get_class_property('PyAlarm','PanicUserTimeout') or 60)
     
     def init(self,tag=''):
       

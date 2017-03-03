@@ -61,6 +61,10 @@ PANIC_PROPERTIES = {
         [PyTango.DevVarStringArray,
         "Users authorized to modify the Alarms (apart of receivers) ",
         [ ] ],
+    'PanicUserTimeout':
+        [PyTango.DevLong,
+         "Number of seconds to keep user login in panic GUI",
+         [ 60 ] ],
     'UserValidator':
         [PyTango.DevString,
          "Module.Class to be used to validate admin user/passwords.",
