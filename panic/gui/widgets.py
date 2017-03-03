@@ -151,7 +151,7 @@ class iValidatedWidget(object):
       UserValidator : user_login.TangoLoginDialog
     
     """
-    KEEP = 60
+    KEEP = int(os.getenv('PANIC_USER_TIMEOUT',60))
     
     def init(self,tag=''):
       
