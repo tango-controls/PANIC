@@ -19,3 +19,6 @@ The methods that the i*ValidatedWidget decorator requires of a validator are:
  * setLogMessage()
  * exec_()
 
+User validation in the GUI will be kept for consecutive actions as long as the allowed users list for each action doesn't change. If a new action is required on an Alarm with different receivers, the login will be asked again.
+
+The login will be kept for a time defined by *PyAlarm.PanicUserTimeout* property. This time is 60 seconds by default.
