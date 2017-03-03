@@ -1,9 +1,10 @@
 import panic, sys, re, os, traceback, time
 import PyTango, fandango, taurus, taurus.qt.qtgui.base
-from widgets import QtCore, QtGui, Qt
+from fandango.functional import *
+from widgets import QtCore, QtGui, Qt, TRACE_LEVEL
 from taurus.core import TaurusEventType
 from taurus.qt.qtgui.base import TaurusBaseComponent
-from widgets import getAlarmTimestamp,trace,clean_str,getThemeIcon
+from widgets import getAlarmTimestamp,trace,clean_str,getThemeIcon,getAttrValue
 #from htmlview import *
 
 REFRESH_TIME = 10000
@@ -80,7 +81,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 if not getattr(self,'ack_attr',None):
                     self.ack_attr = taurus.Attribute(self.device+'/AcknowledgedAlarms')
                     self.ack_attr.changePollingPeriod(REFRESH_TIME)
-                ack_val = getattr(self.ack_attr.read(),'rvalue','value')
+                ack_val = getAttrValue(self.ack_attr.read())
                 val = any([a==self.alarm.tag for a in (ack_val or [])])
             else: 
                 val = taurus.Device(self.alarm.device).command_inout('CheckAcknowledged',self.alarm.tag)
@@ -98,7 +99,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 if not getattr(self,'dis_attr',None):
                     self.dis_attr = taurus.Attribute(self.device+'/DisabledAlarms')
                     self.dis_attr.changePollingPeriod(REFRESH_TIME)
-                dis_val = getattr(self.dis_attr.read(),'rvalue','value')
+                dis_val = getAttrValue(self.dis_attr.read())
                 val = any(re.split('[: ,;]',a)[0]==self.alarm.tag for a in (dis_val or []))
             else: 
                 val = taurus.Device(self.alarm.device).command_inout('CheckDisabled',self.alarm.tag)
@@ -128,14 +129,14 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
             
     def eventReceived(self,evt_src,evt_type,evt_value):
         try:
-            debug = 'debug' in str(evt_src).lower()
+            debug = 'debug' in str(evt_src).lower() or TRACE_LEVEL>0
             now = fandango.time2str()
             evtype = str(TaurusEventType.reverseLookup[evt_type])
-            evvalue = getattr(evt_value,'rvalue',getattr(evt_value,'value',None))
+            evvalue = getAttrValue(evt_value)
             if debug: 
                 print '\n'
-                #trace('%s: In AlarmRow(%s).eventReceived(%s,%s,%s)'%(fandango.time2str(),self.alarm.tag,evt_src,evtype,evvalue),clean=True)
-            disabled,acknowledged,quality,value = self.alarmDisabled,self.alarmAcknowledged,self.quality,bool(self.alarm.active)
+                trace('%s: In AlarmRow(%s).eventReceived(%s,%s,%s)'%(fandango.time2str(),self.alarm.tag,evt_src,evtype,evvalue),clean=True)
+            disabled,acknowledged,quality,value = self.alarmDisabled,self.alarmAcknowledged,self.quality,bool(evvalue) #bool(self.alarm.active)
             if self.qtparent and getattr(self.qtparent,'api',None): self.alarm = self.qtparent.api[self.tag] #Using common api object
             
             #Ignoring Config Events
@@ -144,10 +145,11 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 return
 
             #Filtering Error Events
-            elif evt_type==TaurusEventType.Error or not hasattr(evt_value,'value'):
+            elif evt_type==TaurusEventType.Error or evvalue is None:
                 error = True
                 self.errors+=1
                 if self.errors>=self.MAX_ERRORS: 
+                    #After MAX_ERRORS the alarm is simply ignored
                     self.alarm.active,self.quality = None,PyTango.AttrQuality.ATTR_INVALID
                 if not self.errors%self.MAX_ERRORS:
                     if 'EventConsumer' not in str(evt_value): 
@@ -175,9 +177,9 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 disabled = self.get_disabled()
                 acknowledged = self.get_acknowledged()
                 if str(self.model).endswith('/ActiveAlarms'):
-                    value,quality = any(s.startswith(self.alarm.tag+':') for s in (evt_value.value or [])),self.alarm.get_quality()
+                    value,quality = any(s.startswith(self.alarm.tag+':') for s in (evvalue or [])),self.alarm.get_quality()
                 else:
-                    value,quality = evt_value.value,evt_value.quality
+                    value,quality = evvalue,evt_value.quality
                 
                 if debug: trace('In AlarmRow(%s).eventReceived(%s,%s,%s)' % (self.alarm.tag,evt_src,str(TaurusEventType.reverseLookup[evt_type]),evvalue),clean=True)
                 if debug: trace('\t%s (%s), dis:%s, ack:%s'%(value,quality,disabled,acknowledged))
@@ -191,7 +193,9 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 self.alarmDisabled = disabled
                 self.alarmAcknowledged = acknowledged
                 self.quality = quality
-                self.alarm.active = getAlarmTimestamp(self.alarm) if value else 0
+                self.alarm.active = getAlarmTimestamp(self.alarm) if value else 0 #It will get the date from ActiveAlarms array
+                
+                if debug: trace('\tactive since %s'%time2str(self.alarm.active))
                 
                 self.updateStyle(event=True,error=False)
             else: 
@@ -230,19 +234,22 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                     #trace('updateStyle(%s): value not received yet' %(self.alarm.tag),clean=True)
                     pass
                 else:
-                    #trace('Event Received: %s = %s' %(self.alarm.tag,self.value),clean=True)
+                    trace('AlarmRow.updateStyle: %s = %s (%s)' %(self.alarm.tag,self.alarm.active,self.quality),clean=True)
                     if self.alarm.active and not self.alarmDisabled:
                         if self.quality==PyTango.AttrQuality.ATTR_ALARM:
+                            trace('alarm')
                             if self.alarmAcknowledged:
                                 self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
                             else:
                                 self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"software-update-urgent",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
                         elif self.quality==PyTango.AttrQuality.ATTR_WARNING:
+                            trace('warning')
                             if self.alarmAcknowledged:
                                 self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
                             else:
                                 self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-important",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
                         elif self.quality==PyTango.AttrQuality.ATTR_VALID:
+                            trace('debug')
                             if self.alarmAcknowledged:
                                 self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
                             else:

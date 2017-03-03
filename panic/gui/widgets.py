@@ -1,4 +1,4 @@
-import time,traceback
+import time,traceback,os
 import taurus,fandango,fandango.qt
 from fandango.qt import Qt, QtCore, QtGui
 
@@ -25,7 +25,9 @@ def clean_str(s):
 def print_clean(s):
     print(clean_str(s))
 
-TRACE_LEVEL = -1
+try: TRACE_LEVEL = int(os.getenv('TRACE_LEVEL',-1))
+except: TRACE_LEVEL = (traceback.print_exc(),-1)[-1]
+
 def trace(msg,head='',level=0,clean=False,use_taurus=False):
     if level > TRACE_LEVEL: return
     if type(head)==int: head,level = '',head
@@ -57,20 +59,24 @@ def setCheckBox(cb,v):
         print 'Failed to setCheckBox(%s,%s)'%(cb,v)
         print traceback.format_exc()
         
+def getAttrValue(obj):
+    # Exctracts rvalue in taurus3/4 compatible way
+    return getattr(obj,'rvalue',getattr(obj,'value',None))
+        
 def getAlarmTimestamp(alarm,attr_value=None,use_taurus=True):
     """
     Returns alarm activation timestamp (or 0) of an alarm object
     """
-    #print 'panic.gui.getAlarmTimestamp(%s)'%(alarm.tag)
+    trace('panic.gui.getAlarmTimestamp(%s(%s),%s,%s)'%(type(alarm),alarm,attr_value,use_taurus))
     #Not using API method, reusing last Taurus polled attribute instead
-    #self.date = self.alarm.get_active()
     try:
         if attr_value is None and use_taurus:
             attr_value = taurus.Attribute(alarm.device+'/ActiveAlarms').read()
-            attr_value = getattr(attr_value,'rvalue','value')
+            attr_value = getAttrValue(attr_value)
         return alarm.get_time(attr_value=attr_value)
     except:
-        print 'getAlarmTimestamp(%s/%s): Failed!'%(alarm.device,alarm.tag) #if fandango.check_device(alarm.device): print traceback.format_exc()
+        trace('getAlarmTimestamp(%s/%s): Failed!'%(alarm.device,alarm.tag))
+        trace(fandango.check_device(alarm.device) and traceback.format_exc())
         return 0 #In case of error it must always return 0!!! (as it is used to set alarm.active)
     
 def getAlarmReport(alarm,parent=None):
