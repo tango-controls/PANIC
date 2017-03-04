@@ -1,13 +1,38 @@
 server	class	device	property	value
-SimulatorDS/alarmtest	SimulatorDS	test/alarms/sim-01	KeepTime	100
+				
+SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
+				
 			DynamicAttributes	T=S and (now()-S)%60
 				R=RW
 				S=GET('Start',default=0)
 				RW=VAR('rwattr',default=10.,WRITE=True)
+				F=1/0.
+				Tout=t<5 or time.sleep(10.)
+				
 			DynamicCommands	Start=str(SET('Start',now()))
 				Stop=str(SET('Start',0))
+				
 			DynamicStates	FAULT=ATTR('S') and ATTR('T')>45
 				RUNNING=ATTR('S')
-				ON=1
+				ON=1 #t<5 and ATTR(‘RW’) or 1/0.
+				
 			KeepAttributes	Yes
 				
+PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE
+			RethrowAttribute	FALSE
+			RethrowState	TRUE
+			AlarmList	NOEXCEPT:test/panic/sim-01/F
+			PollingPeriod	3
+			Enabled	1
+		test/panic/attribute	IgnoreExceptions	TRUE
+			RethrowAttribute	TRUE
+			RethrowState	TRUE
+			AlarmList	REATTR:test/panic/sim-01/F
+			PollingPeriod	3
+			Enabled	1
+		test/panic/except	IgnoreExceptions	FALSE
+			RethrowAttribute	FALSE
+			RethrowState	FALSE
+			AlarmList	EXCEPT:test/panic/sim-01/F
+			PollingPeriod	3
+			Enabled	1

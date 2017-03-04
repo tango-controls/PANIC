@@ -525,7 +525,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.debug('\n\n'+'%s: Reading alarm tag %s; formula: %s'%(now,tag_name,alarm.formula)+'\n'+'-'*80)
                     variables = {}
                     VALUE = self.EvaluateFormula(alarm.formula,tag_name=tag_name,as_string=False,lock=True,_locals=_locals,variables=variables)
-                    self.debug('\t%s = %s' % (tag_name,VALUE))
+                    self.debug('\tupdateAlarms(%s) = %s' % (tag_name,type(VALUE) if isinstance(VALUE,Exception) else VALUE))
                         
                     #Wait moved out of try/except to avoid locked waits.
                     if VALUE is None and tag_name in self.FailedAlarms:
@@ -1471,7 +1471,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             STATE = any((not attribute or attribute.lower().strip() == 'state') for device,attribute,what in varnames)
             RAISE = (STATE and self.RethrowState) or self.RethrowAttribute or fandango.isFalse(self.IgnoreExceptions)
             if not RAISE: RAISE = fandango.NaN if fandango.isNaN(self.IgnoreExceptions) else None
-            self.debug('In EvaluateFormula(%s): STATE = %s'%(tag_name or formula,STATE))
+            self.debug('In EvaluateFormula(%s): STATE = %s, RAISE = %s'%(tag_name or formula,STATE,RAISE))
             # ALARM EVALUATION
             #####################################################
             if self.worker and tag_name:
@@ -1483,22 +1483,26 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     STATE = True
                     raise Exception('UNKNOWN ALARM %s!!'%tag_name)
             else:
+                if 'debug' in str(self.getLogLevel()).lower(): self.Eval._trace = True
                 VALUE = self.Eval.eval(formula,_raise=RAISE)
+
             if tag_name:
                 variables.update(self.get_last_values(alarm=tag_name,variables=varnames))
             else:
                 variables.update(self.Eval.last)
-            self.debug(shortstr('%s: %s, Values = %s'%(tag_name or formula,VALUE,variables),512))
+
+            svalue = str(type(VALUE)) if isinstance(VALUE,Exception) else str(VALUE)
+            self.debug(shortstr('EvaluateFormula(%s): %s, Values = %s'%(tag_name or formula,svalue,variables),512))
         except Exception,e:
             desc = except2str(e)
-            if STATE or self.RethrowAttribute: 
+            if STATE: 
                 self.warning('-> Exception while checking State alarm %s:'%tag_name + '\n%s'%formula + '\n%s'%(traceback.format_exc()))
             else:
-                self.info( '-> Exception while checking alarm %s:\n%s'%(tag_name or formula,traceback.format_exc()))
+                self.info( '-> Exception while checking alarm %s:\n%s'%(tag_name or formula,except2str(e) ) )
             if (self.RethrowState and STATE) or self.RethrowAttribute:
                 # STATE EXCEPTION: Exceptions in reading of State attributes will trigger alarms
                 ###################################################################################
-                VALUE = desc or str(e) or 'Exception!' #Must Have a Value!
+                VALUE = e #desc or str(e) or 'Exception!' #Must Have a Value!
                 #variables = self.get_last_values(alarm=tag_name,variables=variables)
                 variables.update({tag_name or 'VALUE':VALUE})
             else:
