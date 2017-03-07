@@ -734,7 +734,7 @@ class AlarmAPI(fandango.SingletonMap):
           elif '%' in r:
             for p in self.phonebook:
               #re.split used to discard partial matches
-              if p in re.split('[,:;/\)\(]',p):
+              if p in re.split('[,:;/\)\(]',r):
                 r = r.replace(p,self.phonebook[p])
           result.append(r)
         return ','.join(result)
