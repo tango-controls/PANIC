@@ -12,17 +12,4 @@ Three properties control if exceptions will enable the alarm or will be simply i
 
 :RethrowState: if True, only alarms reading State attributes will be activated by exception. PyAlarm state will change to ALARM or FAULT if IgnoreExceptions is False and all alarms are in failed state.
 
-So, in case of having an alarm reading a faulty attribute, the status of the alarm will be:
-
-:DISABLED: If IgnoreExceptions=False and RethrowAttribute=False
-
-:NOT ACTIVE: If IgnoreExceptions=True and RethrowAttribute=False
-
-:ACTIVE: If IgnoreExceptions=False and RethrowAttribute=True
-
-:ACTIVE: If IgnoreExceptions=True and RethrowAttribute=True
-
-...
-
-
 
