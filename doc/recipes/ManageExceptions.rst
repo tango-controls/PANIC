@@ -15,7 +15,14 @@ Three properties control if exceptions will enable the alarm or will be simply i
 So, in case of having an alarm reading a faulty attribute, the status of the alarm will be:
 
 :DISABLED: If IgnoreExceptions=False and RethrowAttribute=False
+
 :NOT ACTIVE: If IgnoreExceptions=True and RethrowAttribute=False
+
 :ACTIVE: If IgnoreExceptions=False and RethrowAttribute=True
+
 :ACTIVE: If IgnoreExceptions=True and RethrowAttribute=True
+
+...
+
+
 
