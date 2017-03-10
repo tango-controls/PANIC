@@ -578,10 +578,13 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
                 else:
                     row = self.AlarmRows[alarm.tag]
                     try:
-                        model = AttributeNameValidator().getParams(row.getModel())
-                    except:
                         model = AttributeNameValidator().getUriGroups(row.getModel())
-                    olddev = model['devicename'] if model else None
+                        olddev = model['devname'] if model else None
+                    except:
+                        #Taurus 3
+                        #traceback.print_exc()
+                        model = AttributeNameValidator().getParams(row.getModel())
+                        olddev = model['devicename'] if model else None
                     if alarm.device != olddev:
                         trace('\t%s device changed: %s => %s; changed = True'%(alarm.tag,alarm.device,olddev))
                         self.modelsQueue.put((nr,row,alarm,(len(ordered)>self.MAX_ALARMS)))
