@@ -108,7 +108,7 @@ class Alarm(object):
 
     def clear(self):
         """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
-        #print 'Alarm.clear()'
+        print 'Alarm.clear()'
         self.active = 0 #Last timestamp it was activated
         self.recovered = 0 #Last time it was recovered
         self.counter = 0 #N cycles being active
@@ -404,22 +404,28 @@ class AlarmDS(object):
         props = self.get_alarm_properties()
         self.alarms = {}
         for line in props['AlarmList']:
+            #print('read:',line)
             line = line.split('#',1)[0].strip()
-            if not line or not fun.searchCl(filters,line): continue
+            if not line or not fun.searchCl(filters,line): 
+              #print('read:pass')
+              continue
             try:
                 tag,formula = line.split(':',1)
                 self.alarms[tag] = {'formula':formula}
                 try: 
                   local_receivers = fun.first(r for r in props['AlarmReceivers'] if r.startswith(tag+':')).split(':',1)[-1]
-                  global_receivers = self.api.get_global_receivers(tag)
-                  self.alarms[tag]['receivers'] = ','.join((local_receivers,global_receivers))
-                except: self.alarms[tag]['receivers'] = ''
+                  #global_receivers = self.api.get_global_receivers(tag)
+                  #self.alarms[tag]['receivers'] = ','.join((local_receivers,global_receivers))
+                  self.alarms[tag]['receivers'] = local_receivers
+                except: 
+                  traceback.print_exc()
+                  self.alarms[tag]['receivers'] = ''
                 try: self.alarms[tag]['description'] = fun.first(r for r in props['AlarmDescriptions'] if r.startswith(tag+':')).split(':',1)[-1]
                 except: self.alarms[tag]['description'] = ''
                 try: self.alarms[tag]['severity'] = fun.first(r for r in props['AlarmSeverities'] if r.startswith(tag+':')).split(':',1)[-1]
                 except: self.alarms[tag]['severity'] = ''
             except:
-                print 'Unparsable Alarm!: %s' % line
+                print('Unparsable Alarm!: %s' % line)
         #print '%s device manages %d alarms: %s'%(self.name,len(self.alarms),self.alarms.keys())
         return self.alarms
 
@@ -470,6 +476,7 @@ class AlarmAPI(fandango.SingletonMap):
         self.alarms = {}
         self.filters = filters
         self.tango_host = tango_host or os.getenv('TANGO_HOST')
+        self._global_receivers = None
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
         self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
@@ -503,7 +510,7 @@ class AlarmAPI(fandango.SingletonMap):
         filters = filters or self.filters or '*'
         if fun.isSequence(filters): filters = '|'.join(filters)
         self.devices,all_alarms = fandango.CaselessDict(),{}
-        self.log('%s: Loading PyAlarm devices matching %s'%(time.ctime(),filters))
+        self.log('Loading PyAlarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
         all_devices = map(str.lower,fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
@@ -527,6 +534,7 @@ class AlarmAPI(fandango.SingletonMap):
         tprops = time.time()
 
         for d in all_devices:
+            self.log('Loading device: %s'%d)
             d = d.lower()
             ad = AlarmDS(d,api=self)
             if filters=='*' or d in matched or fun.matchCl(filters,d,terminate=True):
@@ -549,6 +557,7 @@ class AlarmAPI(fandango.SingletonMap):
         #Updating alarms dictionary
         for d,vals in sorted(all_alarms.items()):
             for k,v in vals.items():
+                self.log('Loading alarm %s.%s (new=%s): %s'%(d,k,k not in self.alarms,v))
                 if k in self.alarms: #Updating
                     if self.alarms[k].device.lower()!=d.lower():
                         self.warning('AlarmAPI.load(): WARNING!: Alarm %s duplicated in devices %s and %s' % (k,self.alarms[k].device,d))
@@ -768,13 +777,16 @@ class AlarmAPI(fandango.SingletonMap):
         self.phonebook = None #Force to reload
         return new_prop
       
-    def get_global_receivers(self,tag=''):
-        prop = self.get_class_property('PyAlarm','GlobalReceivers')
+    def get_global_receivers(self,tag='',renew=False):
+        if renew or self._global_receivers is None:
+          prop = self.get_class_property('PyAlarm','GlobalReceivers')
+        else:
+          prop = self._global_receivers
         if not tag:
           return prop
         else:
           masks = (p.split(':',1) for p in prop)
-          rows = (val for mask,val in masks if fun.clmatch(mask,tag))
+          rows = (mask[-1] for mask in masks if fun.clmatch(mask[0],tag))
           return ','.join(rows)
     
     GROUP_EXP = fandango.tango.TangoEval.FIND_EXP.replace('FIND','GROUP')
