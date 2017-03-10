@@ -349,14 +349,23 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             receivers = self.Alarms[tag_name].receivers.split('#')[0]
             receivers += ','+self.Alarms.get_global_receivers(tag_name)
         
-        if '%' in str(receivers) or '$' in str(receivers):
+        if '%' in str(receivers):
           raw_receivers = ','.join(receivers) if isSequence(receivers) else receivers
           receivers = self.Alarms.parse_phonebook(raw_receivers)
-          receivers = self.parse_defines(receivers,tag_name,message=message)
-          self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
-
+          if receivers != raw_receivers: 
+            self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
+          
         if not isSequence(receivers): receivers = receivers.split(',')
         receivers = [r for r in receivers if not filtre or filtre in r]
+          
+        if '$' in str(receivers):
+          #Phonebook and Defines must be parsed separately
+          raw_receivers = ','.join(receivers) if isSequence(receivers) else receivers
+          receivers = self.parse_defines(receivers,tag_name,message=message)
+          if receivers != raw_receivers: 
+            self.debug( 'In parse_receivers: %s replaced by %s' % (raw_receivers,receivers))
+
+        if not isSequence(receivers): receivers = receivers.split(',')
         self.debug(('parse_receivers(%s,%s): %s' % (tag_name,filtre,receivers))[:120])
         return receivers
         
@@ -737,7 +746,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
               mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
               sms_receivers = self.parse_receivers(tag_name,'SMS',receivers,message=message)
               action_receivers = self.parse_action_receivers(tag_name,message,receivers)
-              self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers))[:240]+'...')
+              #self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers))[:240]+'...')
+              self.info(('%s receivers:\n\tmail:%s\n\tsms:%s\n\taction[%s]: %s'%(
+                tag_name,mail_receivers,sms_receivers,len(action_receivers),action_receivers))[:120])
           finally:
               self.lock.release()
               
