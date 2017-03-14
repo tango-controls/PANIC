@@ -11,6 +11,7 @@ SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
 				
 			DynamicCommands	Start=str(SET('Start',now()))
 				Stop=str(SET('Start',0))
+				Hung=time.sleep(float(ARGS[0]))
 				
 			DynamicStates	FAULT=ATTR('S') and ATTR('T')>45
 				RUNNING=ATTR('S')
@@ -36,3 +37,31 @@ PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE
 			AlarmList	EXCEPT:test/panic/sim-01/F
 			PollingPeriod	3
 			Enabled	1
+				
+				
+PyAlarm/Group		test/panic/subalarms		
+		test/panic/sharedattr		
+		test/panic/group		
+				
+				
+PyAlarm/Clock		test/panic/ck02		
+		test/panic/ck05		
+		test/panic/ck3		
+		test/panic/ck5		
+		test/panic/ck10		
+				
+PyAlarm/Actions		test/panic/wattr		
+		test/panic/comm		
+		test/panic/system		
+		test/panic/property		
+				
+PyAlarm/Delay		test/panic/enabled1	DynamicAttributes	Cycles
+		test/panic/delay	DynamicAttributes	StartedAt
+		test/panic/enabled10		
+				
+				
+PanicManager/1		test/panic/manager	DynamicAttributes	AlarmList
+				DeviceAlarms
+				AlarmVariables
+				AlarmReceivers
+				AlarmFormula
