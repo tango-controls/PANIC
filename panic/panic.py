@@ -108,7 +108,6 @@ class Alarm(object):
 
     def clear(self):
         """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
-        print 'Alarm.clear()'
         self.active = 0 #Last timestamp it was activated
         self.recovered = 0 #Last time it was recovered
         self.counter = 0 #N cycles being active
@@ -413,7 +412,8 @@ class AlarmDS(object):
                 tag,formula = line.split(':',1)
                 self.alarms[tag] = {'formula':formula}
                 try: 
-                  local_receivers = fun.first(r for r in props['AlarmReceivers'] if r.startswith(tag+':')).split(':',1)[-1]
+                  local_receivers = [r for r in props['AlarmReceivers'] if r.startswith(tag+':')]
+                  local_receivers = fun.first(local_receivers or ['']).split(':',1)[-1]
                   #global_receivers = self.api.get_global_receivers(tag)
                   #self.alarms[tag]['receivers'] = ','.join((local_receivers,global_receivers))
                   self.alarms[tag]['receivers'] = local_receivers
