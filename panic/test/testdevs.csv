@@ -19,48 +19,116 @@ SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
 				
 			KeepAttributes	Yes
 				
+PyAlarm/*	PyAlarm		AllowedActions	fandango
+			StartupDelay	5
+			PhoneBook	
+			SMSConfig	
+			FromAddress	
+			PanicAdminUsers	
+			PanicUserTimeout	
+			UserValidator	
+			GlobalReceivers	tester@localhost
+				
+PyAlarm/*	PyAlarm	*	PollingPeriod	1
+			Enabled	1
+			AutoReset	5
+			AlarmThreshold	3
+			IgnoreExceptions	TRUE
+			EvalTimeout	500
+			UseProcess	FALSE
+			UseTaurus	FALSE
+			RethrowAttribute	FALSE
+			RethrowState	TRUE
+			Reminder	0
+			CreateNewContext	
+			UseSnap	FALSE
+			LogFile	
+			LogLevel	INFO
+			AlertOnRecovery	FALSE
+			LogFile	
+			HtmlFolder	
+			FlagFile	
+			MaxMessagesPerAlarm	3600
+			FromAddress	tester@tango
+				
+				
+				
 PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE
 			RethrowAttribute	FALSE
 			RethrowState	TRUE
 			AlarmList	NOEXCEPT:test/panic/sim-01/F
-			PollingPeriod	3
-			Enabled	1
+				
 		test/panic/attribute	IgnoreExceptions	TRUE
 			RethrowAttribute	TRUE
 			RethrowState	TRUE
 			AlarmList	REATTR:test/panic/sim-01/F
-			PollingPeriod	3
-			Enabled	1
+				
 		test/panic/except	IgnoreExceptions	FALSE
 			RethrowAttribute	FALSE
 			RethrowState	FALSE
 			AlarmList	EXCEPT:test/panic/sim-01/F
+				
+				
+				
+				
+				
+PyAlarm/Group	PyAlarm	test/panic/subalarms	AlarmList	SUB0:True
+				SUB1:False
+				GROUP0:SUB0 OR SUB1
+				GROUP1:SUB0 AND SUB1
+				GROUP2:SUB0 and not SUB1 and REATTR
+				
+		test/panic/sharedattr	AlarmList	
+				
+		test/panic/group	AlarmList	GGROUP: GROUP(test/panic/*exc*/*exc*)
+				GROUP_TEST:GROUP(test/panic/group/TEST_*)
+				GROUP_MACRO:GROUP(TEST_*)
+				
+				
+				
+				
+				
+PyAlarm/Clock	PyAlarm	test/panic/ck02	AlarmList	CK02:not CK02
+			AlarmThreshold	1
+			PollingPeriod	0.2
+			AutoReset	0.2
+		test/panic/ck05	AlarmList	CK05: not CK05
+			AlarmThreshold	1
+			PollingPeriod	0.5
+			AutoReset	0.5
+		test/panic/ck3	AlarmList	CK3: not CK3
+			AlarmThreshold	1
 			PollingPeriod	3
-			Enabled	1
+			AutoReset	3
+		test/panic/ck5	AlarmList	CK5: not CK5
+			AlarmThreshold	1
+			PollingPeriod	5
+			AutoReset	5
+		test/panic/ck10	AlarmList	CK10: not CK10
+			AlarmThreshold	1
+			PollingPeriod	10
+			AutoReset	10
 				
 				
-PyAlarm/Group		test/panic/subalarms		
-		test/panic/sharedattr		
-		test/panic/group		
 				
 				
-PyAlarm/Clock		test/panic/ck02		
-		test/panic/ck05		
-		test/panic/ck3		
-		test/panic/ck5		
-		test/panic/ck10		
 				
-PyAlarm/Actions		test/panic/wattr		
+PyAlarm/Actions	PyAlarm	test/panic/wattr		
 		test/panic/comm		
 		test/panic/system		
 		test/panic/property		
 				
-PyAlarm/Delay		test/panic/enabled1	DynamicAttributes	Cycles
+PyAlarm/Delay	PyAlarm	test/panic/enabled1	DynamicAttributes	Cycles
 		test/panic/delay	DynamicAttributes	StartedAt
 		test/panic/enabled10		
+		test/panic/reset		
 				
 				
-PanicManager/1		test/panic/manager	DynamicAttributes	AlarmList
+				
+				
+				
+				
+PanicDS/1	PanicManager	test/panic/manager	DynamicAttributes	AlarmList
 				DeviceAlarms
 				AlarmVariables
 				AlarmReceivers
