@@ -31,6 +31,17 @@ All Enabled alarms will be evaluated at each cycle; and if evaluated to a True v
 Once an Alarm has been active by a number of cycles equal to the device AlarmThreshold it will become Active. 
 Then the PyAlarm will process all elements of the AlarmReceivers list.
 
+AlertOnRecovery and AlarmReset
+.....................................
+
+Whenever an alarm formula becomes True; a counter starts to increase until it reaches the AlarmThreshold value, becoming an active alarm.
+
+This counter is kept at AlarmThreshold value and starts decreasing once the formula is no longer True. If the counter reaches 0 (its minimum value) the alarm will be still active but its new state will be RECOVERED, an email will be sent to receivers if AlertOnRecovery property is True.
+
+Then, if the AlarmReset value (in seconds) is distinct from 0, a time count starts from the point of RECOVERY. If there's no change in the alarm state during this time count, the alarm will be automatically RESET (notifying receivers or not depending on configuration).
+
+So, if you need an alarm to have a fast recovery keep in mind that you'll have to apply a delay equal to AlarmThreshold+PollingPeriod to the value that you have set as AutoReset.
+
 The TangoEval engine
 --------------------
 
