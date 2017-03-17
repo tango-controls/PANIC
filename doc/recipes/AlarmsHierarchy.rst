@@ -54,6 +54,8 @@ It uses the read_attribute schema from TangoEval, thus using .delta to keep trac
 For example, GROUP(test/alarms/*/TEST_[ABC]) will be replaced by::
        
   any([t.delta>0 for d in FIND(test/alarms/*/TEST_[ABC].all)])
+  
+But, as regular expressions may trigger unexpected results, the syntax with explicit ALARM names is prefered.
 
 The GROUP macro can be called with one or several expressions separated by commas and a condition separated by semicolon::
 
@@ -72,7 +74,12 @@ Or
   GROUP(LOCAL_ALARM1,t01:10000/an/alarm/dev/ALARM2;x>=1)
   
 In the first case you'll get a peak when any of them changes from 0 to 1; in the second case you'll get if any of them is already on 1 (so a change in the second alarm will not trigger a second peak).
-  
+
+Future Releases
+---------------
+
+In future releases the GROUP macro will be capable of evaluating any tango attribute and not only alarms. ** As of 6.0 this feature is not yet supported ** 
+
 If the condition is empty then PyAlarm checks any .delta != 0. It can be modified if the formula contains a semicolon ";" and 
 a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm::
 
