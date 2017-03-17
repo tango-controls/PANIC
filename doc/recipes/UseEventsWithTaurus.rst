@@ -43,3 +43,28 @@ Taurus will take care of subscribing to events and update cached values.
  
 This is the result you can expect when showing both alarm attributes (test/pyalarm/clock/clock and test/pyalarm/events/events) in a taurustrend:
  
+.. image:: clock-events.png
+  :height: 100px
+  :width: 200 px
+  :scale: 50 %
+  :alt: alternate text
+  :align: right
+
+Is this approach really Event-Based?
+------------------------------------
+
+Yes, but not asynchronously. PyAlarm will use Taurus to catch Tango Events and buffer them; but alarms are still triggered by the internal polling thread of PyAlarm. 
+It means that the PyAlarm.PollingPeriod property effectively filters how often incoming events are processed.
+
+But, delegating event collection to Taurus allows to not execute read_attribute in the polling thread; allowing to very small PollingPeriod values (10-20 ms)
+
+As seen in this picture, it allows to have a very fast reaction from the Alarm attributes respect to the trigger:
+
+.. image:: clock-events-zoom.png
+  :height: 100px
+  :width: 200 px
+  :scale: 50 %
+  :alt: alternate text
+  :align: right
+
+This approach, however, is costly in terms of cpu usage if using polling periods below 100 ms. A pure-asynchronous event implementation of the PyAlarm is still pending.
