@@ -43,4 +43,3 @@ Taurus will take care of subscribing to events and update cached values.
  
 This is the result you can expect when showing both alarm attributes (test/pyalarm/clock/clock and test/pyalarm/events/events) in a taurustrend:
  
-.. image:: clock-events.png
