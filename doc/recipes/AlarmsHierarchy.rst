@@ -78,7 +78,7 @@ In the first case you'll get a peak when any of them changes from 0 to 1; in the
 Future Releases
 ---------------
 
-In future releases the GROUP macro will be capable of evaluating any tango attribute and not only alarms. ** As of 6.0 this feature is not yet supported ** 
+In future releases the GROUP macro will be capable of evaluating any tango attribute and not only alarms. **As of 6.0 this feature is not yet supported** 
 
 If the condition is empty then PyAlarm checks any .delta != 0. It can be modified if the formula contains a semicolon ";" and 
 a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm::
