@@ -19,6 +19,8 @@ Generating Clock Signals
 Playing with PollingPeriod, AlarmThreshold and AutoReset properties is possible to 
 achieve an square signal that keeps the alarm active/inactive at regular intervals.
 
+ CLOCK=NOT CLOCK
+
 The AlarmThreshold applies to both activation and reset of the alarm, so it has to be 
 added to the AutoReset period to regulate the duty cycle. Keeping the PollingPeriod and 
 AutoReset values very small will generate an accurate frequency (do not expect high accuracy,
@@ -30,3 +32,9 @@ My values for a 10 seconds alarm cycle are::
  AlarmThreshold = 50
  AutoReset = 0.0001
  
+If you want a more accurate alarm, you can also use the NOW() function. This example generates a
+switch every second
+
+ CLOCK = NOW()%2<1
+ PollingPeriod=1
+ AlarmThreshold-1
