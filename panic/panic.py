@@ -793,9 +793,10 @@ class AlarmAPI(fandango.SingletonMap):
     
     def group_macro(self,match):
         """
-        For usage details:
-        
-        see: https://github.com/tango-controls/PANIC/new/documentation/doc/recipes
+        For usage details see:
+
+          https://github.com/tango-controls/PANIC/
+            blob/documentation/doc/recipes/AlarmsHierarchy.rst
         """
         match,cond = match.split(';',1) if ';' in match else (match,'')
         #if '/' not in match and self._eval._locals.get('DEVICE',None): 

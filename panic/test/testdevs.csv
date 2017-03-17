@@ -20,6 +20,7 @@ SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
 			KeepAttributes	Yes
 				
 PyAlarm/*	PyAlarm		AllowedActions	fandango
+				date > /tmp/date
 			StartupDelay	5
 			PhoneBook	
 			SMSConfig	
@@ -70,53 +71,48 @@ PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE
 				
 				
 				
-				
-				
-PyAlarm/Group	PyAlarm	test/panic/subalarms	AlarmList	SUB0:True
-				SUB1:False
-				GROUP0:SUB0 OR SUB1
-				GROUP1:SUB0 AND SUB1
-				GROUP2:SUB0 and not SUB1 and REATTR
-				
-		test/panic/sharedattr	AlarmList	
-				
-		test/panic/group	AlarmList	GGROUP: GROUP(test/panic/*exc*/*exc*)
-				GROUP_TEST:GROUP(test/panic/group/TEST_*)
-				GROUP_MACRO:GROUP(TEST_*)
-				
-				
-				
-				
-				
-PyAlarm/Clock	PyAlarm	test/panic/ck02	AlarmList	CK02:not CK02
-			AlarmThreshold	1
-			PollingPeriod	0.2
+PyAlarm/*	PyAlarm	test/panic/ck*	PollingPeriod	0.2
 			AutoReset	0.2
-		test/panic/ck05	AlarmList	CK05: not CK05
+				
+				
+PyAlarm/Clock	PyAlarm	test/panic/ck02	AlarmList	CK02:False and not CK02
 			AlarmThreshold	1
+		test/panic/ck05	AlarmList	CK05: False and not CK05
+			AlarmThreshold	2
+			PollingPeriod	0.125
+		test/panic/ck1	AlarmList	CK1: not CK1
+			AlarmThreshold	5
+		test/panic/ck2	AlarmList	CK2: NOW()%2 < 1
+			AlarmThreshold	1
+		test/panic/ck5	AlarmList	CK5: NOW()%5<2.5
+			AlarmThreshold	1
+		test/panic/ck10	AlarmList	CK10:NOW()%10<5
+			AlarmThreshold	1
+				
+				
+PyAlarm/Group	PyAlarm	test/panic/group	AlarmList	GROUP_0: GROUP(test/panic/ck*/ck5|ck10)
+				GROUP_1: GROUP(CK5,CK10)
+				GROUP_OR: GROUP(CK5,CK10;x>=1)
+				GROUP_AND: test/panic/ck2/ck2 and test/panic/ck5/ck5
+				GROUP_ALL: GROUP( GROUP_0,GROUP_1,GROUP_2,GROUP_AND )
+				
+			AutoReset	0.0001
 			PollingPeriod	0.5
-			AutoReset	0.5
-		test/panic/ck3	AlarmList	CK3: not CK3
 			AlarmThreshold	1
-			PollingPeriod	3
-			AutoReset	3
-		test/panic/ck5	AlarmList	CK5: not CK5
-			AlarmThreshold	1
-			PollingPeriod	5
-			AutoReset	5
-		test/panic/ck10	AlarmList	CK10: not CK10
-			AlarmThreshold	1
-			PollingPeriod	10
-			AutoReset	10
+				
+				
+PyAlarm/Actions	PyAlarm	test/panic/wattr	AlarmList	WATTR:True
+			AlarmReceivers	WATTR:ACTION(alarm:attribute,test/panic/sim-01/rw,int(345)),ACTION(reset:attribute,test/panic/sim-01/rw,int(0))
+		test/panic/comm	AlarmList	COMM:(  NOW() - test/panic/sim-01/rw ) >5
+			AlarmReceivers	COMM:ACTION(alarm:command,test/panic/wattr/ResetAlarm,WATTR,test)
+		test/panic/system	AlarmList	SYSTEM:WATTR
+			AlarmReceivers	SYSTEM:ACTION(alarm:system,date > /tmp/date)
+		test/panic/property	AlarmList	
+			AlarmReceivers	
 				
 				
 				
 				
-				
-PyAlarm/Actions	PyAlarm	test/panic/wattr		
-		test/panic/comm		
-		test/panic/system		
-		test/panic/property		
 				
 PyAlarm/Delay	PyAlarm	test/panic/enabled1	DynamicAttributes	Cycles
 		test/panic/delay	DynamicAttributes	StartedAt
@@ -133,3 +129,11 @@ PanicDS/1	PanicManager	test/panic/manager	DynamicAttributes	AlarmList
 				AlarmVariables
 				AlarmReceivers
 				AlarmFormula
+				
+				
+PyAlarm/results	PyAlarm	test/panic/results	AlarmList	EXCEPTS_OK:REATTR AND NOT NOEXCEPT AND NOT EXCEPT AND test/panic/except/state == FAULT
+				
+				
+				
+				
+			AlarmSeverities	EXCEPTS_OK:Debug
