@@ -27,3 +27,19 @@ Start your device server using Astor, fandango or manually
   import fandango as fn
   fn.Astor('test/pyalarm/events').start_servers(host='your_hostname')
 
+Then, configure the device properties to read attributes using Taurus and react as fast as possible
+Taurus will take care of subscribing to events and update cached values.
+
+.. code-block:: python
+
+  dtest = alarms.devices['test/pyalarm/events']
+  dtest.config['UseTaurus'] = True
+  dtest.config['AutoReset'] = 0.05
+  dtest.config['Enabled'] = 10
+  dtest.config['AlarmThreshold'] = 1
+  dtest.config['PollingPeriod'] = 0.05
+  alarms.put_db_properties(dtest.name,dtest.config)
+  dtest.init()
+ 
+This is the result you can expect when showing both alarm attributes (test/pyalarm/clock/clock and test/pyalarm/events/events) in a taurustrend:
+ 
