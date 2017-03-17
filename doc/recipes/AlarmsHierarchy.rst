@@ -41,10 +41,14 @@ For an expression matching multiple alarms or attributes, GROUP returns a new fo
 if any of the alarm changes to active state (.delta) or matches a given condition::
 
   GROUP(ALARM1, ALARM2, ALARM3)
+  
+Thus, GROUP will be activated when any of the three alarms switches to active; and immediately reset to wait for the next change. In this way you get a notification for any new activation of the three alarms.
 
-**NOTE**: BY DEFAULT IS NOT LIKE any(FIND(*)); it will react only on change, not if already active!
+**NOTE**: BY DEFAULT IS NOT LIKE any(FIND(*)); it will react only on change, not taking in account previous states!
 
 **NOTE2**: you must tune your PyAlarm properties to have AlarmThreshold = 1 and AutoReset <= 3 to take profit of this feature.
+
+**NOTE3**: The GROUP activation will be just a peak when using .delta (default); take this in account when setting up several levels of alarms as fast peaks may not be noticed if higher level alarms have long thresholds.
 
 It uses the read_attribute schema from TangoEval, thus using .delta to keep track of which values has changed. 
 For example, GROUP(test/alarms/*/TEST_[ABC]) will be replaced by::
@@ -63,7 +67,13 @@ Thus, a valid GROUP expression is::
 
   GROUP(LOCAL_ALARM1,t01:10000/an/alarm/dev/ALARM2)
   
-If the condition is empty then checks any .delta != 0. It can be modified if the formula contains a semicolon ";" and 
+Or
+ 
+  GROUP(LOCAL_ALARM1,t01:10000/an/alarm/dev/ALARM2;x>=1)
+  
+In the first case you'll get a peak when any of them changes from 0 to 1; in the second case you'll get if any of them is already on 1 (so a change in the second alarm will not trigger a second peak).
+  
+If the condition is empty then PyAlarm checks any .delta != 0. It can be modified if the formula contains a semicolon ";" and 
 a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm::
 
   GROUP(bl09/vc/vgct-*/p[12];x>1e-5) => [x>1e-5 for x in FIND(bl09/vc/vgct-*/p[12])]
