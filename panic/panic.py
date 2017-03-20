@@ -476,7 +476,7 @@ class AlarmAPI(fandango.SingletonMap):
         self.alarms = {}
         self.filters = filters
         self.tango_host = tango_host or os.getenv('TANGO_HOST')
-        self._global_receivers = None
+        self._global_receivers = [],0
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
         self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
@@ -762,12 +762,12 @@ class AlarmAPI(fandango.SingletonMap):
         lines = [line.strip().split(':',1)[0].upper() for line in prop]
         if name in lines: #Replacing
             index = lines.index(name)
-            print 'AlarmAPI.edit_phonebook(%s,%s,%s), replacing at [%d]'%(tag,value,section,index)
+            print('AlarmAPI.edit_phonebook(%s,%s,%s), replacing at [%d]'%(tag,value,section,index))
             prop = prop[:index]+[value]+prop[index+1:]
         else: #Adding
             if section and '#' not in section: section = '#%s'%section
             index = len(lines) if not section or section not in lines else lines.index(section)+1
-            print 'AlarmAPI.edit_phonebook(%s,%s,%s), adding at [%d]'%(tag,value,section,index)
+            print('AlarmAPI.edit_phonebook(%s,%s,%s), adding at [%d]'%(tag,value,section,index))
             prop = prop[:index]+[value]+prop[index:]
         self.save_phonebook(prop)
 
@@ -778,17 +778,31 @@ class AlarmAPI(fandango.SingletonMap):
         return new_prop
       
     def get_global_receivers(self,tag='',renew=False):
-        if renew or self._global_receivers is None:
-          prop = self.get_class_property('PyAlarm','GlobalReceivers')
-        else:
-          prop = self._global_receivers
-        if not tag:
-          return prop
-        else:
-          masks = (p.split(':',1) for p in prop)
-          rows = (mask[-1] for mask in masks if fun.clmatch(mask[0],tag))
-          return ','.join(rows)
-    
+        try:
+          if (renew or self._global_receivers[-1]<time.time()-3600):
+            prop = self.get_class_property('PyAlarm','GlobalReceivers')
+            self._global_receivers = (prop,time.time())
+          else:
+            prop = self._global_receivers[0]
+          if not tag:
+            return prop
+          else:
+            prop = [p.split(':',1) for p in prop]
+            rows = []
+            for line in prop:
+              mask = (line[0] if len(line)>1 else '*').split(',')
+              neg = [m[1:] for m in mask if m.startswith('!')]
+              if neg and any(fun.clmatch(m,tag) for m in neg):
+                continue
+              pos = [m for m in mask if not m.startswith('!')]
+              if not pos or any(fun.clmatch(m,tag) for m in pos):
+                rows.append(line[-1])
+            return ','.join(rows)
+        except:
+          print('>>> Exception at get_global_receivers(%s)'%tag)
+          traceback.print_exc()
+          return ''
+        
     GROUP_EXP = fandango.tango.TangoEval.FIND_EXP.replace('FIND','GROUP')
     
     def group_macro(self,match):
