@@ -132,7 +132,8 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
             debug = 'debug' in str(evt_src).lower() or TRACE_LEVEL>0
             now = fandango.time2str()
             evtype = str(TaurusEventType.reverseLookup[evt_type])
-            evvalue = getAttrValue(evt_value)
+            evvalue = getAttrValue(evt_value) if not getattr(evt_value,'is_empty',False) else []
+            
             if debug: 
                 print '\n'
                 trace('%s: In AlarmRow(%s).eventReceived(%s,%s,%s)'%(fandango.time2str(),self.alarm.tag,evt_src,evtype,evvalue),clean=True)
