@@ -1117,6 +1117,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     #It's just for checking if alarms has been added/removed from the API
                     else:
                         self.Alarms.load(self.get_name())
+                        self.Alarms.get_global_receivers(renew=True)
                         alarm_attrs = dict((a,v.get_attribute()) for a,v in self.Alarms.items())
                         for a in self.DynamicAttributes[:]:
                             if a not in alarm_attrs.values():
