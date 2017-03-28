@@ -722,8 +722,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
           if message not in ('ALARM','REMINDER') and not self.AlertOnRecovery:
               mail_receivers = sms_receivers = []
 
-          if alarm and mail_receivers:
-            report = self.GenerateReport(tag_name,mail_receivers,message=message,
+          if alarm:
+            report = self.GenerateReport(tag_name,mail_receivers or '',message=message,
                         user_comment=comment,values=values)
           else: 
             #Sending a test message (no alarm involved)
@@ -823,6 +823,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.lock.release()
 
     def update_log_file(self,argin='',tag='',report='',message=''):
+        self.debug('update_log_file(%s,%s,%s,%s)'%(argin,tag,report,message))
         logfile = (argin.strip() or self.LogFile or '').strip()
         if not logfile or logfile == '/dev/null': return
         try:
