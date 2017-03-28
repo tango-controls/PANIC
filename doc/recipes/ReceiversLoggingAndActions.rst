@@ -31,7 +31,9 @@ All the logging methods support defined variables ($ALARM, $DATE, $DEVICE, $MESS
 Local LogFile
 .............
 
-Simply set the LogFile property to your preferred local file path (e.g. /tmp/pyalarm/$ALARM_$DATE.log )
+Simply set the LogFile property to your preferred local file path::
+
+  LogFile = /tmp/pyalarm/$NAME_$DATE_$MESSAGE.log
 
 Remote LogFile
 ..............
