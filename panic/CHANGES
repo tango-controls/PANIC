@@ -1,15 +1,32 @@
 ONGOING 6.0
 ---------------------
 
+alpha 6
+
+  Solve bug on PyAlarm.GenerateReport command
+
 alpha 5 (bliss 6.1)
-GUI adapted to Taurus 4
-Replace phonebook entries on ACTION receivers
-panic.Evaluate() timeout set to 1000.
-Quality of failed alarms set to INVALID (~DISABLED)
-free_alarm and send_alarm methods refactored for better actions
-Added SendAlarm as command
-kill/pause events added
-Added MemUsage/LastUpdate attributes
+
+  launcher renamed to just "panic"
+  Solve GUI bug on empty ActiveAlarms attribute
+  allow multiple filters on GlobalReceivers
+  reload global_receivers on init()
+  Add test cases for Group/Action/Clock/Reset
+  Solve API bug on empty receivers
+  Move Reset notification to send_alarm()
+  Solve getParams deprecation on Taurus4
+  Add Reports Cache, refactor send_alarm logging
+  Refactor PyAlarm.parse_receivers
+  Solve bug in AlarmsAPI.get_global_properties
+
+  GUI adapted to Taurus 4
+  Replace phonebook entries on ACTION receivers
+  panic.Evaluate() timeout set to 1000.
+  Quality of failed alarms set to INVALID (~DISABLED)
+  free_alarm and send_alarm methods refactored for better actions
+  Added SendAlarm as command
+  kill/pause events added
+  Added MemUsage/LastUpdate attributes
 
 alpha 4
 Solve bug on AlarmAPI.put_db_properties (Wrote to device instead of free property)

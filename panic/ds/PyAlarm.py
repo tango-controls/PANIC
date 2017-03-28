@@ -1717,6 +1717,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         When called from Tango a single argument is received; which is a list containing all arguments
         :param message: Can be one of self.MESSAGE_TYPES or a different text
         """
+        self.info('In GenerateReport(%s,%s,%s)'%(tag_name,mail_receivers,message))
+        if isSequence(tag_name):
+          mail_receivers = first(tag_name[1:] or [mail_receivers])
+          message = first(tag_name[2:] or [message])
+          tag_name = first(tag_name)
+          
         alarm = (self.Alarms.get(tag_name) or [None])[0]
         result = 'FAILED'
         
@@ -1725,7 +1731,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             result = self.Reports[tag_name][(tag_name,message,alarm.active,html)]
             return result
         
-        self.info( 'In GenerateReport(%s,%s,%s,%s,%s)'%(tag_name,message,alarm.active,html,mail_receivers))
+        self.info( 'In GenerateReport(%s,%s,%s,%s,%s)'%(tag_name,message,getattr(alarm,'active',None),html,mail_receivers))
           
         #Check email receivers
         #-----------------------------------------------------------------------------------------------
