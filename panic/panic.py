@@ -299,6 +299,10 @@ class Alarm(object):
     def to_dict(self):
         isprivate = lambda k: k.startswith('_') or k=='api'
         return dict((k,v) for k,v in self.__dict__.items() if not isprivate(k))
+      
+    def __bool__(self):
+        return bool(self.get_active())
+    __nonzero__=__bool__ #Python 2/3 compatibility
         
     def to_str(self):
         return str(self.to_dict().items())
