@@ -132,7 +132,9 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
             debug = 'debug' in str(evt_src).lower() or TRACE_LEVEL>0
             now = fandango.time2str()
             evtype = str(TaurusEventType.reverseLookup[evt_type])
-            evvalue = getAttrValue(evt_value) if not getattr(evt_value,'is_empty',False) else []
+            # Direct getattr(o,n,v) fails on some taurus classes
+            is_empty = (hasattr(evt_value,'is_empty') and getattr(evt_value,'is_empty')) or False
+            evvalue = getAttrValue(evt_value) if not is_empty else []
             
             if debug: 
                 print '\n'
