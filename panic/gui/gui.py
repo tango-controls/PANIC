@@ -56,7 +56,8 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
         self.expert = False
         self.tools = {} #Widgets dictionary
         try:
-            px = QtGui.QPixmap('/homelocal/sicilia/applications/Panic/PanicBanner.gif')
+            url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6-banner.png'
+            px = QtGui.QPixmap(url)
             self.splash = QtGui.QSplashScreen(px)
             self.splash.showMessage('initializing application...')
             self.splash.show()
@@ -80,6 +81,9 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
         if self.mainwindow:
             #self.mainwindow.setWindowTitle(str(os.getenv('TANGO_HOST')).split(':',1)[0]+' Alarm Widget (%s)'%self.filters)
             self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(self.filters or self.regEx or '',str(os.getenv('TANGO_HOST')).split(':',1)[0]))
+            url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6.svg'
+            px = QtGui.QPixmap(url)
+            self.mainwindow.setWindowIcon(Qt.QIcon(px))
             
         self.snapi = None
         self.ctx_names = []
