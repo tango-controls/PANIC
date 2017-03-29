@@ -1,6 +1,42 @@
 #!/bin/sh
 
 PANIC=$(python -c "import imp;print(imp.find_module('panic')[1])")
-CMD=$PANIC/gui/gui.py
-echo $CMD $*
-python $CMD $*
+
+PANIC_DEFAULT="--filter=!building"
+
+HASSCREEN=$(which screen 2>/dev/null)
+CMD="python $PANIC/gui/gui.py"
+
+if [ "$( echo $1 | grep '\?\|\-h' )" ] ; then
+  echo "Usage:"
+  echo "    > panic [-?] [-v/--attach] [--filter=...]"
+  echo ""
+  echo "Console output will be disabled unless attach/v options are passed"
+  echo "SCREEN is used as default shell if present"
+  echo ""
+  
+else
+  echo "Launching panic-gui ..."
+  if [ "$*" ] && [ "$( echo "$*" | grep '\-v' )" ] ; then
+    echo "raw"
+    CMD=${CMD}
+
+  elif [ "$*" ] && [ "$( echo "$*" | grep 'attach' )" ] ; then
+    echo "screen"
+    if [ "${HASSCREEN}" ] ; then
+      CMD="screen -S panic-gui ${CMD}"
+    fi
+    
+  else
+    echo "run detached"
+    if [ "${HASSCREEN}" ] ; then
+      CMD="screen -dm -S panic-gui ${CMD}"
+    else
+      CMD="${CMD} > /dev/null"
+    fi
+  fi
+  echo $CMD $*
+  $CMD $*
+fi
+
+

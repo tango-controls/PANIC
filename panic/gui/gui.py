@@ -959,8 +959,8 @@ def main(args=[]):
     import widgets
     from taurus.qt.qtgui.application import TaurusApplication
 
-    opts = [a for a in args if a.startswith('--')]
-    args = [a for a in args if not a.startswith('--')]
+    opts = [a for a in args if a.startswith('-')]
+    args = [a for a in args if not a.startswith('-')]
     URL = 'http://www.cells.es/Intranet/Divisions/Computing/Controls/Help/Alarms/panic'
     
     #uniqueapp = Qt.QApplication([])
@@ -986,7 +986,7 @@ def main(args=[]):
     tmw.helpMenu = Qt.QMenu('Help',tmw.menuBar)
     
     trace('\tlaunching AlarmGUI ... %s'%sys.argv)
-    alarmApp = AlarmGUI(filters='|'.join(a for a in sys.argv[1:] if not a.startswith('--')),options=opts,mainwindow=tmw)
+    alarmApp = AlarmGUI(filters='|'.join(args),options=opts,mainwindow=tmw)
     tmw.setCentralWidget(alarmApp)
 
     tmw.setMenuBar(tmw.menuBar)
