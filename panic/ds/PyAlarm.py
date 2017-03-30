@@ -910,12 +910,17 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             except:
                 self.warning('Unable to execute action %s'%str(action))
                 self.warning(traceback.format_exc())
-        elif action[0]=='system' and action[1] in self.AllowedActions:
+        elif action[0]=='system':
+          if action[1] in self.AllowedActions:
             try:
-                os.system(action[1]+'&')
+                cmd = self.parse_defines(action[1],tag,message=message)
+                self.info('OS action: %s'%str(cmd))                
+                os.system(cmd+'&')
             except:
                 self.warning('Unable to execute action %s'%str(action))
                 self.warning(traceback.format_exc())
+          else:
+                self.info('OS action not allowed: %s'%str(action))
         else:
             self.warning('\tUnknown Action: %s'%action[0])
 
@@ -1744,10 +1749,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         maillist = []
         alnum = '[a-zA-Z0-9-_.]+'
-        email = '(' + alnum + '@' + '(?:' + alnum + r"[\.]" + ')+' + alnum + ')'
+        ##email = '(' + alnum + '@' + '(?:' + alnum + r"[\.]" + ')+' + alnum + ')'
+        email = '(' + alnum + '@' + alnum + ')'
+        print('mail_receivers',mail_receivers)
         for m in mail_receivers:
             addresses = re.findall(email,m)
-            self.debug( 'in %s, addresses=%s'%(m,addresses))
+            self.info( 'in %s, addresses=%s'%(m,addresses))
             [maillist.append(a.lower()) for a in addresses if a.lower() not in maillist]
 
         #if (maillist or (not maillist and html)):
@@ -1802,7 +1809,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             try: report+= '\n\n' + 'Other Active Alarms are:' + '\n\t'.join([''] + sorted(['%s:%s:%s'%(k,fun.time2str(v.active),self.Alarms[k].formula) for k,v in self.Alarms.items() if v.active]))
             except: pass
         if self.PastAlarms:
-            report+= '\n\n' + 'Past Alarms were:' + '\n\t'.join([''] + ['%s:%s'%(','.join(k),fun.time2str(d)) for d,k in self.PastAlarms.items()])
+            report+= '\n\n' + 'Past Alarms were:' + '\n\t'.join([''] + ['%s:%s'%(','.join(k),fun.time2str(d)) for d,k in sorted(self.PastAlarms.items())[-10:]])
         if html:
             result = [report, subject]
         else:
@@ -1887,6 +1894,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         Arguments: message, subject, receivers
         """
+        self.info('SendMail(%s)'%str(argin))
         def format4sendmail(report):
             MAX_MAIL_LENGTH = 512
             out = report.replace('\r','\n').replace('\n\n','\n').replace('\n','\\n').replace('"',"'") #.replace("'",'')
