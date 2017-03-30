@@ -550,10 +550,14 @@ class AlarmAPI(fandango.SingletonMap):
         self.get_phonebook(load=True)
         
         #Verifying that previously loaded alarms still exist
-        for k in self.alarms.keys()[:]:
-            if not any(k in vals for vals in all_alarms.values()):
-                self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,self.alarms[k].device))
-                self.alarms.pop(k)
+        for k,v in self.alarms.items()[:]:
+          found = False
+          for d,vals in all_alarms.items():
+            found = k in vals and d.lower() == v.device.lower()
+          if not found:
+            self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,v.device))
+            self.alarms.pop(k)
+        
         #Updating alarms dictionary
         for d,vals in sorted(all_alarms.items()):
             for k,v in vals.items():
