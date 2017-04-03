@@ -160,7 +160,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def set_status(self,status):
         self._status = status
         PyTango.Device_4Impl.set_status(self,status)
-    def get_status(self,status):
+    def get_status(self):
         return self._status
     def dev_status(self):
         return self._status
@@ -1233,7 +1233,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug("In "+ self.get_name()+ "::always_excuted_hook()")
         try:
             actives = list(reversed([(v.active,k) for k,v in self.Alarms.items() if v.active]))
-            if self.last_attribute_check and self.last_attribute_check<(time.time()-2*self.PollingPeriod):
+            if self.Alarms and 0<self.last_attribute_check<(time.time()-2*self.PollingPeriod):
                 self.set_state(PyTango.DevState.FAULT)
                 msg = 'Alarm Values not being updated!!!\n\n'
                 self.set_status(msg+self.get_status().replace(msg,''))
