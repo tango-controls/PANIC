@@ -3,6 +3,7 @@ server	class	device	property	value
 SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
 				
 			DynamicAttributes	T=S and (now()-S)%60
+				T30=now()%30
 				R=RW
 				S=GET('Start',default=0)
 				RW=VAR('rwattr',default=10.,WRITE=True)
@@ -120,7 +121,8 @@ PyAlarm/Delay	PyAlarm	test/panic/enabled1	DynamicAttributes	Cycles
 		test/panic/reset		
 				
 				
-				
+PyAlarm/Value	PyAlarm	test/panic/value	AlarmList	A_VALUE:test/panic/sim-01/T30>15
+PyAlarm/Quality	PyAlarm	test/panic/quality	AlarmList	A_QUALITY:test/panic/sim-01/T30.quality == ATTR_ALARM
 				
 				
 				
@@ -132,8 +134,4 @@ PanicDS/1	PanicManager	test/panic/manager	DynamicAttributes	AlarmList
 				
 				
 PyAlarm/results	PyAlarm	test/panic/results	AlarmList	EXCEPTS_OK:REATTR AND NOT NOEXCEPT AND NOT EXCEPT AND test/panic/except/state == FAULT
-				
-				
-				
-				
 			AlarmSeverities	EXCEPTS_OK:Debug
