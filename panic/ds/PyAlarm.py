@@ -503,6 +503,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     'Enabled alarms to process in next %d s cycle (UseProcess=%s): %s ' % (self.PollingPeriod,self.UseProcess,[a[0] for a in myAlarms])
                     +'\n'+'#'*80)
                 if not self.get_enabled(force=True): self.info( 'ALARM SENDING IS DISABLED!!')
+
                 ###############################################################
                 # NOT using a subProcess and Using Taurus to update the variables
                 if not self.worker and self.UseTaurus:
@@ -524,11 +525,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         #self.warning(traceback.format_exc())
                 elif self.worker:
                     self.info('Worker last alive at %s: %s,%s'%(time.ctime(self.worker.last_alive),self.worker._process.is_alive(),self.worker._receiver.is_alive()))
+                    
                 ###############################################################
                     
                 for tag_name,alarm in myAlarms: #Format is:    TAG3:LT/VC/Dev1/Pressure > 1e-4
+                    self.pause.wait(timewait) #Pause should be done at the start of the loop
+                    ##########################################################
                     now = self.last_attribute_check = time.time()
-                    ######################################################################################################################
+                    ##########################################################
                     WAS_OK = alarm.counter<self.AlarmThreshold
                     self.info('Checking alarm tag %s'%tag_name)
                     self.debug(alarm.formula)
@@ -539,9 +543,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     if WAS_OK:
                       self.info('\tupdateAlarms(%s) = %s' % (tag_name,type(VALUE) if isinstance(VALUE,Exception) else VALUE))
                               
-                    #Wait moved out of try/except to avoid locked waits.
-                    if VALUE is None and tag_name in self.FailedAlarms:
-                        self.pause.wait(timewait)
+                    # ALARM May be failed or removed during the thread iteration
+                    if (  tag_name not in self.Alarms or 
+                        (VALUE is None and tag_name in self.FailedAlarms) ):
                         continue
 
                     if VALUE:
@@ -600,23 +604,25 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
                     self.debug( 'Alarm %s counter is : %s' %(tag_name, alarm.counter))
                     if tag_name in self.FailedAlarms: self.FailedAlarms.pop(tag_name)
-                    self.lock.acquire()
-                    self.Alarms[tag_name]=alarm ###< NOT NECESSARY, OBJECTS ARE ALREADY THE SAME
-                    self._lastupdate = time.time()
-                    self.lock.release()
-                    ######################################################################################################################
-                    self.pause.wait(timewait)
+                    ##########################################################
+                    # END OF ALARMS LOOP
                 
+                self._lastupdate = time.time()
                 if not myAlarms: self.pause.wait(timewait)
                 else: self.info('\n'+'-'*80)
                 self.Uncatched=''
             
             except Exception,e:
+                self.set_state(PyTango.DevState.FAULT)
                 from traceback import format_exc
                 tr=format_exc()
-                self.error( 'Uncatched exception in PyAlarm::updateAlarmsThread:\n%s'%tr + '\n' + '='*80)
+                msg = ( 'Uncatched exception in PyAlarm::updateAlarmsThread:\n%s'%tr + '\n' + '='*80)
+                self.error(msg)
+                self.set_status(msg)
                 self.Uncatched+=tr+'\n'
                 self.pause.wait(timewait)
+                
+            # END OF MAIN LOOP
             
         self.info( 'In updateAlarms(): Thread finished')
         return
@@ -1227,9 +1233,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug("In "+ self.get_name()+ "::always_excuted_hook()")
         try:
             actives = list(reversed([(v.active,k) for k,v in self.Alarms.items() if v.active]))
-            if self.last_attribute_check and self.last_attribute_check<(time.time()-600.):
+            if self.last_attribute_check and self.last_attribute_check<(time.time()-2*self.PollingPeriod):
                 self.set_state(PyTango.DevState.FAULT)
-                self.set_status('Alarm Values not being updated!!!')
+                msg = 'Alarm Values not being updated!!!\n\n'
+                self.set_status(msg+self.get_status().replace(msg,''))
             elif self.worker and not (self.worker._process.is_alive() and self.worker._receiver.is_alive()):
                 self.set_state(PyTango.DevState.FAULT)
                 self.set_status('Alarm Values not being processed!!!') 
@@ -2176,7 +2183,10 @@ class PyAlarmClass(PyTango.DeviceClass):
         'LastUpdate':
             [[PyTango.DevDouble,
             PyTango.SCALAR,
-            PyTango.READ]],
+            PyTango.READ],
+            {
+                'description':"Timestamp of the last cycle completed",
+            } ],
         }
 
     def dyn_attr(self,dev_list):
