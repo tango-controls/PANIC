@@ -68,7 +68,17 @@ The _proxies object allows to retrieve either DeviceProxy or DeviceServer object
 
 
 ###############################################################################
-#@todo: These methods and AlarmAPI.setAlarmDeviceProperty should be moved to AlarmDS
+#@todo: Tango access methods
+
+def getAttrValue(obj,default=None):
+    """
+    Extracts rvalue in tango/taurus3/4 compatible way
+    If default = True, obj is returned
+    """
+    return getattr(obj,'rvalue',
+             getattr(obj,'value',
+               obj if default is True 
+                 else default))
 
 def getAlarmDeviceProperties(device):
     """ Method used in all panic classes """

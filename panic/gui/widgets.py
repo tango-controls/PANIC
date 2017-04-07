@@ -8,6 +8,7 @@ from taurus.qt.qtgui.panel import TaurusForm
 from taurus.core.util  import Logger
 
 import panic
+from panic import getAttrValue
 from panic.widgets import AlarmValueLabel, getThemeIcon
 import getpass
 
@@ -58,10 +59,6 @@ def setCheckBox(cb,v):
     except:
         print 'Failed to setCheckBox(%s,%s)'%(cb,v)
         print traceback.format_exc()
-        
-def getAttrValue(obj):
-    # Exctracts rvalue in taurus3/4 compatible way
-    return getattr(obj,'rvalue',getattr(obj,'value',None))
         
 def getAlarmTimestamp(alarm,attr_value=None,use_taurus=True):
     """
