@@ -20,6 +20,6 @@ PANIC Recipes
    recipes/UseEventsWithTaurus
    recipes/AlarmDistribution
    recipes/Exceptions
-   recipes/AlarmProperties
-   recipes/AlarmFormulas
+   recipes/PyAlarmTuning
+   recipes/GroupAlarms
 

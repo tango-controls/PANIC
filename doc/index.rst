@@ -24,7 +24,10 @@ Contents:
    Install
    PyAlarmUserGuide
    recipes
-   panic   
+   panic.panic
+   panic.gui.gui
+   panic.widgets  
+   panic.gui.widgets 
 
 
 Indices and tables
