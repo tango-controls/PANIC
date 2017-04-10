@@ -18,6 +18,8 @@ SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
 				RUNNING=ATTR('S')
 				ON=1 #t<5 and ATTR(‘RW’) or 1/0.
 				
+			DynamicQualities	T30=ATTR_ALARM if ATTR('T30')<15 else ATTR_VALID
+				
 			KeepAttributes	Yes
 				
 PyAlarm/*	PyAlarm		AllowedActions	fandango
