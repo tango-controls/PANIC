@@ -1,81 +1,94 @@
-ONGOING 6.0
----------------------
+PANIC 6.0
+---------
 
-alpha 6
+Package refactored to build valid system/PIP/rpm packages
+PANIC Migrated to github.
+Development moved to develop branch, stable to master
 
-  Solve bug on PyAlarm.GenerateReport command
+Main new features:
 
-alpha 5 (bliss 6.1)
+ * enhanced logs and actions
+ * properties managed in the API side
+ * added multiple test cases
+ * added GlobalReceivers and Defines
+ * logs: record local or remote using text or json
+ * enabled plugin methods for user validation
+ * solved many, many bugs
+ 
+Dropped features from this release:
 
-  launcher renamed to just "panic"
-  Solve GUI bug on empty ActiveAlarms attribute
-  allow multiple filters on GlobalReceivers
-  reload global_receivers on init()
-  Add test cases for Group/Action/Clock/Reset
-  Solve API bug on empty receivers
-  Move Reset notification to send_alarm()
-  Solve getParams deprecation on Taurus4
-  Add Reports Cache, refactor send_alarm logging
-  Refactor PyAlarm.parse_receivers
-  Solve bug in AlarmsAPI.get_global_properties
+ * gui refactoring
+ * alarm collections
+ * IEC compliance (in progress)
+ * kibana integration
+ 
 
-  GUI adapted to Taurus 4
-  Replace phonebook entries on ACTION receivers
-  panic.Evaluate() timeout set to 1000.
+Summary of changes since PANIC 5.4 (Last Sourceforge release):
+
+
+ PyAlarm device server:
+ 
+  All panic times are now seconds, added deprecated message for pollings in milliseconds
   Quality of failed alarms set to INVALID (~DISABLED)
+  
+  Solve bug on PyAlarm.GenerateReport command
+  Solve bug on "zombie" alarm deleted/removed 
+  Move Reset notification to send_alarm()
+  Replace phonebook entries on ACTION receivers
+  reload global_receivers on init()
+  
   free_alarm and send_alarm methods refactored for better actions
   Added SendAlarm as command
   kill/pause events added
-  Added MemUsage/LastUpdate attributes
+  Added MemUsage/LastUpdate attributes  
+  Properties definition moved to panic.properties
+  Add invalid quality to disabled alarms
+  Add FAULT state when many alarms are failed
+  Add LastUpdate and MemUsage attributes
+  Avoid update_locals to reread attributes if check=False
+  Add receiver defines: $ALARM/TAG/NAME/DEVICE/DESCRIPTION/VALUES/REPORT/DATE/JSON
+  
+  Implement Pause() command and kill/pause methods for thread management.
+  LogFiles capable of saving remotely using fandango.device.FolderDS 
+  
+  Solved bugs on trigger_action (see documentation on github)
+  Properties definition moved to panic.properties
+  Added global receivers property  
+  Add Reports Cache, refactor send_alarm logging
+  Refactor PyAlarm.parse_receivers
+  Alarm actions will be executed before mail and snapshot.
+  Added replacement of $DESCRIPTION,$ALARM in actions
+  
+ GUI:
+  New panic Icon
+  Reduce gui dependencies to speed up startup
+  GUI adapted to Taurus 4
+  launcher renamed to just "panic"
+  Solve GUI bug on empty ActiveAlarms attribute
+  Solve getParams deprecation on Taurus4
+  Added User login access via UserValidator widget
 
-alpha 4
-Solve bug on AlarmAPI.put_db_properties (Wrote to device instead of free property)
-
-alpha 3 (January 2017)
-PyAlarm:
-Properties definition moved to panic.properties
-Add invalid quality to disabled alarms
-Add FAULT state when many alarms are failed
-Add LastUpdate and MemUsage attributes
-Avoid update_locals to reread attributes if check=False
-Add receiver defines: $ALARM/TAG/NAME/DEVICE/DESCRIPTION/VALUES/REPORT/DATE/JSON
-Implement Pause() command and kill/pause methods for thread management.
-LogFiles capable of saving remotely using fandango.device.FolderDS 
-Solved bugs on trigger_action (see documentation on github)
-
-API:
-Properties definition moved to panic.properties
-Added global receivers property
-Solved bug on phonebook parsing
-Group macro refactored (see documentation/recipes)
-Add api.split_formula()
-Change api.evaluate() timeout and checks
-
-GUI:
-New panic Icon
-
-alpha 1 (April 2016)
- * Alarm Qualities will change to reflect alarm life cycle instead of severity.
- * Alarm may be declared in its own class/free property; instead of using Alarm* device properties.
- * Alarm collections will be used to manage different sets of alarms in GUI>
-
-Package refactored to build valid system/PIP/rpm packages
-
-PyAlarm:
-Alarm actions will be executed before mail and snapshot.
-Added replacement of $DESCRIPTION,$ALARM in actions
-All panic times are now seconds, added deprecated message for pollings in milliseconds
-
-API:
-Logging added to AlarmAPI
-Added self.disabled flag
-to_dict and ping() methods for Alarms and AlarmDS objects
-get_active_alarms() method added to AlarmDS
-AlarmDS.Enable/Disable methods now can enable both Devices and individual Alarms
-Added export_to_csv and export_to_dict API methods
-
+ API: 
+ 
+  Logging added to AlarmAPI
+  Added Alarm.disabled flag
+  to_dict and ping() methods for Alarms and AlarmDS objects
+  get_active_alarms() method added to AlarmDS
+  AlarmDS.Enable/Disable methods now can enable both Devices and individual Alarms
+  Added export_to_csv and export_to_dict API methods
+  panic.Evaluate() timeout set to 1000. 
+  allow multiple filters on GlobalReceivers
+  Add test cases for Group/Action/Clock/Reset
+  Solve API bug on empty receivers  
+  Solve bug on AlarmAPI.put_db_properties (Wrote to device instead of free property)
+  Solve bug in AlarmsAPI.get_global_properties
+  Solved bug on phonebook parsing
+  Group macro refactored (see documentation/recipes)
+  Add api.split_formula()
+  Change api.evaluate() timeout and checks
 
 
+  
 Release 5.4 - 2015/12
 ---------------------
 

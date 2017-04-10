@@ -2,25 +2,24 @@
 PANIC, a python Alarm System for TANGO
 ======================================
 
+Get the latest release of Panic from: https://github.com/tango-controls/PANIC/releases
+See CHANGE log in panic/CHANGES file
+
 PROJECT URLs: 
 -------------
 
 * http://www.tango-controls.org/community/projects/panic-alarm-system
 * https://github.com/tango-controls.org/panic
+* https://pypi.python.org/pypi/panic
 
-
-PANIC IS TESTED ON LINUX ONLY, WINDOWS/MAC MAY NOT BE FULLY SUPPORTED IN MASTER BRANCH
-
-Panic package contains the python AlarmAPI for managing the PyAlarm device servers from a client 
+The Panic package contains the python AlarmAPI for managing the PyAlarm device servers from a client 
 application or a python shell. The panic module is used by PyAlarm, Panic Toolbar and Panic GUI.
 
-THIS IS THE ALPHA VERSION OF PANIC 6.0
 PANIC IS TESTED ON LINUX ONLY, WINDOWS/MAC MAY NOT BE FULLY SUPPORTED IN MASTER BRANCH
 
 The optional panic submodules are:
 
  panic.ds : PyAlarm device server
- panic.extra : PyAlarm/panic plugins (e.g., install here your smslib.py module)
  panic.gui :  Placeholder for the PanicGUI application
 
 
@@ -49,14 +48,6 @@ In edit mode user can change name, move alarms to another device, change descrip
 Additional widgets in which the app is equipped allows alarm history viewing, phonebook editing and 
 device settings manipulation.
 
-
-----
-
-# TAGS 
-
-trunk will contain current development
-tags/latest will contain sources for building nightly packages
-tags/release_* will contain stable releases
 
 ----
 
