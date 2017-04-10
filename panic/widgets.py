@@ -421,3 +421,10 @@ if __name__ == '__main__':
     tmw.addToolBar(toolbar)
 
     sys.exit(qapp.exec_())
+
+try:
+    from fandango.doc import get_fn_autodoc
+    __doc__ = get_fn_autodoc(__name__,vars())
+except:
+    import traceback
+    traceback.print_exc()

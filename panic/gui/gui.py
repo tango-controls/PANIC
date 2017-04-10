@@ -1050,3 +1050,10 @@ def main_gui():
     
 if __name__ == "__main__":
     main_gui()
+
+try:
+    from fandango.doc import get_fn_autodoc
+    __doc__ = get_fn_autodoc(__name__,vars())
+except:
+    import traceback
+    traceback.print_exc()

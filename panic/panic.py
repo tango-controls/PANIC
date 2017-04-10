@@ -1189,3 +1189,10 @@ def current():
 def main():
     import sys,fandango as Fn
 
+try:
+    from fandango.doc import get_fn_autodoc
+    __doc__ = get_fn_autodoc(__name__,vars())
+except:
+    import traceback
+    traceback.print_exc()
+  

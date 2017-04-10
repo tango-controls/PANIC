@@ -228,3 +228,11 @@ ALARM_CONFIG = ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()+ALARM_LOGS.keys()+DEVICE_
 
 ALARM_SEVERITIES = ['ERROR','ALARM','WARNING','DEBUG']
 
+try:
+    from fandango.doc import get_fn_autodoc
+    __doc__ = get_fn_autodoc(__name__,vars(),
+        module_vars=['PANIC_PROPERTIES','DEVICE_CONFIG','ALARM_LOGS',
+                     'ALARM_CYCLE','ALARM_TABLES','ALARM_ARCHIVE'])
+except:
+    import traceback
+    traceback.print_exc()
