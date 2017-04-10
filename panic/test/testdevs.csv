@@ -67,13 +67,13 @@ PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE
 			RethrowAttribute	TRUE
 			RethrowState	TRUE
 			AlarmList	REATTR:test/panic/sim-01/F
-			AlarmSeverities	NOEXCEPT:ERROR
+			AlarmSeverities	REATTR:ERROR
 				
 		test/panic/except	IgnoreExceptions	FALSE
 			RethrowAttribute	FALSE
 			RethrowState	FALSE
 			AlarmList	EXCEPT:test/panic/sim-01/F
-			AlarmSeverities	NOEXCEPT:ERROR
+			AlarmSeverities	EXCEPT:ERROR
 				
 				
 				

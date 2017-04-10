@@ -4,7 +4,7 @@ PANIC Test Devices
 
 To load the .csv file (using fandango)::
 
-   csv2tango panic/tests/testdevs.csv
+   csv2tango panic/test/testdevs.csv
    
 To launch all the devices (using screen)::
 
@@ -17,14 +17,14 @@ To launch all the devices (using screen)::
 
 Show attributes and alarms for the tests::
 
-  SIMS=$(fandango.sh find_attributes "test/panic/sim-01/(stat|t$|t30|f|r)*")
+  SIMS=$(fandango find_attributes "test/panic/sim-01/(stat|t$|t30|f|r)*")
   taurusform $SIMS&
-  taurustrend $(fandango find_attributes "test/panic/*/ck*") &
-  taurustrend $(fandango find_attributes "test/panic/*/(wattr|comm|rw)*") &
+  (t3) taurustrend $(fandango find_attributes "test/panic/*/ck*") &
+  (t3) taurustrend $(fandango find_attributes "test/panic/*/(wattr|comm|rw)*") &
   
 Show the Panic UI::
 
-  python panic/gui/gui.py
+  (t3) python panic/gui/gui.py &
 
 For each of the implemented alarms the behaviour is:
 
@@ -49,11 +49,9 @@ For each of the implemented alarms the behaviour is:
 
 ----
 
-!!*: test not 100% passed for 6.0 release and taurus 3.7 (March 2017)
+!!*: tests passed for 6.0; but with some bugs in GUI:
 
-EXCEPT is green, should be grey
-GROUP_ALL is not able to follow the speed of all GROUP signal changes (2 levels)
-DEBUG alarms are shown in Orange (should be Yellow)
-
-
+* EXCEPT is green, should be grey
+* EXCEPTS_OK is shown in Orange (should be Yellow)
+* GROUP_ALL is hard to predict due to chained delay in evaluation
 
