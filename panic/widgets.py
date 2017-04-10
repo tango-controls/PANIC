@@ -12,9 +12,13 @@ from PyQt4 import Qt, QtCore, QtGui
 
 from taurus.qt.qtgui.base.taurusbase import TaurusBaseComponent
 from taurus.qt.qtgui.base.taurusbase import TaurusBaseWidget
-from taurus.qt.qtgui.display.taurusvaluelabel import TaurusValueLabel
+
+try:
+  from taurus.qt.qtgui.display.taurusvaluelabel import TaurusValueLabel
+except:
+  from taurus.qt.qtgui.display.tauruslabel import TaurusLabel as TaurusValueLabel
+
 from taurus.qt.qtgui.container import TaurusMainWindow
-from taurus.qt.qtgui.resource import getThemeIcon
 from taurus.qt.qtgui.panel import TaurusForm
 import panic
 from panic import AlarmAPI
@@ -23,6 +27,23 @@ try:
   #if available, this module will try to load the full AlarmGUI
   from panic.gui import AlarmGUI
 except: AlarmGUI = None
+
+###############################################################################
+
+def getThemeIcon(icon):
+    if 3 == int(taurus.Release().version_info[0]):
+        from taurus.qt.qtgui import resource
+        if ':' in icon:
+            icon = resource.getIcon(icon)
+        else:
+            icon = resource.getThemeIcon(icon)
+    else:
+        if ':' in icon:
+            icon = icon.replace('/',':').strip(':')
+            icon = Qt.QIcon(icon)
+        else:
+            icon = Qt.QIcon.fromTheme(icon)
+    return icon
 
 ###############################################################################
 

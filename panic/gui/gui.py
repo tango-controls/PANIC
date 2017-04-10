@@ -1,32 +1,35 @@
 import sys, re, os, traceback, time
-import threading
-from PyQt4 import QtCore, QtGui, Qt
+import threading, Queue
 
-import PyTango, fandango, taurus, taurus.qt.qtgui.base
-import panic,Queue,fandango.qt
+import PyTango, fandango
+import panic, fandango.qt
+from fandango.qt import QtCore, QtGui, Qt
 from fandango.excepts import Catched
+
+import taurus, taurus.qt.qtgui.base
 from taurus.qt.qtgui import container
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui.resource import getThemeIcon
-from taurus.core import AttributeNameValidator
-
-from row import AlarmRow
-from widgets import *
-from editor import FormulaEditor,AlarmForm
-from core import Ui_AlarmList
-#from htmlview import *
-
-OPEN_WINDOWS = []
 
 try:
-    from alarmhistory import *
-except Exception,e:
-    #print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',str(e)
-    SNAP_ALLOWED=False
+  from taurus.core.tango.tangovalidator import TangoAttributeNameValidator as AttributeNameValidator
+except:
+  #Taurus3
+  from taurus.core import AttributeNameValidator
+
+from row import AlarmRow
+from widgets import * #< getThemeIcon imported here
+from editor import FormulaEditor,AlarmForm
+from core import Ui_AlarmList
+from alarmhistory import *
+    
+OPEN_WINDOWS = []
+
+import widgets
+widgets.TRACE_LEVEL = 0
 
 PARENT_CLASS = QtGui.QWidget
-class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
-    REFRESH_TIME = 10000 #Default period between list order updates
+class AlarmGUI(PARENT_CLASS,iValidatedWidget):
+    REFRESH_TIME = 5000 #Default period between list order updates
     RELOAD_TIME = 60000 #Default period between database reloads
     MAX_REFRESH = 3 #Controls the new interval set by hurry()
     MAX_ALARMS = 30 #AlarmRow.use_list will be enabled only if number of alarms is higher than this number
@@ -34,7 +37,7 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
     __pyqtSignals__ = ("valueChanged",)
     
     def __init__(self, parent=None, filters='*', options=None, mainwindow=None):
-        print '>'*80
+        trace('>>>> AlarmGUI()')
         options = options or {}
         if not fandango.isDictionary(options):
             options = dict((o.replace('--','').split('=')[0],o.split('=',1)[-1]) for o in options)
@@ -53,11 +56,12 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
         self.expert = False
         self.tools = {} #Widgets dictionary
         try:
-            px = QtGui.QPixmap('/homelocal/sicilia/applications/Panic/PanicBanner.gif')
+            url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6-banner.png'
+            px = QtGui.QPixmap(url)
             self.splash = QtGui.QSplashScreen(px)
             self.splash.showMessage('initializing application...')
             self.splash.show()
-            print 'showing splash ... %s'%px.size()
+            trace('showing splash ... %s'%px.size())
         except: print traceback.format_exc()
 
         self._message = QtGui.QMessageBox(self)
@@ -77,14 +81,12 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
         if self.mainwindow:
             #self.mainwindow.setWindowTitle(str(os.getenv('TANGO_HOST')).split(':',1)[0]+' Alarm Widget (%s)'%self.filters)
             self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(self.filters or self.regEx or '',str(os.getenv('TANGO_HOST')).split(':',1)[0]))
+            url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6.svg'
+            px = QtGui.QPixmap(url)
+            self.mainwindow.setWindowIcon(Qt.QIcon(px))
             
-        try:
-            assert SNAP_ALLOWED
-            self.snapi=snap.SnapAPI()
-            self.ctx_names=[c.name for c in self.snapi.get_contexts().values()]
-        except:
-            self.snapi = None
-            self.ctx_names = []
+        self.snapi = None
+        self.ctx_names = []
 
         if not self.api.keys(): trace('NO ALARMS FOUND IN DATABASE!?!?')
         AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
@@ -100,6 +102,7 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
             self.severities.remove('debug')
         if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
 
+        trace('Set Models thread ...')
         #self.connectAll()
         #self.buildList()
         self._connected = False
@@ -111,15 +114,16 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
         self.refreshTimer = QtCore.QTimer()
         QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
         QtCore.QObject.connect(self.reloadTimer, QtCore.SIGNAL("timeout()"), self.onReload)
-        self.reloadTimer.start(5000.)
-        self.refreshTimer.start(2*self.REFRESH_TIME)
+        self.reloadTimer.start(self.REFRESH_TIME/2.)
+        self.refreshTimer.start(self.REFRESH_TIME)
         
+        trace('Setting combos ...')
         self.source = "" #Value in first comboBox
         self.setFirstCombo()
         self.setSecondCombo()
         self._ui.infoLabel0_1.setText(self._ui.contextComboBox.currentText())
         self.updateStatusLabel()
-        print('__init__ done')
+        trace('AlarmGUI(): done')
         
         #if not SNAP_ALLOWED:
             #Qt.QMessageBox.critical(self,"Unable to load SNAP",'History Viewer Disabled!', QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
@@ -492,7 +496,11 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
             elif stateFilter=='FAILED':
                 if a.tag not in self.AlarmRows or (str(self.AlarmRows[a.tag].quality) == 'ATTR_INVALID'): result.append(a)
             elif stateFilter=='HISTORY':
-                if SNAP_ALLOWED and a.tag in self.ctx_names: result.append(a)
+                if not self.snapi: 
+                  self.snapi = get_snap_api()
+                if self.snapi:
+                  self.ctx_names = [c.name for c in self.snapi.get_contexts().values()]
+                  if SNAP_ALLOWED and a.tag in self.ctx_names: result.append(a)
             else:
                 result.append(a)
         trace('filterByState(%d): %d alarms returned'%(len(source),len(result)))
@@ -573,8 +581,14 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
                     except Exception,e: trace('===> AlarmRow.setModel(%s) FAILED!: %s' %(alarm.tag,e))
                 else:
                     row = self.AlarmRows[alarm.tag]
-                    model = AttributeNameValidator().getParams(row.getModel())
-                    olddev = model['devicename'] if model else None
+                    try:
+                        model = AttributeNameValidator().getUriGroups(row.getModel())
+                        olddev = model['devname'] if model else None
+                    except:
+                        #Taurus 3
+                        #traceback.print_exc()
+                        model = AttributeNameValidator().getParams(row.getModel())
+                        olddev = model['devicename'] if model else None
                     if alarm.device != olddev:
                         trace('\t%s device changed: %s => %s; changed = True'%(alarm.tag,alarm.device,olddev))
                         self.modelsQueue.put((nr,row,alarm,(len(ordered)>self.MAX_ALARMS)))
@@ -655,9 +669,9 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
             lambda s=self:WindowManager.addWindow(s.showAlarmPreview()))
         act.setEnabled(len(items)==1)
         self.popMenu.addAction(getThemeIcon("view-refresh"), "Sort/Update List",self.onSevFilter)
-        if SNAP_ALLOWED and row.get_alarm_tag() in self.ctx_names:
-            act = self.popMenu.addAction(getThemeIcon("office-calendar"), "View History",self.viewHistory)
-            act.setEnabled(len(items)==1)
+
+        act = self.popMenu.addAction(getThemeIcon("office-calendar"), "View History",self.viewHistory)
+        act.setEnabled(SNAP_ALLOWED and len(items)==1) # and row.get_alarm_tag() in self.ctx_names)
             
         sevMenu = self.popMenu.addMenu('Change Severity')
         for S in ('ERROR','ALARM','WARNING','DEBUG'):
@@ -773,10 +787,24 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
     ###############################################################################
 
     def viewHistory(self):
-        self.ahApp = ahWidget()
-        self.ahApp.show()
-        #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.currentItem().text().split('|')[0]).strip(' '))
-        self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.currentItem().get_alarm_tag()))
+        alarm = str(self._ui.listWidget.currentItem().get_alarm_tag())
+
+        if SNAP_ALLOWED and not self.snapi: 
+          self.snapi = get_snap_api()
+
+        if self.snapi:
+          self.ctx_names=[c.name for c in self.snapi.get_contexts().values()]
+
+        if alarm in self.ctx_names: 
+          self.ahApp = ahWidget()
+          self.ahApp.show()
+          #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.currentItem().text().split('|')[0]).strip(' '))
+          self.ahApp.setAlarmCombo(alarm=alarm)
+        else:
+          v = QtGui.QMessageBox.warning(None,'Not Archived', \
+              'This alarm has not recorded history',QtGui.QMessageBox.Ok)
+          return
+        
         
     def showAlarmPreview(self):
         form = AlarmPreview(tag=self.getCurrentAlarm(),parent=self.parent())
@@ -933,11 +961,10 @@ class AlarmGUI(PARENT_CLASS,iLDAPValidatedWidget):
 
 def main(args=[]):
     import widgets
-    from taurus.qt.qtgui import resource
     from taurus.qt.qtgui.application import TaurusApplication
 
-    opts = [a for a in args if a.startswith('--')]
-    args = [a for a in args if not a.startswith('--')]
+    opts = [a for a in args if a.startswith('-')]
+    args = [a for a in args if not a.startswith('-')]
     URL = 'http://www.cells.es/Intranet/Divisions/Computing/Controls/Help/Alarms/panic'
     
     #uniqueapp = Qt.QApplication([])
@@ -963,7 +990,7 @@ def main(args=[]):
     tmw.helpMenu = Qt.QMenu('Help',tmw.menuBar)
     
     trace('\tlaunching AlarmGUI ... %s'%sys.argv)
-    alarmApp = AlarmGUI(filters='|'.join(a for a in sys.argv[1:] if not a.startswith('--')),options=opts,mainwindow=tmw)
+    alarmApp = AlarmGUI(filters='|'.join(args),options=opts,mainwindow=tmw)
     tmw.setCentralWidget(alarmApp)
 
     tmw.setMenuBar(tmw.menuBar)
@@ -974,9 +1001,9 @@ def main(args=[]):
     tmw.helpMenu.addAction(getThemeIcon("applications-system"),"Webpage",lambda : os.system('konqueror %s &'%URL))
     tmw.toolsMenu.addAction(getThemeIcon("applications-system"),"Jive",lambda : os.system('jive &'))
     tmw.toolsMenu.addAction(getThemeIcon("applications-system"),"Astor",lambda : os.system('astor &'))
-    tmw.fileMenu.addAction(resource.getIcon(":/designer/back.png"),"Export to CSV file",alarmApp.saveToFile)
-    tmw.fileMenu.addAction(resource.getIcon(":/designer/forward.png"),"Import from CSV file",alarmApp.loadFromFile)
-    tmw.fileMenu.addAction(resource.getIcon(":/designer/filereader.png"),"Use external editor",alarmApp.editFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/back.png"),"Export to CSV file",alarmApp.saveToFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/forward.png"),"Import from CSV file",alarmApp.loadFromFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/filereader.png"),"Use external editor",alarmApp.editFile)
     tmw.fileMenu.addAction(getThemeIcon("applications-system"),"Exit",tmw.close)
     tmw.viewMenu.connect(tmw.viewMenu,Qt.SIGNAL('aboutToShow()'),alarmApp.setViewMenu)
     
@@ -985,7 +1012,7 @@ def main(args=[]):
     tmw.toolsMenu.addAction(getThemeIcon("x-office-address-book"), "PhoneBook", alarmApp.tools['bookApp'].show)
     toolbar.addAction(getThemeIcon("x-office-address-book") ,"PhoneBook",alarmApp.tools['bookApp'].show)
     
-    trend_action = (resource.getIcon(":/designer/qwtplot.png"),
+    trend_action = (getThemeIcon(":/designer/qwtplot.png"),
         'Trend',
         lambda:WindowManager.addWindow(widgets.get_archive_trend(show=True))
         )
@@ -1016,7 +1043,9 @@ def main(args=[]):
   
 def main_gui():
     import sys
-    n = main(sys.argv[1:] or ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else [])).exec_()
+    app = main(sys.argv[1:] or ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else []))
+    print('app created')
+    n = app.exec_()
     sys.exit(n) 
     
 if __name__ == "__main__":

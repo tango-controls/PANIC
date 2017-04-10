@@ -1,6 +1,5 @@
-from PyQt4 import QtCore, QtGui
-from taurus.qt.qtgui.resource import getThemeIcon
-from widgets import clickableQLineEdit, clickableQTextEdit
+from widgets import QtCore, QtGui
+from widgets import clickableQLineEdit, clickableQTextEdit,getThemeIcon
 
 """
 ui_data.py, this file contains the Ui Classes used for AlarmEditor form.
