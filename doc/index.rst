@@ -9,9 +9,14 @@ Welcome to panic's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
-   panic
+   description
+   changes   
+   Install
+   PyAlarmUserGuide
+   recipes
+   panic   
 
 
 Indices and tables
