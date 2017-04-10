@@ -1,0 +1,5 @@
+
+Changelog
+=========
+
+.. include:: ../../panic/CHANGES
