@@ -716,3 +716,10 @@ if __name__ == '__main__':
     form = AlarmPreview(*sys.argv[1:])
     form.show()
     qapp.exec_()
+
+try:
+    from fandango.doc import get_fn_autodoc
+    __doc__ = get_fn_autodoc(__name__,vars())
+except:
+    import traceback
+    traceback.print_exc()
