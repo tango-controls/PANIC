@@ -61,16 +61,19 @@ PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE
 			RethrowAttribute	FALSE
 			RethrowState	TRUE
 			AlarmList	NOEXCEPT:test/panic/sim-01/F
+			AlarmSeverities	NOEXCEPT:ERROR
 				
 		test/panic/attribute	IgnoreExceptions	TRUE
 			RethrowAttribute	TRUE
 			RethrowState	TRUE
 			AlarmList	REATTR:test/panic/sim-01/F
+			AlarmSeverities	NOEXCEPT:ERROR
 				
 		test/panic/except	IgnoreExceptions	FALSE
 			RethrowAttribute	FALSE
 			RethrowState	FALSE
 			AlarmList	EXCEPT:test/panic/sim-01/F
+			AlarmSeverities	NOEXCEPT:ERROR
 				
 				
 				
@@ -79,17 +82,23 @@ PyAlarm/*	PyAlarm	test/panic/ck*	PollingPeriod	0.2
 				
 				
 PyAlarm/Clock	PyAlarm	test/panic/ck02	AlarmList	CK02:False and not CK02
+			AlarmSeverities	CK02:DEBUG
 			AlarmThreshold	1
 		test/panic/ck05	AlarmList	CK05: False and not CK05
+			AlarmSeverities	CK05:DEBUG
 			AlarmThreshold	2
 			PollingPeriod	0.125
 		test/panic/ck1	AlarmList	CK1: not CK1
+			AlarmSeverities	CK1:DEBUG
 			AlarmThreshold	5
 		test/panic/ck2	AlarmList	CK2: NOW()%2 < 1
+			AlarmSeverities	CK2:DEBUG
 			AlarmThreshold	1
 		test/panic/ck5	AlarmList	CK5: NOW()%5<2.5
+			AlarmSeverities	CK5:DEBUG
 			AlarmThreshold	1
 		test/panic/ck10	AlarmList	CK10:NOW()%10<5
+			AlarmSeverities	CK10:DEBUG
 			AlarmThreshold	1
 				
 				
@@ -99,6 +108,10 @@ PyAlarm/Group	PyAlarm	test/panic/group	AlarmList	GROUP_0: GROUP(test/panic/ck*/c
 				GROUP_AND: test/panic/ck2/ck2 and test/panic/ck5/ck5
 				GROUP_ALL: GROUP( GROUP_0,GROUP_1,GROUP_2,GROUP_AND )
 				
+			AlarmSeverities	GROUP_1: ALARM
+				GROUP_OR: ALARM
+				GROUP_AND: ALARM
+				GROUP_ALL:ALARM
 			AutoReset	0.0001
 			PollingPeriod	0.5
 			AlarmThreshold	1
@@ -106,6 +119,7 @@ PyAlarm/Group	PyAlarm	test/panic/group	AlarmList	GROUP_0: GROUP(test/panic/ck*/c
 				
 PyAlarm/Actions	PyAlarm	test/panic/wattr	AlarmList	WATTR:True
 			AlarmReceivers	WATTR:ACTION(alarm:attribute,test/panic/sim-01/rw,int(345)),ACTION(reset:attribute,test/panic/sim-01/rw,int(0))
+			PollingPeriod	3
 		test/panic/comm	AlarmList	COMM:(  NOW() - test/panic/sim-01/rw ) >5
 			AlarmReceivers	COMM:ACTION(alarm:command,test/panic/wattr/ResetAlarm,WATTR,test)
 		test/panic/system	AlarmList	SYSTEM:WATTR
