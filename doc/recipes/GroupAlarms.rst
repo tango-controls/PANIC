@@ -1,5 +1,5 @@
-Alarm Formulas Examples (Max IV, 2014)
---------------------------------------
+Grouping Alarms
+===============
 
 The proper way is (for readability I use upper case letters for alarms):
 
