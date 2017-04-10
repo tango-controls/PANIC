@@ -1,16 +1,19 @@
-======================================
+--------------------------------------
 PANIC, a python Alarm System for TANGO
-======================================
+--------------------------------------
 
-Get the latest release of Panic from: https://github.com/tango-controls/PANIC/releases
-See CHANGE log in panic/CHANGES file
+.. contents::
 
-PROJECT URLs: 
--------------
+Description
+===========
 
-* http://www.tango-controls.org/community/projects/panic-alarm-system
-* https://github.com/tango-controls.org/panic
-* https://pypi.python.org/pypi/panic
+PANIC is a set of tools (api, Tango device server, user interface) that provides:
+
+ * Periodic evaluation of a set of conditions.
+ * Notification (email, sms, pop-up, speakers)
+ * Keep a log of what happened. (files, Tango Snapshots)
+ * Taking automated actions (Tango commands / attributes)
+ * Tools for configuration/visualization
 
 The Panic package contains the python AlarmAPI for managing the PyAlarm device servers from a client 
 application or a python shell. The panic module is used by PyAlarm, Panic Toolbar and Panic GUI.
@@ -21,10 +24,20 @@ The optional panic submodules are:
 
  panic.ds : PyAlarm device server
  panic.gui :  Placeholder for the PanicGUI application
+ 
+Get the latest release of Panic from: https://github.com/tango-controls/PANIC/releases
+See CHANGE log in panic/CHANGES file
+
+Other Project pages
+===================
+
+* http://www.tango-controls.org/community/projects/panic-alarm-system
+* https://github.com/tango-controls.org/panic
+* https://pypi.python.org/pypi/panic
 
 
 PyAlarm Device Server
----------------------
+=====================
 
 panic.ds.PyAlarm Device Class
 
@@ -37,7 +50,7 @@ so it could be loaded as a part of the module.
 
 
 Panic GUI
----------
+=========
 
 panic.gui.AlarmGUI Class
 
@@ -48,8 +61,13 @@ In edit mode user can change name, move alarms to another device, change descrip
 Additional widgets in which the app is equipped allows alarm history viewing, phonebook editing and 
 device settings manipulation.
 
-
-----
+Authors
+=======
 
 Sergi Rubio
 Alba Synchrotron 2006-2016
+
+LICENSE AND WARRANTY
+====================
+
+see `LICENSE file <https://github.com/tango-controls/fandango/blob/documentation/LICENSE>`_

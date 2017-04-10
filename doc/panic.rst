@@ -1,6 +1,13 @@
 panic Package
 =============
 
+.. toctree::
+   :maxdepth: 2
+
+   panic.panic
+   panic.gui
+   panic.widgets
+
 :mod:`panic` Package
 --------------------
 
