@@ -1,14 +1,15 @@
-
-import time,traceback
-from PyQt4 import Qt, QtCore, QtGui
+import time,traceback,os
 import taurus,fandango,fandango.qt
+from fandango.qt import Qt, QtCore, QtGui
+
 from taurus.qt.qtgui.base import TaurusBaseWidget
 from taurus.qt.qtgui.container import TaurusWidget
-from taurus.qt.qtgui import resource
+from taurus.qt.qtgui.panel import TaurusForm
 from taurus.core.util  import Logger
 
 import panic
-from panic.widgets import AlarmValueLabel
+from panic import getAttrValue
+from panic.widgets import AlarmValueLabel, getThemeIcon
 import getpass
 
 dummies = []
@@ -18,12 +19,6 @@ def get_user():
         return getpass.getuser()
     except:
         return ''
-
-try:
-    from alarmhistory import *
-except Exception,e:
-    print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',traceback.format_exc()
-    SNAP_ALLOWED=False
     
 def clean_str(s):
     return ' '.join(str(s).replace('\r',' ').replace('\n',' ').split())
@@ -31,7 +26,9 @@ def clean_str(s):
 def print_clean(s):
     print(clean_str(s))
 
-TRACE_LEVEL = -1
+try: TRACE_LEVEL = int(os.getenv('TRACE_LEVEL',-1))
+except: TRACE_LEVEL = (traceback.print_exc(),-1)[-1]
+
 def trace(msg,head='',level=0,clean=False,use_taurus=False):
     if level > TRACE_LEVEL: return
     if type(head)==int: head,level = '',head
@@ -53,7 +50,7 @@ def get_bold_font(points=8):
     font.setWeight(75)
     font.setBold(True)
     return font
-    
+           
 def setCheckBox(cb,v):
     try:
         cb.blockSignals(True)
@@ -67,16 +64,16 @@ def getAlarmTimestamp(alarm,attr_value=None,use_taurus=True):
     """
     Returns alarm activation timestamp (or 0) of an alarm object
     """
-    #print 'panic.gui.getAlarmTimestamp(%s)'%(alarm.tag)
+    trace('panic.gui.getAlarmTimestamp(%s(%s),%s,%s)'%(type(alarm),alarm,attr_value,use_taurus))
     #Not using API method, reusing last Taurus polled attribute instead
-    #self.date = self.alarm.get_active()
     try:
         if attr_value is None and use_taurus:
-            attr_value = taurus.Attribute(alarm.device+'/ActiveAlarms').read().value 
-            #self.get_ds().get().read_attribute('ActiveAlarms').value
+            attr_value = taurus.Attribute(alarm.device+'/ActiveAlarms').read()
+            attr_value = getAttrValue(attr_value)
         return alarm.get_time(attr_value=attr_value)
     except:
-        print 'getAlarmTimestamp(%s/%s): Failed!'%(alarm.device,alarm.tag) #if fandango.check_device(alarm.device): print traceback.format_exc()
+        trace('getAlarmTimestamp(%s/%s): Failed!'%(alarm.device,alarm.tag))
+        trace(fandango.check_device(alarm.device) and traceback.format_exc())
         return 0 #In case of error it must always return 0!!! (as it is used to set alarm.active)
     
 def getAlarmReport(alarm,parent=None):
@@ -141,39 +138,86 @@ def multiline2line(lines):
 
 ###############################################################################
 
-class iLDAPValidatedWidget(object):
+class iValidatedWidget(object):
     """
     This class assumes that you have a self.api=PanicAPI() member in your subclass 
     
     Typical usage:
+    
         self.setAllowedUsers(self.api.get_admins_for_alarm(len(items)==1 and items[0].get_alarm_tag()))
         if not self.validate('onDisable/Enable(%s,%s)'%(checked,[a.get_alarm_tag() for a in items])):
             return
-    """
+            
+    This class requires PanicAdminUsers and UserValidator PyAlarm properties to be declared.
     
-    def init_ldap(self,tag=''):
-        try:
-            from ldap_login import LdapLogin
-        except:
-            print('LdapLogin module not found')
-            return None
+      PanicAdminUsers : [root, tester]
+      UserValidator : user_login.TangoLoginDialog
+    
+    """
+    KEEP = int(fandango.tango.get_class_property('PyAlarm','PanicUserTimeout') or 60)
+    
+    def init(self,tag=''):
+      
         if not hasattr(self,'validator'):
-            self.validator = LdapLogin()
-            log = (self.api.get_class_property('PyAlarm','PanicLogFile') or [''])[0]
-            if log: self.validator.setLogging(True,log)
-            users = self.api.get_admins_for_alarm(tag)
-            self.validator.setAllowedUsers(users)
-        return True
+          self.UserValidator,self.validator = '',None
+          try:
+              props = self.api.servers.db.get_class_property('PyAlarm',['UserValidator','PanicAdminUsers'])
+              self.UserValidator = fandango.first(props['UserValidator'],'')
+              self.AdminUsers = list(props['PanicAdminUsers'])
+              if self.UserValidator:
+                mod,klass = self.UserValidator.rsplit('.',1)
+                mod = fandango.objects.loadModule(mod)
+                klass = getattr(mod,klass)
+                self.validator = klass()
+                log = (self.api.get_class_property('PyAlarm','PanicLogFile') or [''])[0]
+                if log: self.validator.setLogging(True,log)
+          except:
+              print('iValidateWidget: %s module not found'%(self.UserValidator or 'PyAlarm.UserValidator'))
+              return -1
+
+        if not self.AdminUsers and not self.UserValidator:
+          #passwords not available
+          return None
+        users = sorted(self.api.get_admins_for_alarm(tag))
+        if not users: 
+          #Not using passwords for this alarm
+          self.last_users = None
+          return None
+        elif self.validator is None:
+          #Failed to initialize
+          return -1
+        else:
+          if users != getattr(self,'last_users',[]):
+            self.last_valid = 0
+          self.validator.setAllowedUsers(users)
+          self.last_users = users
+          return self.validator
         
     def setAllowedUsers(self,users):
-        if self.init_ldap() is None: return
+        if self.init() is None: return
         self.validator.setAllowedUsers(users)
         
     def validate(self,msg='',tag=''):
-        if self.init_ldap(tag) is None: return True
-        self.validator.setLogMessage('AlarmForm(%s).Validate(%s): %s'%(tag,msg,tag and self.api[tag].to_str()))
-        #print('LdapValidUsers %s'%self.validator.getAllowedUsers())
-        return self.validator.exec_() if self.validator.getAllowedUsers() else True
+        if getattr(self,'last_valid',0) > time.time()-self.KEEP:
+          r = True
+          
+        else:
+          err = self.init(tag)
+          if err is None: 
+            return True
+          if err == -1:
+            Qt.QMessageBox.critical(None,
+                "Error!",
+                "%s module not found"%(self.UserValidator or 'PyAlarm.UserValidator'),
+                QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
+            return False
+          
+          self.validator.setLogMessage('AlarmForm(%s).Validate(%s): %s'%(tag,msg,tag and self.api[tag].to_str()))
+          #print('LdapValidUsers %s'%self.validator.getAllowedUsers())
+          r = self.validator.exec_() if self.validator.getAllowedUsers() else True
+          
+        if r: self.last_valid = time.time()
+        return r
 
 class WindowManager(fandango.objects.Singleton):
     WINDOWS = []
@@ -232,6 +276,27 @@ class CleanMainWindow(Qt.QMainWindow,WindowManager):
 
 ###############################################################################
 
+global SNAP_ALLOWED
+SNAP_ALLOWED = True
+
+def get_snap_api():
+    trace('get_snap_api()',level=-1)
+    global SNAP_ALLOWED
+    if SNAP_ALLOWED is True:
+      try:
+          from PyTangoArchiving import snap
+          #from PyTangoArchiving.widget.snaps import *
+          db = fandango.get_database()
+          assert list(db.get_device_exported_for_class('SnapManager'))
+          SNAP_ALLOWED = snap.SnapAPI()
+          
+      except Exception,e:
+          trace('PyTangoArchiving.Snaps not available: HISTORY VIEWER DISABLED: '+traceback.format_exc(),'WARNING',-1)
+          SNAP_ALLOWED = None
+    
+    trace('get_snap_api(): %s'%SNAP_ALLOWED,level=-1)
+    return SNAP_ALLOWED
+
 from taurus.qt.qtgui.plot import TaurusTrend
 
 def get_archive_trend(models=None,length=4*3600,show=False):
@@ -244,7 +309,7 @@ def get_archive_trend(models=None,length=4*3600,show=False):
                 #setattr(self,'_tuned',True)        
             #TaurusTrend.showEvent(self,event)
     
-    from PyQt4 import Qwt5
+    from taurus.external.qt import Qwt5
     tt = TaurusTrend()
     try:
         tt.setXDynScale(True)
@@ -266,6 +331,7 @@ def get_archive_trend(models=None,length=4*3600,show=False):
 ###############################################################################
         
 class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
+  
     def __init__(self,model=None,parent=None,device=None,_locals=None,allow_edit=False):
         Qt.QWidget.__init__(self,parent)
         self.api = panic.current() #Singletone, reuses existing object ... Sure? What happens if filters apply?
@@ -317,12 +383,12 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
                 self.tf.setEnabled(False)
                 self.connect(self.editcb,Qt.SIGNAL('toggled(bool)'),self.onEdit)
                 upperPanel.layout().addWidget(self.editcb,0,4,1,1)
-                self.undobt.setIcon(resource.getThemeIcon('edit-undo'))
+                self.undobt.setIcon(getThemeIcon('edit-undo'))
                 self.undobt.setToolTip('Undo changes in formula')
                 self.undobt.setEnabled(True)
                 self.connect(self.undobt,Qt.SIGNAL('pressed()'),self.undoEdit)
                 upperPanel.layout().addWidget(self.undobt,0,5,1,1)
-                self.savebt.setIcon(resource.getThemeIcon('media-floppy'))
+                self.savebt.setIcon(getThemeIcon('media-floppy'))
                 self.savebt.setToolTip('Save Alarm Formula')
                 self.savebt.setEnabled(False)
                 upperPanel.layout().addWidget(self.savebt,0,6,1,1)
@@ -341,7 +407,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
             self.tb.setMinimumHeight(50)
             self.tb.setReadOnly(True)
             self.redobt = Qt.QPushButton()
-            self.redobt.setIcon(resource.getThemeIcon('view-refresh'))
+            self.redobt.setIcon(getThemeIcon('view-refresh'))
             self.redobt.setToolTip('Update result')
             self.connect(self.redobt,Qt.SIGNAL('pressed()'),self.updateResult)
             lowerPanel.layout().addWidget(self.redobt,row,6,1,1)
@@ -453,7 +519,7 @@ class AttributesPreview(Qt.QFrame):
         try:
             self.setLayout(Qt.QGridLayout())
             self.redobt = Qt.QPushButton()
-            self.redobt.setIcon(resource.getThemeIcon('view-refresh'))
+            self.redobt.setIcon(getThemeIcon('view-refresh'))
             self.redobt.setToolTip('Update result')
             self.taurusForm=TaurusForm()
             self.taurusForm.setWithButtons(False)
@@ -478,7 +544,7 @@ class AttributesPreview(Qt.QFrame):
         else: model = sorted(set('%s/%s'%(var[0],var[1]) for var in self.test.parse_variables(model or '')))
         self.model = model
         self.taurusForm.setModel(model)
-        [tvalue.setLabelConfig("attr_fullname") for tvalue in self.taurusForm.getItems()]
+        [tvalue.setLabelConfig("<attr_fullname>") for tvalue in self.taurusForm.getItems()]
         
     ###########################################################################
 

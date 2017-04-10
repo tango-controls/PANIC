@@ -7,7 +7,7 @@
 ##
 ## http://www.tango-controls.org/
 ##
-## (copyleft) Sergi Rubio Manrique / CELLS / ALBA Synchrotron, Bellaterra, Spain
+## Author: Sergi Rubio Manrique
 ##
 ## This is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -48,9 +48,9 @@
 import traceback,re,time,os,sys
 import fandango
 import fandango.functional as fun
-from fandango.tango import CachedAttributeProxy
-import PyTango
+from fandango.tango import CachedAttributeProxy,PyTango
 
+from .properties import *
 
 _TANGO = PyTango.Database()
 
@@ -65,145 +65,20 @@ The _proxies object allows to retrieve either DeviceProxy or DeviceServer object
 
 """
 
-###############################################################################
-# PyAlarm Device Default Properties
 
-ALARM_TABLES = {
-    # Alarm Properties: This properties will be managed by API; DON'T ACCESS THEM WITH self.
-    'AlarmList':
-        [PyTango.DevVarStringArray,
-        "List of alarms to be monitorized. The format is:\n<br>domain/family/member #It simply checks that dev is alive\n<br>domain/family/member/attribute > VALUE\n<br>domain/family/member/State == UNKNOWN\n<br>domain/family/*/Temperature > VALUE\n<br>\n<br>When using wildcards all slash / must be included",
-        [] ],
-    'AlarmReceivers':
-        [PyTango.DevVarStringArray,
-        "Users that will be notified for each alarm. The format is:\n<br>[TYPE]:[ADDRESS]:[attributes];...\n<br>\n<br>[TYPE]: MAIL / SMS\n<br>[ADDRESS] : operator@accelerator.es / +34666555444\n<br>[attributes]: domain/family/member/attribute;domain/family/*",
-        [] ],
-    'AlarmDescriptions':
-        [PyTango.DevVarStringArray,
-        "Description to be included in emails for each alarm. The format is:\n<br>TAG:AlarmDescription...",
-        [] ],
-    'AlarmConfigurations':
-        [PyTango.DevVarStringArray,
-        "Configuration customization appliable to each alarm. The format is:\n<br>TAG:PAR1=Value1;PAR2=Value2;...",
-        [] ],
-    'AlarmSeverities':
-        [PyTango.DevVarStringArray,
-        "ALARM:DEBUG/INFO/WARNING/ERROR #DEBUG alarms will not trigger messages",
-        [] ],
-    }
-        
-ALARM_CYCLE = {
-    'Enabled':
-        [PyTango.DevString,
-        "If False forces the device to Disabled state and avoids messaging; if INT then it will last only for N seconds after Startup; if a python formula is written it will be used to enable/disable the device",
-        [ '120' ] ],#Overriden by panic.DefaultPyAlarmProperties
-    'AlarmThreshold':
-        [PyTango.DevLong,
-        "Min number of consecutive Events/Pollings that must trigger an Alarm.",
-        [ 3 ] ],
-    'AlertOnRecovery':
-        [PyTango.DevString,
-        "It can contain 'email' and/or 'sms' keywords to specify if an automatic message must be sent in case of alarm returning to safe level.",
-        [ "false" ] ],
-    'PollingPeriod':
-        [PyTango.DevFloat,
-        "Periode in seconds in which all attributes not event-driven will be polled.",
-        [ 15. ] ],
-    'Reminder':
-        [PyTango.DevLong,
-        "If a number of seconds is set, a reminder mail will be sent while the alarm is still active, if 0 no Reminder will be sent.",
-        [ 0 ] ],
-    'AutoReset':
-        [PyTango.DevFloat,
-        "If a number of seconds is set, the alarm will reset if the conditions are no longer active after the given interval.",
-        [ 3600. ] ],
-    'RethrowState':
-        [PyTango.DevBoolean,
-        "Whether exceptions in State reading will be rethrown.",
-        [ True ] ],
-    'RethrowAttribute':
-        [PyTango.DevBoolean,
-        "Whether exceptions in Attribute reading will be rethrown.",
-        [ False ] ],
-    'IgnoreExceptions':
-        [PyTango.DevString,
-        "Value can be False/True/NaN to return Exception, None or NotANumber in case of read_attribute exception.",
-        [ 'True' ] ],#Overriden by panic.DefaultPyAlarmProperties
-    }
-        
-ALARM_ARCHIVE = {
-    'UseSnap':
-        [PyTango.DevBoolean,
-        "If false no snapshots will be trigered (unless specifically added to receivers)",
-        [ True ] ],
-    'CreateNewContexts':
-        [PyTango.DevBoolean,
-        "It enables PyAlarm to create new contexts for alarms if no matching context exists in the database.",
-        [ False ] ],
-    }
-
-ALARM_LOGS = {
-    'LogFile':
-        [PyTango.DevString,
-        """File where alarms are logged, like /tmp/alarm_$NAME.log\n
-        Keywords are $DEVICE,$ALARM,$NAME,$DATE\n
-        From version 6.0 a FolderDS-like device can be used for remote logging:\n
-        \ttango://test/folder/01/$ALARM_$DATE.log""",
-        [ "" ] ], 
-    'HtmlFolder':
-        [PyTango.DevString,
-        "File where alarm reports are saved",
-        [ "htmlreports" ] ],
-    'FlagFile':
-        [PyTango.DevString,
-        "File where a 1 or 0 value will be written depending if theres active alarms or not.\n<br>This file can be used by other notification systems.",
-        [ "/tmp/alarm_ds.nagios" ] ],
-    'MaxMessagesPerAlarm':
-        [PyTango.DevLong,
-        "Max Number of messages to be sent each time that an Alarm is activated/recovered/reset.",
-        [ 20 ] ],
-    'FromAddress':
-        [PyTango.DevString,
-        "Address that will appear as Sender in mail and SMS",
-        [ "oncall" ] ],
-    }
-    
-DEVICE_CONFIG = {
-    'LogLevel':
-        [PyTango.DevString,
-        "stdout log filter",
-        [ "INFO" ] ],
-    'SMSConfig':
-        [PyTango.DevString,
-        "Arguments for sendSMS command",
-        [ ":" ] ],
-    'StartupDelay':
-        [PyTango.DevLong,
-        "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
-        [ 0 ] ],
-    'EvalTimeout':
-        [PyTango.DevLong,
-        "Timeout for read_attribute calls, in milliseconds .",
-        [ 500 ] ],
-    'UseProcess':
-        [PyTango.DevBoolean,
-        "To create new OS processes instead of threads.",
-        [ False ] ],
-    'UseTaurus':
-        [PyTango.DevBoolean,
-        "Use Taurus to connect to devices instead of plain PyTango.",
-        [ False ] ],
-    }
-    
-ALARM_CONFIG = ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()+ALARM_LOGS.keys()+DEVICE_CONFIG.keys()
-PyAlarmDefaultProperties = dict(fun.join(d.items() for d in (ALARM_CYCLE,ALARM_ARCHIVE,ALARM_LOGS,DEVICE_CONFIG)))
-ALARM_SEVERITIES = ['ERROR','ALARM','WARNING','DEBUG']
-
-# End of PyAlarm properties
-###############################################################################
 
 ###############################################################################
-#@todo: These methods and AlarmAPI.setAlarmDeviceProperty should be moved to AlarmDS
+#@todo: Tango access methods
+
+def getAttrValue(obj,default=None):
+    """
+    Extracts rvalue in tango/taurus3/4 compatible way
+    If default = True, obj is returned
+    """
+    return getattr(obj,'rvalue',
+             getattr(obj,'value',
+               obj if default is True 
+                 else default))
 
 def getAlarmDeviceProperties(device):
     """ Method used in all panic classes """
@@ -243,7 +118,6 @@ class Alarm(object):
 
     def clear(self):
         """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
-        #print 'Alarm.clear()'
         self.active = 0 #Last timestamp it was activated
         self.recovered = 0 #Last time it was recovered
         self.counter = 0 #N cycles being active
@@ -539,19 +413,29 @@ class AlarmDS(object):
         props = self.get_alarm_properties()
         self.alarms = {}
         for line in props['AlarmList']:
+            #print('read:',line)
             line = line.split('#',1)[0].strip()
-            if not line or not fun.searchCl(filters,line): continue
+            if not line or not fun.searchCl(filters,line): 
+              #print('read:pass')
+              continue
             try:
                 tag,formula = line.split(':',1)
                 self.alarms[tag] = {'formula':formula}
-                try: self.alarms[tag]['receivers'] = fun.first(r for r in props['AlarmReceivers'] if r.startswith(tag+':')).split(':',1)[-1]
-                except: self.alarms[tag]['receivers'] = ''
+                try: 
+                  local_receivers = [r for r in props['AlarmReceivers'] if r.startswith(tag+':')]
+                  local_receivers = fun.first(local_receivers or ['']).split(':',1)[-1]
+                  #global_receivers = self.api.get_global_receivers(tag)
+                  #self.alarms[tag]['receivers'] = ','.join((local_receivers,global_receivers))
+                  self.alarms[tag]['receivers'] = local_receivers
+                except: 
+                  traceback.print_exc()
+                  self.alarms[tag]['receivers'] = ''
                 try: self.alarms[tag]['description'] = fun.first(r for r in props['AlarmDescriptions'] if r.startswith(tag+':')).split(':',1)[-1]
                 except: self.alarms[tag]['description'] = ''
                 try: self.alarms[tag]['severity'] = fun.first(r for r in props['AlarmSeverities'] if r.startswith(tag+':')).split(':',1)[-1]
                 except: self.alarms[tag]['severity'] = ''
             except:
-                print 'Unparsable Alarm!: %s' % line
+                print('Unparsable Alarm!: %s' % line)
         #print '%s device manages %d alarms: %s'%(self.name,len(self.alarms),self.alarms.keys())
         return self.alarms
 
@@ -602,6 +486,7 @@ class AlarmAPI(fandango.SingletonMap):
         self.alarms = {}
         self.filters = filters
         self.tango_host = tango_host or os.getenv('TANGO_HOST')
+        self._global_receivers = [],0
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
         self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
@@ -635,7 +520,7 @@ class AlarmAPI(fandango.SingletonMap):
         filters = filters or self.filters or '*'
         if fun.isSequence(filters): filters = '|'.join(filters)
         self.devices,all_alarms = fandango.CaselessDict(),{}
-        self.log('%s: Loading PyAlarm devices matching %s'%(time.ctime(),filters))
+        self.log('Loading PyAlarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
         all_devices = map(str.lower,fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
@@ -659,6 +544,7 @@ class AlarmAPI(fandango.SingletonMap):
         tprops = time.time()
 
         for d in all_devices:
+            self.log('Loading device: %s'%d)
             d = d.lower()
             ad = AlarmDS(d,api=self)
             if filters=='*' or d in matched or fun.matchCl(filters,d,terminate=True):
@@ -674,13 +560,18 @@ class AlarmAPI(fandango.SingletonMap):
         self.get_phonebook(load=True)
         
         #Verifying that previously loaded alarms still exist
-        for k in self.alarms.keys()[:]:
-            if not any(k in vals for vals in all_alarms.values()):
-                self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,self.alarms[k].device))
-                self.alarms.pop(k)
+        for k,v in self.alarms.items()[:]:
+          found = False
+          for d,vals in all_alarms.items():
+            found = k in vals and d.lower() == v.device.lower()
+          if not found:
+            self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,v.device))
+            self.alarms.pop(k)
+        
         #Updating alarms dictionary
         for d,vals in sorted(all_alarms.items()):
             for k,v in vals.items():
+                self.log('Loading alarm %s.%s (new=%s): %s'%(d,k,k not in self.alarms,v))
                 if k in self.alarms: #Updating
                     if self.alarms[k].device.lower()!=d.lower():
                         self.warning('AlarmAPI.load(): WARNING!: Alarm %s duplicated in devices %s and %s' % (k,self.alarms[k].device,d))
@@ -866,7 +757,7 @@ class AlarmAPI(fandango.SingletonMap):
           elif '%' in r:
             for p in self.phonebook:
               #re.split used to discard partial matches
-              if p in re.split('[,:;/\)\(]',p):
+              if p in re.split('[,:;/\)\(]',r):
                 r = r.replace(p,self.phonebook[p])
           result.append(r)
         return ','.join(result)
@@ -885,12 +776,12 @@ class AlarmAPI(fandango.SingletonMap):
         lines = [line.strip().split(':',1)[0].upper() for line in prop]
         if name in lines: #Replacing
             index = lines.index(name)
-            print 'AlarmAPI.edit_phonebook(%s,%s,%s), replacing at [%d]'%(tag,value,section,index)
+            print('AlarmAPI.edit_phonebook(%s,%s,%s), replacing at [%d]'%(tag,value,section,index))
             prop = prop[:index]+[value]+prop[index+1:]
         else: #Adding
             if section and '#' not in section: section = '#%s'%section
             index = len(lines) if not section or section not in lines else lines.index(section)+1
-            print 'AlarmAPI.edit_phonebook(%s,%s,%s), adding at [%d]'%(tag,value,section,index)
+            print('AlarmAPI.edit_phonebook(%s,%s,%s), adding at [%d]'%(tag,value,section,index))
             prop = prop[:index]+[value]+prop[index:]
         self.save_phonebook(prop)
 
@@ -899,43 +790,63 @@ class AlarmAPI(fandango.SingletonMap):
         self.put_class_property('PyAlarm','Phonebook',new_prop)
         self.phonebook = None #Force to reload
         return new_prop
-    
+      
+    def get_global_receivers(self,tag='',renew=False):
+        try:
+          if (renew or self._global_receivers[-1]<time.time()-3600):
+            prop = self.get_class_property('PyAlarm','GlobalReceivers')
+            self._global_receivers = (prop,time.time())
+          else:
+            prop = self._global_receivers[0]
+          if not tag:
+            return prop
+          else:
+            prop = [p.split(':',1) for p in prop]
+            rows = []
+            for line in prop:
+              mask = (line[0] if len(line)>1 else '*').split(',')
+              neg = [m[1:] for m in mask if m.startswith('!')]
+              if neg and any(fun.clmatch(m,tag) for m in neg):
+                continue
+              pos = [m for m in mask if not m.startswith('!')]
+              if not pos or any(fun.clmatch(m,tag) for m in pos):
+                rows.append(line[-1])
+            return ','.join(rows)
+        except:
+          print('>>> Exception at get_global_receivers(%s)'%tag)
+          traceback.print_exc()
+          return ''
+        
     GROUP_EXP = fandango.tango.TangoEval.FIND_EXP.replace('FIND','GROUP')
     
     def group_macro(self,match):
         """
-        For an expression matching multiple ALARM attributes returns a new formula that will evaluate to True
-        if any of the alarm changes to active state (.delta). NOTE, THIS IS NOT any(FIND(*)); it will react only
-        on change, not if already active!
-        
-        It uses the read_attribute schema from TangoEval, thus using .delta to keep track of which values has changed.
-        For example, GROUP(test/alarms/*/TEST_[ABC]) will be replaced by:
-            any([t.delta>0 for d in FIND(test/alarms/*/TEST_[ABC].all)])
-            
-        By default GROUP is active if any .delta is >0. It can be modified if the formula contains a semicolon ";" and 
-        a condition using 'x' as variable; in this case it will be used instead of delta to check for alarm
-            GROUP(bl09/vc/vgct-*/p[12],x>1e-5) => [x>1e-5 for x in FIND(bl09/vc/vgct-*/p[12])]
+        For usage details see:
+
+          https://github.com/tango-controls/PANIC/
+            blob/documentation/doc/recipes/AlarmsHierarchy.rst
         """
-        match,cond = match.split(';',1) if ';' in match else (match,'x>0')
-        if '/' not in match and self._eval._locals.get('DEVICE',None): match = self._eval._locals['DEVICE']+'/'+match
-        matches = []
-        if '/' in match:
-            matches = [d+'/'+a for dev,attr in [match.rsplit('/',1)] for d,dd in self.devices.items() for a in dd.alarms if fun.matchCl(dev,d) and fun.matchCl(attr,a)]
-        else:
-            matches = [self[a].get_attribute(full=True) for a in self if fun.matchCl(match,a)]
-        if not cond: matches = [m+'.delta' for m in matches]
-        exp = 'any([%s for x in [ %s ]])'%(cond,' , '.join(matches))
-        print exp
-        #if not cond: #It just tries to find DELTA in all variables matching the condition
-            ##By default, summarize which attributes has changed
-            #exp = "any([t.delta>0 for t in FIND(%s.all) if PANIC.has_tag(t.name)])"%(match)
-            #if '/' not in match: #Trying to match alarm names instead of attributes
-                #matches = [a for a in self.alarms if fun.matchCl(match+'$',a)]
-                #if matches:
-                    #attrs = sorted(set(self.alarms[a].get_attribute(full=True) for a in self.alarms if fun.matchCl(match+'$',a)))
-                    #exp = '('+'any([d>0 for d in [ %s ] ])'%' , '.join(s+'.delta' for s in attrs) + ' and [ %s ])'%' , '.join(attrs)
-        #else:
-            #exp = '(any([%s for x in FIND(%s)]))'%(cond,match)
+        match,cond = match.split(';',1) if ';' in match else (match,'')
+        #if '/' not in match and self._eval._locals.get('DEVICE',None): 
+          #match = self._eval._locals['DEVICE']+'/'+match
+
+        exps = match.split(',')
+        attrs = []
+        for e in exps:
+          if '/' in e:
+              attrs.extend(d+'/'+a 
+                  for dev,attr in [e.rsplit('/',1)] 
+                  for d,dd in self.devices.items() 
+                  for a in dd.alarms 
+                  if fun.matchCl(dev,d) and fun.matchCl(attr,a))
+          else:
+              attrs.extend(self[a].get_attribute(full=True) for a in self if fun.matchCl(e,a))
+              
+        if not cond: 
+          attrs = [m+'.delta' for m in attrs]
+          cond = 'x > 0'
+
+        exp = 'any([%s for x in [ %s ]])'%(cond,' , '.join(attrs))
         return exp
       
     def split_formula(self,formula,keep_operators=False):

@@ -1,7 +1,6 @@
-from PyQt4 import Qt, QtCore, QtGui
-from taurus.qt.qtgui.resource import getThemeIcon
 import panic, fandango
-from widgets import iLDAPValidatedWidget
+from widgets import Qt,QtCore,QtGui
+from widgets import iValidatedWidget,getThemeIcon
 
 
 class dacWidget(QtGui.QWidget):
@@ -19,7 +18,7 @@ class dacWidget(QtGui.QWidget):
     def show(self):
         QtGui.QWidget.show(self)
         
-class devattrchangeForm(iLDAPValidatedWidget,object):
+class devattrchangeForm(iValidatedWidget,object):
     api=None
     def __init__(self,api=None):
         print 'creating devattrchangeForm ...'

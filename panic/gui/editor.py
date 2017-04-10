@@ -1,20 +1,15 @@
 import sys, re
 import panic
-from PyQt4 import QtCore, QtGui, Qt
+from widgets import QtCore, QtGui, Qt
 from ui_data import Ui_Data,Ui_ReceiversLine
 from ui_data import uiBodyForm,uiRowForm
-from taurus.qt.qtgui.resource import getThemeIcon
+from widgets import getThemeIcon
 from widgets import AlarmValueLabel,setCheckBox,getAlarmReport,get_user,trace
-from widgets import AttributesPreview,AlarmPreview,iLDAPValidatedWidget
+from widgets import AttributesPreview,AlarmPreview,iValidatedWidget
 from fandango.excepts import Catched
 
 #AlarmFormula widget is added to the editor in the ui_data.py file
-
-try:
-    from alarmhistory import *
-except Exception,e:
-    #print 'UNABLE TO LOAD SNAP ... HISTORY VIEWER DISABLED: ',str(e)
-    SNAP_ALLOWED=False
+from widgets import SNAP_ALLOWED,get_snap_api
 
 #get_next_index = lambda d: max([0]+list(d))+1
 
@@ -23,7 +18,7 @@ except Exception,e:
 
 FormParentClass = Qt.QDialog
 
-class AlarmForm(FormParentClass,iLDAPValidatedWidget): #(QtGui.QWidget):
+class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     
     __pyqtSignals__ = ("valueChanged",)
     
@@ -381,7 +376,7 @@ class AlarmForm(FormParentClass,iLDAPValidatedWidget): #(QtGui.QWidget):
             if SNAP_ALLOWED:
                 try:
                     print('\tRenaming Alarm context %s to %s'%(old_name,tag))
-                    snapi = snap.snapAPI()
+                    snapi = get_snap_api()
                     self.ctx_list = snapi.get_contexts()
                     for cid in self.ctx_list:
                         if (self.ctx_list[cid].name.lower()==old_name.lower() and self.ctx_list[cid].reason=='ALARM'):
