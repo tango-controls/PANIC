@@ -1,6 +1,6 @@
 .. _description:
 
-PANIC README
-------------
+PANIC Description
+-----------------
 
 .. include:: README

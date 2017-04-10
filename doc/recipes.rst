@@ -18,4 +18,8 @@ PANIC Recipes
    recipes/ReceiversLoggingAndActions
    recipes/TestsAndExamples
    recipes/UseEventsWithTaurus
+   recipes/AlarmDistribution
+   recipes/Exceptions
+   recipes/AlarmProperties
+   recipes/AlarmFormulas
 

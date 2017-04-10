@@ -41,7 +41,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'panic'
-copyright = u'2014, Author'
+copyright = u'2014, S.Rubio Manrique'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -91,7 +91,8 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+#html_theme = 'default'
+html_theme = 'agogo'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -111,6 +112,7 @@ html_theme = 'default'
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
 #html_logo = None
+html_logo = 'panic-6-thin.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -228,7 +230,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'panic', u'panic Documentation',
-   u'Author', 'panic', 'One line description of project.',
+   u'Sergi Rubio-Manrique', 'panic', 'One line description of project.',
    'Miscellaneous'),
 ]
 
@@ -246,9 +248,9 @@ texinfo_documents = [
 
 # Bibliographic Dublin Core info.
 epub_title = u'panic'
-epub_author = u'Author'
-epub_publisher = u'Author'
-epub_copyright = u'2014, Author'
+epub_author = u'Sergi Rubio-Manrique'
+epub_publisher = u'Sergi Rubio-Manrique'
+epub_copyright = u'2014, Sergi Rubio-Manrique'
 
 # The language of the text. It defaults to the language option
 # or en if the language is not set.
