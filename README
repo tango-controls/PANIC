@@ -9,7 +9,7 @@ PROJECT URLs:
 -------------
 
 * http://www.tango-controls.org/community/projects/panic-alarm-system
-* https://github.com/tango-controls.org/panic
+* https://github.com/tango-controls/panic
 * https://pypi.python.org/pypi/panic
 
 The Panic package contains the python AlarmAPI for managing the PyAlarm device servers from a client 
