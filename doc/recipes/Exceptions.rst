@@ -1,3 +1,6 @@
+Exception Management
+====================
+
 Alarm properties that control if exceptions trigger alarms or not ...
 
         'RethrowState':

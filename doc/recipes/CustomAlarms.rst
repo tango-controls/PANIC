@@ -1,5 +1,5 @@
-PANIC Alarm Recipes
-===================
+Special Alarm Recipes
+=====================
 
 Special keys used in Alarm formulas
 -----------------------------------
@@ -20,6 +20,39 @@ Special keys used in Alarm formulas
 - PREV: Previous values
 - READ(attr): TangoEval.read_attribute(attr)
 - FIND('expression'): Finds all attributes matching the expression and return its values.
+
+Expiration Date
+---------------
+
+Disabling or re-enabling after a given date
+
+A temporal condition can be achieved using the T() macro in the formula.
+
+To disable an Alarm after a given date::
+
+  T() < T('2013-04-23') and D/F/M.A > V1
+
+To re-enable it after a maintenance period::
+
+  T() > T('2013-04-23') and D/F/M.A > V1
+
+
+Accessing PyAlarm Values CACHE
+------------------------------
+
+The PyAlarm CACHE dictionary contains the last values stored for each tango attribute that 
+appeared in the formulas. The size of cache is AlarmTrheshold + 1
+
+Usage::
+
+  PASS_BY_0=[(k,v.time.tv_sec,str(v.value)) for k,t in CACHE.items() for v in t if v.value==0]
+
+  
+This will trigger alarm if ALL values in the cache are equal, it is NOT the same as Delta 
+because it checks only the first and last values::
+
+  not (lambda l:max(l)-min(l))([v.value for v in CACHE['wr/rf/circ-1/heartbeat']])
+ 
 
 Clock: Alarm triggered by time
 ------------------------------

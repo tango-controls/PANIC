@@ -1,3 +1,6 @@
+PyAlarm timing configuration
+============================
+
 * StartupDelay: the device will wait before starting to evaluate the alarms (e.g. giving some time to the system to recover from a powercut).
 
 * Enabled: if False or 0 the PyAlarm it equals to disabling all alarm actions of the device; if it is True the behavior will be the normal expected; if it has a numeric value (e.g. 120) it means that the device will evaluate the alarms but not execute actions during the first 120 seconds (thus alarms can be activated but no action executed). It is used to prevent a restart of the device to re-execute all alarms that were already active.
