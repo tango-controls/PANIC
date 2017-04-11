@@ -39,7 +39,7 @@ for data in (recipes,devices):
  try:
   folder,header,filename = data
   files = [f for f in os.listdir(folder) if '.rst' in f]
-  for f in files:
+  for f in sorted(files):
     header += '\n   '+folder+'/'+f.split('.rst')[0]
   header += '\n\n'
   o = open(filename,'w')

@@ -61,21 +61,21 @@ Sending a Test Message at Startup
 
 This alarm formula is just "True" ; therefore will be enabled immediately sendin an email message to test@tester.com
 
-.. code-block::
+.. code-block:: python
 
-  AlarmList -> DEBUG:True
-  AlarmDescriptions -> DEBUG:The PyAlarm Device $NAME has been restarted
-  AlarmReceivers -> DEBUG: test@tester.com
+   AlarmList -> DEBUG:True
+   AlarmDescriptions -> DEBUG:The PyAlarm Device $NAME has been restarted
+   AlarmReceivers -> DEBUG: test@tester.com
 
 Testing a device availability
 -----------------------------
 
 It is done if you put directly the name of the device or its State as a condition by itself. In the second case and alarm will be triggered either if the Pressure is above threshold or the device is not reachable.
 
-.. code-block::
+.. code-block:: python
 
-  PRESSURE:SR/VC/VGCT/Pressure > 1e-4
-  STATE_AND_PRESSURE:?SR/VC/VGCT and SR/VC/VGCT/Pressure > 1e-4
+   PRESSURE:SR/VC/VGCT/Pressure > 1e-4
+   STATE_AND_PRESSURE:?SR/VC/VGCT and SR/VC/VGCT/Pressure > 1e-4
 
 
 Getting Tango state/attribute/value/quality/time/delta in formulas
@@ -83,45 +83,45 @@ Getting Tango state/attribute/value/quality/time/delta in formulas
 
 The Alarm syntax allows to add the following clauses to the attribute name (value returned by default):
 
-.. code-block::
+.. code-block:: python
 
-  some/device/name{/attribute}{.value/all/time/quality/delta/exception} 
+   some/device/name{/attribute}{.value/all/time/quality/delta/exception} 
 
 *attribute*: if no attribute name is given, then device state is read.
 
-.. code-block::
+.. code-block:: python
 
-  PLC_Alarm: BL22/CT/EPS-PLC-01 == FAULT
+   PLC_Alarm: BL22/CT/EPS-PLC-01 == FAULT
 
 *value*: default, returns the value of the attribute
 
-.. code-block::
+.. code-block:: python
 
-  Pressure_Alarm: BL22/CT/EPS-PLC-01/CC1_AF.value > 1e-5
+   Pressure_Alarm: BL22/CT/EPS-PLC-01/CC1_AF.value > 1e-5
 
 *time*: returns the epoch in seconds of the last value read
 
-.. code-block::
+.. code-block:: python
 
-  Not_Updated: BL22/CT/EPS-PLC-01/CPU_Status.time < (now-60)
+   Not_Updated: BL22/CT/EPS-PLC-01/CPU_Status.time < (now-60)
 
 *quality* : returns the tango quality value (ATTR_VALID, ATTR_INVALID, ATTR_WARNING, ATTR_ALARM).
 
-.. code-block::
+.. code-block:: python
 
-  Temperature_Alarm: BL22/CT/EPS-PLC-01/OP_WBAT_OH01_01_TC11.quality == ATTR_ALARM
+   Temperature_Alarm: BL22/CT/EPS-PLC-01/OP_WBAT_OH01_01_TC11.quality == ATTR_ALARM
 
 *delta* : returns the variation of the value in the last N=AlarmThreshold reads (stored in TangoEval.cache array of size AlarmThreshold+1)
 
-.. code-block::
+.. code-block:: python
 
-  Valve_Just_Closed: BL22/CT/EPS-PLC-01/VALVE_11.delta == -1
+   Valve_Just_Closed: BL22/CT/EPS-PLC-01/VALVE_11.delta == -1
 
 *exception* : True if the attribute is unreadable, False otherwise
 
-.. code-block::
+.. code-block:: python
 
-  Not_Found: BL22/CT/EPS-PLC-01/I_Dont_Exist.exception
+   Not_Found: BL22/CT/EPS-PLC-01/I_Dont_Exist.exception
 
 *all* : returns the raw attribute object as returned by PyTango.DeviceProxy.read_attribute method.
 
@@ -136,8 +136,8 @@ A single formula clock would be more hackish; this alarm will execute a command 
 
 .. code-block:: python
 
-  PERIODIC:(FrontEnds/VC/Elotech-01/Temperature and FrontEnds/VC/VGCT-01/P1 \ 
-    and (1920<(now%3600)<3200)) or (ResetAlarm('PERIODIC') and False)
+   PERIODIC:(FrontEnds/VC/Elotech-01/Temperature and FrontEnds/VC/VGCT-01/P1 \ 
+   and (1920<(now%3600)<3200)) or (ResetAlarm('PERIODIC') and False)
 
 Enabling search, expression matching and list comprehensions
 ------------------------------------------------------------
@@ -146,13 +146,13 @@ Having the syntax ``dom/fam/mem/attr.quality`` whould allow us to call attrs lik
 
 .. code-block:: python
 
-  any([ATTR_ALARM==s+'.quality' for s in FIND('dom/fam/*/pressure')])
+   any([ATTR_ALARM==s+'.quality' for s in FIND('dom/fam/*/pressure')])
 
 One way may be using QUALITY, VALUE, TIME key functions:
 
 .. code-block:: python
 
-  any([ATTR_ALARM==QUALITY(s) for s in FIND('dom/fam/*/pressure')]) 
+   any([ATTR_ALARM==QUALITY(s) for s in FIND('dom/fam/*/pressure')]) 
 
 The use of FIND allows PyAlarm to prepare a list Taurus models that can be redirected from an <pre>event_received(...)</pre> hook.
 
@@ -161,37 +161,37 @@ Some list comprehension examples
 
 .. code-block:: python
 
-  any([s for s in FIND(SR/ID/SCW01/Cooler*Err*)])
+   any([s for s in FIND(SR/ID/SCW01/Cooler*Err*)])
 
 equals to 
 
 .. code-block:: python
 
-  any(FIND(SR/ID/SCW01/Cooler*Err*))
+   any(FIND(SR/ID/SCW01/Cooler*Err*))
 
 The negate:
 
 .. code-block:: python
 
-  any([s==0 for s in FIND(SR/ID/SCW01/Cooler*Err*)])
+   any([s==0 for s in FIND(SR/ID/SCW01/Cooler*Err*)])
 
 is equivalent to
 
 .. code-block:: python
 
-  any(not s for s in FIND(SR/ID/SCW01/Cooler*Err*)])
+   any(not s for s in FIND(SR/ID/SCW01/Cooler*Err*)])
 
 is equivalent to
 
 .. code-block:: python
 
-  not all(FIND(SR/ID/SCW01/Cooler*Err*))
+   not all(FIND(SR/ID/SCW01/Cooler*Err*))
 
 is equivalent to
 
 .. code-block:: python
 
-  [s for s in FIND(SR/ID/SCW01/Cooler*Err*) if not s]
+   [s for s in FIND(SR/ID/SCW01/Cooler*Err*) if not s]
 
 
 Grouping Alarms in Formulas
@@ -201,26 +201,26 @@ The proper way is (for readability I use upper case letters for alarms):
 
 .. code-block:: python
 
-  ALARM_1: just/my/tango/attribute_1
-  ALARM_2: just/my/tango/attribute_2
+   ALARM_1: just/my/tango/attribute_1
+   ALARM_2: just/my/tango/attribute_2
 
 then:
 
 .. code-block:: python
 
-  ALARM_1_OR_2: ALARM_1 or ALARM_2
+   ALARM_1_OR_2: ALARM_1 or ALARM_2
 
 or:
 
 .. code-block:: python
 
-  ALARM_1_OR_2: any(( ALARM_1 , ALARM_2 ))
+   ALARM_1_OR_2: any(( ALARM_1 , ALARM_2 ))
 
 or:
 
 .. code-block:: python
 
-  ALARM_ANY: any( FIND(my/alarm/device/ALARM_*) )
+   ALARM_ANY: any( FIND(my/alarm/device/ALARM_*) )
 
 Any alarm you declare becomes both a PyAlarm attribute and a variable that you can anywhere (also in other PyAlarm devices). You don't trigger any new read because you just use the result of the formula already evaluated.
 
@@ -228,7 +228,7 @@ The GROUP is used to tell you that a set of conditions has changed from its prev
 
 .. code-block:: python
 
-  GROUP(my/alarm/device/ALARM_[12])
+   GROUP(my/alarm/device/ALARM_[12])
 
 ----
 
@@ -258,39 +258,39 @@ AlarmList
 
 Format of alarms will be:
 
-.. code-block::
+.. code-block:: python
 
-  TAG1:LT/VC/Dev1
-  TAG2:LT/VC/Dev1/State
-  TAG3:LT/VC/Dev1/Pressure > 1e-4
+   TAG1:LT/VC/Dev1
+   TAG2:LT/VC/Dev1/State
+   TAG3:LT/VC/Dev1/Pressure > 1e-4
 
 NOTE: This property was previously called AlarmsList; it is still loaded if AlarmList is empty for backward compatibility
 
 AlarmDescriptions
 .................
 
-Description to be included in emails for each alarm. The format is:
+Description to be included in emails for each alarm. The format is::
 
-  TAG:AlarmDescriptions...
+   TAG:AlarmDescriptions...
 
 NOTE: Special Tags like $NAME (for name of PyAlarm device) or $TAG (for name of the Alarm) will be automatically replaced in description.
 
 AlarmReceivers
 ..............
 
-.. code-block::
+.. code-block:: python
 
-  TAG1:vacuum@accelerator.es,SMS:+34935924381,file:/tmp/err.log
-  vacuum@accelerator.es:TAG1,TAG2,TAG3
+   TAG1:vacuum@accelerator.es,SMS:+34935924381,file:/tmp/err.log
+   vacuum@accelerator.es:TAG1,TAG2,TAG3
 
 Other options are SNAP or ACTION:
 
-.. code-block::
+.. code-block:: python
 
-  user@cells.es,
-  SMS:+34666777888, #If SMS sending available
-  SNAP, #Alarm changes will be recorded in SNAP database.
-  ACTION(alarm:command,mach/alarm/beep/play_sequence,$DESCRIPTION)
+   user@cells.es,
+   SMS:+34666777888, #If SMS sending available
+   SNAP, #Alarm changes will be recorded in SNAP database.
+   ACTION(alarm:command,mach/alarm/beep/play_sequence,$DESCRIPTION)
 
 
 Adding ACTION as receiver
@@ -298,39 +298,39 @@ Adding ACTION as receiver
 
 Executing a command on alarm/disable/reset/acknowledge:
 
-.. code-block::
+.. code-block:: python
 
-  ACTION(alarm:command,mach/alarm/beep/play_sequence,$DESCRIPTION)
+   ACTION(alarm:command,mach/alarm/beep/play_sequence,$DESCRIPTION)
 
 The syntax allow both attribute/command execution and the usage of multiple typed arguments:
 
-.. code-block::
+.. code-block:: python
 
- ACTION(alarm:command,mach/dummy/motor/move,int(1),int(10))
- ACTION(reset:attribute,mach/dummy/motor/position,int(0))
+   ACTION(alarm:command,mach/dummy/motor/move,int(1),int(10))
+   ACTION(reset:attribute,mach/dummy/motor/position,int(0))
 
 Also commands added to the Class property @AllowedCommands@ can be executed:
 
-.. code-block::
+.. code-block:: python
 
- ACTION(alarm:system:beep&)
+   ACTION(alarm:system:beep&)
 
 PhoneBook (not implemented yet)
 ...............................
 
 File where alarm receivers aliases are declared; e.g. 
 
-.. code-block::
+.. code-block:: python
 
- User:user@accelerator.es;SMS:+34666555666 
+   User:user@accelerator.es;SMS:+34666555666 
  
 Default location is: `` `$HOME/var/alarm_phone_book.log` ``
  
 If User and Operator are defined in phonebook, AlarmsReceivers can be:
 
-.. code-block::
+.. code-block:: python
 
-  TAG2:User,Operator
+   TAG2:User,Operator
 
 ----
 
@@ -404,28 +404,30 @@ Alarm Configuration Properties
 Device Server Example
 =====================
 
-.. code-block::
+These will be the typical properties of a PyAlarm device
+
+.. code-block:: python
  
-  #---------------------------------------------------------
-  # SERVER PyAlarm/AssemblyArea, PyAlarm device declaration
-  #---------------------------------------------------------
-  PyAlarm/AssemblyArea/DEVICE/PyAlarm: "LAB/VC/Alarms"
-  # --- LAB/VC/Alarms properties
-  LAB/VC/Alarms->AlarmDescriptions: "OVENPRESSURE:The pressure in the Oven exceeds Range",\
+   #---------------------------------------------------------
+   # SERVER PyAlarm/AssemblyArea, PyAlarm device declaration
+   #---------------------------------------------------------
+   PyAlarm/AssemblyArea/DEVICE/PyAlarm: "LAB/VC/Alarms"
+   # --- LAB/VC/Alarms properties
+   LAB/VC/Alarms->AlarmDescriptions: "OVENPRESSURE:The pressure in the Oven exceeds Range",\
                                   "ADIXENPRESSURE:The pressure in the Roughing Station exceeds Range",\
                                   "OVENTEMPERATURE:The Temperature of the Oven exceeds Range",\
                                   "DEBUG:Just for debugging purposes"
-  LAB/VC/Alarms->AlarmReceivers: OVENPRESSURE:somebody@cells.es,someone_else@cells.es,SMS:+34999666333,\
-                               ADIXENPRESSURE:somebody@cells.es,someone_else@cells.es,SMS:+34999666333,\
-                               OVENTEMPERATURE:somebody@cells.es,someone_else@cells.es,SMS:+34999666333,\
-                               DEBUG:somebody@cells.es
-  LAB/VC/Alarms->AlarmsList: "OVENPRESSURE:LAB/VC/BestecOven-1/Pressure_mbar > 5e-4",\
-                           "OVENRUNNING:LAB/VC/BestecOven-1/MaxValue > 70",\
-                           "ADIXENPRESSURE:LAB/VC/Adixen-01/P1 > 1e-4 and OVENRUNNING",\
-                           "OVENTEMPERATURE:LAB/VC/BestecOven-1/MaxValue > 220",\
-                           "DEBUG:OVENRUNNING and not PCISDOWN"
-  LAB/VC/Alarms->PollingPeriod: 30
-  LAB/VC/Alarms->SMSConfig: ...
+   LAB/VC/Alarms->AlarmReceivers: OVENPRESSURE:somebody@cells.es,someone_else@cells.es,SMS:+34999666333,\
+                              ADIXENPRESSURE:somebody@cells.es,someone_else@cells.es,SMS:+34999666333,\
+                              OVENTEMPERATURE:somebody@cells.es,someone_else@cells.es,SMS:+34999666333,\
+                              DEBUG:somebody@cells.es
+   LAB/VC/Alarms->AlarmsList: "OVENPRESSURE:LAB/VC/BestecOven-1/Pressure_mbar > 5e-4",\
+                          "OVENRUNNING:LAB/VC/BestecOven-1/MaxValue > 70",\
+                          "ADIXENPRESSURE:LAB/VC/Adixen-01/P1 > 1e-4 and OVENRUNNING",\
+                          "OVENTEMPERATURE:LAB/VC/BestecOven-1/MaxValue > 220",\
+                          "DEBUG:OVENRUNNING and not PCISDOWN"
+   LAB/VC/Alarms->PollingPeriod: 30
+   LAB/VC/Alarms->SMSConfig: ...
 
 
 ----
@@ -435,42 +437,42 @@ Mail Messages
 
 
 Format of Alarm message
------------------------
 
-.. code-block::
 
-  Subject:     LAB/VC/Alarms: Alarm RECOVERED (OVENTEMPERATURE)
-  Date:     Wed, 12 Nov 2008 11:52:39 +0100
+.. code-block:: python
 
-  TAG: OVENTEMPERATURE
+   Subject:     LAB/VC/Alarms: Alarm RECOVERED (OVENTEMPERATURE)
+   Date:     Wed, 12 Nov 2008 11:52:39 +0100
+
+   TAG: OVENTEMPERATURE
              LAB/VC/BestecOven-1/MaxValue > 220 was RECOVERED at Wed Nov 12 11:52:39 2008
 
-  Alarm receivers are:
+   Alarm receivers are:
              somebody@cells.es
              someone_else@cells.es
-  Other Active Alarms are:
+   Other Active Alarms are:
              DEBUG:Fri Nov  7 18:37:35 2008:OVENRUNNING and not PCISDOWN
              OVENRUNNING:Fri Nov  7 18:37:17 2008:LAB/VC/BestecOven-1/MaxValue > 70
-  Past Alarms were:
+   Past Alarms were:
              OVENTEMPERATURE:Fri Nov  7 20:49:46 2008
 
 
 Format of Recovered message
----------------------------
 
-.. code-block::
 
-  Subject:     LAB/VC/Alarms: Alarm RECOVERED (OVENTEMPERATURE)
-  Date:     Wed, 12 Nov 2008 11:52:39 +0100
+.. code-block:: python
 
-  TAG: OVENTEMPERATURE
+   Subject:     LAB/VC/Alarms: Alarm RECOVERED (OVENTEMPERATURE)
+   Date:     Wed, 12 Nov 2008 11:52:39 +0100
+
+   TAG: OVENTEMPERATURE
              LAB/VC/BestecOven-1/MaxValue > 220 was RECOVERED at Wed Nov 12 11:52:39 2008
 
-  Alarm receivers are:
+   Alarm receivers are:
              somebody@cells.es
              someone_else@cells.es
-  Other Active Alarms are:
+   Other Active Alarms are:
              DEBUG:Fri Nov  7 18:37:35 2008:OVENRUNNING and not PCISDOWN
              OVENRUNNING:Fri Nov  7 18:37:17 2008:LAB/VC/BestecOven-1/MaxValue > 70
-  Past Alarms were:
+   Past Alarms were:
              OVENTEMPERATURE:Fri Nov  7 20:49:46 2008
