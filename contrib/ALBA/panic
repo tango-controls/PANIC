@@ -5,7 +5,7 @@ PANIC=$(python -c "import imp;print(imp.find_module('panic')[1])")
 PANIC_DEFAULT="--filter=!building"
 
 HASSCREEN=$(which screen 2>/dev/null)
-CMD="python $PANIC/gui/gui.py"
+CMD="python $PANIC/gui/gui.py $PANIC_DEFAULT"
 
 if [ "$( echo $1 | grep '\?\|\-h' )" ] ; then
   echo "Usage:"
