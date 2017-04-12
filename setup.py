@@ -15,7 +15,12 @@ install_requires = ['taurus',
                     'PyTango',]
 
 
-package_data = {'': ['VERSION']}
+package_data = {
+  '': ['VERSION'],
+  'panic': [
+    'gui/icon/*',
+    ],
+  }
 
 scripts = [
   './bin/PyAlarm',
@@ -37,6 +42,7 @@ setup(
     install_requires=install_requires,
     entry_points=entry_points,
     scripts=scripts,
+    include_package_date=True,
 )
 
 
