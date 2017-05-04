@@ -52,15 +52,16 @@ except:
     #PyTango.PyDeviceClass = PyTango.DeviceClass
     #PyTango.PyUtil = PyTango.Util
 
-try: __RELEASE__ = open(os.path.dirname(os.path.abspath(__file__))+'../VERSION').read().strip()
-except Exception,e: __RELEASE__ = '?.?'
-print '> PyAlarm %s'%__RELEASE__
-
 ###############################################################################
 # Checking Dependencies
 
 import panic 
 from panic.properties import *
+
+try: 
+  __RELEASE__ = panic.__RELEASE__
+except Exception,e: __RELEASE__ = '?.?'
+print '> PyAlarm %s'%__RELEASE__
 
 try:
     try: import panic.extra.smslib as smslib
@@ -420,13 +421,18 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def get_enabled(self, force=False):
         e = str(self.Enabled).lower().strip()
         last = self.PastValues.get('Enabled',(0,0))
+        # t is time passed since start
         t = int(time.time() - (self.TStarted+self.StartupDelay))
-        if not force and t-last[0] < self.PollingPeriod: return last[1]
+        
         if e in ('true','1','yes','enabled'): r = True
         elif e in ('','false','0','no','none','disabled'): r = None
         elif e=='nan': r = fandango.NaN
         elif fandango.matchCl('^[0-9]+$',e): r = t > int(e)
-        else: #Evaluating an alarm formula
+        elif not force and last[0] and (t-last[0])<self.PollingPeriod:
+            # return last cached value
+            return last[1]
+        else:
+            # Evaluating an alarm formula
             try:
                 self.FailedAlarms.pop('Enabled',None)
                 r = self.EvaluateFormula(self.Enabled,as_string=False,_locals={'t':t})
@@ -434,6 +440,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.FailedAlarms['Enabled'] = traceback.format_exc()
                 print(self.FailedAlarms['Enabled'])
                 r = False
+                
         self.PastValues['Enabled'] = t,r
         return r
 
