@@ -22,6 +22,14 @@ srubio@cells.es
 ----------------------------------------------------------------------------------
 Changelog
 
+VERSION = 6.0; 
+
+Faster startup by delaying SNAP dependency check
+Widget modules reorganized
+Added New Device dialog
+Added LDAP-less generic validator
+Widgets adapted to Taurus4 (but not the API yet)
+
 VERSION = 5.5 December 2015 ; 
 
  - Integration with Taurus GUI
