@@ -185,7 +185,6 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
         print 'In AlarmGUI.setViewMenu(%s)'%action
         self.mainwindow.viewMenu.clear()
         windows = WindowManager.getWindowsNames()
-        print windows
         for w in windows:
             self.mainwindow.viewMenu.addAction(w,lambda x=w:WindowManager.putOnTop(x))
         self.mainwindow.viewMenu.addAction('Close All',lambda : WindowManager.closeAll())
@@ -968,7 +967,7 @@ def main(args=[]):
     URL = 'http://www.cells.es/Intranet/Divisions/Computing/Controls/Help/Alarms/panic'
     
     #uniqueapp = Qt.QApplication([])
-    uniqueapp = TaurusApplication(opts)
+    uniqueapp = TaurusApplication([]) #opts)
     
     print '='*80
     trace(' Launching Panic ...')

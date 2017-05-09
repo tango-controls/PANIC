@@ -60,6 +60,33 @@ def setCheckBox(cb,v):
         print 'Failed to setCheckBox(%s,%s)'%(cb,v)
         print traceback.format_exc()
         
+def getWidgetText(widget,trace=True):
+    """ helper to catch encoding exceptions in forms """
+    msg = ''
+    try:
+        if hasattr(widget,'toPlainText'):
+          msg = str(widget.toPlainText())
+        else:
+          msg = str(widget)
+    except Exception,e:
+        if 'unicode' in str(e).lower():
+            #v = QtGui.QMessageBox.warning(None,'Wrong characters', \
+                #'PANIC properties accept only ASCII characters, '
+                #'please crosscheck your text.' \
+                #QtGui.QMessageBox.Ok);
+            try:org = widget.text()
+            except: org = widget.toPlainText()
+            msg = Qt.QInputDialog.getText(None,'Wrong characters',
+                'PANIC properties accept only ASCII characters, '
+                'please crosscheck your text.',Qt.QLineEdit.Normal,
+                org)
+            msg = getWidgetText(msg)
+        else:
+            #QtGui.QMessageBox.warning(None,'Wrong text',str(e))
+            raise e
+    if trace: print('*'*80+'\n'+'%s => %s'%(widget,msg))
+    return msg
+    
 def getAlarmTimestamp(alarm,attr_value=None,use_taurus=True):
     """
     Returns alarm activation timestamp (or 0) of an alarm object
@@ -474,7 +501,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
          - self.formula: unprocessed formula in a single row
          - self.test.formula: formula with all alarms and attributes replaced
         """
-        text = (str(self.tf.toPlainText()))
+        text = getWidgetText(self.tf)
         self.formula = formula or multiline2line(text)
         self.tf.setPlainText(line2multiline(self.formula))
         if self.org_formula is None: self.org_formula = formula

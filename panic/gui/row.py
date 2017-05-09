@@ -304,6 +304,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 try: 
                     if hasattr(klass,'updateStyle'): klass.updateStyle(self)
                 except: pass
+
         pass
             
     @classmethod
