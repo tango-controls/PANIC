@@ -2,12 +2,16 @@
 
 import sys,os,urllib,traceback
 try:
- import panic,fandango
- from fandango import web
+  import panic,fandango
+  from fandango.functional import *
 except:
- sys.path.append('/homelocal/sicilia/lib/python/site-packages')
- import panic,fandango
- from fandango import web
+  sys.path.append('/homelocal/sicilia/lib/python/site-packages')
+  import panic,fandango
+ 
+try:
+  from fandango import web
+except:
+  web = None
 
 def get_servers_status(regexp='*',exclude=['bpms','test','sr_vc_']):
     servers = fandango.Astor()
@@ -36,6 +40,9 @@ def get_servers_status(regexp='*',exclude=['bpms','test','sr_vc_']):
       for d in sorted(servers[s].get_device_list()):
         if not fandango.matchCl('(sys|dserver)/*',d):
           ss = fandango.check_device(d)
+          p = fandango.tango.get_device_property(d,'pollingperiod')
+          if not p: print('%s has no polling defined'%d)
+          elif float(p)>1000: print('%s has a wrong polling! %s'%(d,p))
           if str(ss) not in ('ALARM','ON'):
             failed.append(s)
             print('%s : %s : %s : %s' % (servers[s].host,s,d,str(ss)))
@@ -43,6 +50,7 @@ def get_servers_status(regexp='*',exclude=['bpms','test','sr_vc_']):
     print('\n%d servers have failed devices'%len(failed))
     restart = sorted(set(d for l in (off,zombies,failed) for d in l))
     print('%d servers should be restarted'%len(restart))
+    print('')
             
     return {'off':off,'on':on,'zombies':zombies,
             'failed':failed,'restart':restart}
@@ -61,10 +69,11 @@ def restart_servers(servers = [], host = ''):
       astor.start_servers(s,host=host)
     return
 
-def generate_html_report():
-    print sys.argv
-    OUTPUT = sys.argv[-1] if len(sys.argv)>1 else '/srv/www/htdocs/reports/alarms.html'
-    FILTER = sys.argv[1] if len(sys.argv)>2 else '*'
+def generate_html_report(args):
+    print('panic.extra.generate_html_report(%s)'%args)
+    assert web,'fandango.web not available'
+    OUTPUT = args[-1] if len(args) else '/srv/www/htdocs/reports/alarms.html'
+    FILTER = args[1] if len(args)>1 else '*'
     HOST = os.getenv('TANGO_HOST',os.getenv('HOST'))
     print 'OUTPUT = %s, FILTER = %s, HOST= %s'% (OUTPUT,FILTER,HOST)
     api = panic.api(FILTER)
@@ -95,4 +104,12 @@ def generate_html_report():
     import pickle
     pickle.dump(values,open(OUTPUT.rsplit('.',1)[0]+'.pck','w'))
     
-if __name__ == '__main__': generate_html_report()
+if __name__ == '__main__': 
+    action = first(sys.argv[1:] or ['help'])
+    if action == 'html': 
+        generate_html_report(sys.argv[2:])
+    if action == 'check': 
+        exclude = [a for a in sys.argv[2:] if a.startswith('!')]
+        include = '|'.join([a for a in sys.argv[2:] if a not in exclude])
+        args = [include or '*'] + iif(list,exclude,[],True)
+        print(dict2str(get_servers_status(*args)))
