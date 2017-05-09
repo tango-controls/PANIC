@@ -27,11 +27,43 @@ __doc__ = "panic.view will contain the AlarmView class for managing"\
           "updated views of the panic system state"
 
 import fandango as fn
+import panic
 from panic import *
 from fandango.functional import *
 from fandango.threads import ThreadedObject
 from fandango.callbacks import EventSource, EventListener
+from fandango.excepts import Catched
+from fandango.objects import Cached,Struct
 from fandango.log import Logger
+from fandango.dicts import SortedDict
+
+class FilterStack(SortedDict):
+    """
+    It is an ordered dictionary of filters
+    Filters are applied sequentially
+    Each filter has a tag and contains an string or dictionary of key/regexp
+    String will be like "key:regexp,key:regexp,key:regexp"
+    Regexp uses the fandango Careless extended syntax ('!\ &')
+    """
+    def add(self,name,s):
+        self[name] = str2dict(s)
+        
+    def match(self,value,strict=False,trace=False):
+        is_map = isMapping(value)
+        m = None
+        f = searchCl if not strict else matchCl
+        for k,v in self.items():
+            for p,r in v.items():
+                t = value.get(p,'') if is_map else getattr(value,p,'')
+                m = f(r,t,extend=True)
+                if not m: 
+                    if trace: print('%s doesnt match %s'%(t,r))
+                    return m
+        return m
+        
+    def apply(self,sequence,strict=False):
+        return filter(partial(self.match,strict=strict),sequence)
+    
 
 class AlarmView(EventListener,Logger):
     #ThreadedObject,
@@ -54,9 +86,9 @@ class AlarmView(EventListener,Logger):
         # These can be modified using apply_filters
         self.filters = filters
         ## default_filters should never change
-        self.defaults = Struct((k,'') for k in 
-              ('device','active','severity','regexp','receivers'
-               'formula','attribute','history','failed','hierarchy'))
+        self.defaults = Struct(dict((k,'') for k in 
+              ('device','active','severity','regexp','receivers',
+               'formula','attribute','history','failed','hierarchy')))
         self.defaults.update(**self.filters)
         
         self.info('AlarmView(%s)'%self.filters)
@@ -84,7 +116,7 @@ class AlarmView(EventListener,Logger):
         #self.ctx_names = []
 
             
-        AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
+        #AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
         N = len(self.getAlarms())
         if len(self.model)<150: 
             self.REFRESH_TIME = 3000
@@ -486,12 +518,12 @@ class AlarmView(EventListener,Logger):
         self.updateStatusLabel()
         #self._ui.listWidget.blockSignals(False)      
     
-  def event_hook(self, src, type_, value):
-    """ 
-    EventListener.eventReceived will jump to this method
-    Method to implement the event notification
-    Source will be an object, type a PyTango EventType, evt_value an AttrValue
-    """
-    src = src.full_name
-    value = getAttrValue(value,True)
+    def event_hook(self, src, type_, value):
+        """ 
+        EventListener.eventReceived will jump to this method
+        Method to implement the event notification
+        Source will be an object, type a PyTango EventType, evt_value an AttrValue
+        """
+        src = src.full_name
+        value = getAttrValue(value,True)
    
