@@ -545,7 +545,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.debug(alarm.formula)
 
                     variables = {}
-                    VALUE = self.EvaluateFormula(alarm.formula,tag_name=tag_name,as_string=False,lock=True,_locals=_locals,variables=variables)
+                    VALUE = self.EvaluateFormula(alarm.formula,
+                            tag_name=tag_name,as_string=False,lock=True,
+                            _locals=_locals,variables=variables)
                     self.debug('was_ok/counter/active/VALUE: %s,%s,%s,%s'%(WAS_OK,alarm.counter,alarm.active,VALUE))
                     if WAS_OK:
                       self.info('\tupdateAlarms(%s) = %s' % (tag_name,type(VALUE) if isinstance(VALUE,Exception) else VALUE))
@@ -1472,7 +1474,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #    argin:  DevString    formula to evaluate
 #    argout: DevString
 #------------------------------------------------------------------
-    def EvaluateFormula(self,argin,tag_name=None,as_string=True,lock=False,_locals=None,variables=None):
+    def EvaluateFormula(self,argin,tag_name=None,as_string=True,
+        lock=False,_locals=None,variables=None):
         """
         This method can be called from both updateAlarms thread or external clients 
         """
@@ -1485,12 +1488,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             _locals = _locals or {}
             _locals['TAG'] = tag_name
             _locals = self.update_locals(_locals)
-            formula = self.Panic.replace_alarms(argin) #This replace those alarm names that are not in locals()
+            formula = self.Panic.replace_alarms(argin) 
+            #This replace those alarm names that are not in locals()
             varnames = self.Eval.parse_variables(formula,_locals)
             
             (self.debug if tag_name else self.info)(
               'In EvaluateFormula(%s): %d variables from %s'%(
-                tag_name or formula,len(varnames),sorted(set([tuple(v)[0] for v in varnames]))))
+                tag_name or formula,len(varnames),
+                  sorted(set([tuple(v)[0] for v in varnames]))))
               
             STATE = any((not attribute or attribute.lower().strip() == 'state') for device,attribute,what in varnames)
             RAISE = (STATE and self.RethrowState) or self.RethrowAttribute or fandango.isFalse(self.IgnoreExceptions)
