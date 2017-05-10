@@ -16,3 +16,14 @@ PyAlarm timing configuration
 * UseProcess: This is an experimental feature, like UseTaurus and others. In general, I advice you to not modify any parameter that is not detailed in the PyAlarm user guide as you may obtain unexpected results. Some parameters are used to test new features still under development and their behavior may vary between commits.
 
 Regarding actions on recovery … this option is planned but not yet fully available. Actually just emails are sent when AlertOnRecovery is True. This feature may be implemented in the next 6 months or so but the syntax is still to be decided. 
+
+
+Testing your PyAlarm installation
+=================================
+
+This script will check the current performance of your PyAlarm devices:
+
+.. code::
+
+    > TANGO_HOST=your_hostname:10000 python panic/extra/report.py check
+  
