@@ -27,21 +27,24 @@ __doc__ = "panic.view will contain the AlarmView class for managing"\
           "updated views of the panic system state"
 
 import fandango as fn
+import fandango.tango as ft
 import panic
 from panic import *
 from fandango.functional import *
 from fandango.threads import ThreadedObject
-from fandango.callbacks import EventSource, EventListener
+from fandango.callbacks import EventSource, EventListener, TangoAttribute
 from fandango.excepts import Catched
 from fandango.objects import Cached,Struct
 from fandango.log import Logger
-from fandango.dicts import SortedDict
+from fandango.dicts import SortedDict,CaselessDict, \
+        CaselessSortedDict, CaselessDefaultDict
 
 class FilterStack(SortedDict):
     """
     It is an ordered dictionary of filters
     Filters are applied sequentially
-    Each filter has a tag and contains an string or dictionary of key/regexp
+    Each filter has a tag and contains an string or dictionary 
+    of key/regexp
     String will be like "key:regexp,key:regexp,key:regexp"
     Regexp uses the fandango Careless extended syntax ('!\ &')
     """
@@ -67,6 +70,8 @@ class FilterStack(SortedDict):
 
 class AlarmView(EventListener,Logger):
     #ThreadedObject,
+    
+    sources = {} #Dictionary for Alarm sources    
   
     def __init__(self,name='AlarmView',filters={}):
 
@@ -90,21 +95,22 @@ class AlarmView(EventListener,Logger):
               ('device','active','severity','regexp','receivers',
                'formula','attribute','history','failed','hierarchy')))
         self.defaults.update(**self.filters)
+        self.filters.update(self.defaults.dict())
         
         self.info('AlarmView(%s)'%self.filters)
                 
         self.ordered=[] #Alarms list ordered
-        self.filtered = []
-        self.sources = {} #Dictionary for Alarm sources
+        self.filtered = [] # vs alarms?
+        self.values = CaselessDefaultDict(dict)
         
         self.timeSortingEnabled=None
         self.changed = True
         
         self.api = panic.AlarmAPI()
-        if not self.api.keys(): 
+        if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
             
-        self.model = self.api.filter_alarms(filters=self.defaults)
+        self.apply_filters() #get_alarms()
         
         #self.default_regEx=options.get('filter',None) or filters or None
         #self.regEx = self.default_regEx
@@ -117,26 +123,57 @@ class AlarmView(EventListener,Logger):
 
             
         #AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
-        N = len(self.getAlarms())
-        if len(self.model)<150: 
+        N = len(self.alarms)
+        
+        ## How often should the ordered list be renewed?
+        if len(self.alarms)<150: 
             self.REFRESH_TIME = 3000
         else:
             self.REFRESH_TIME = 6000
 
-        if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
+        #if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
         
         
-        self.modelsQueue = Queue.Queue()
-        self.modelsThread = fandango.qt.TauEmitterThread(parent=self,queue=self.modelsQueue,method=self.setAlarmRowModel)
-        self.modelsThread.start()
-        #TIMERS (to reload database and refresh alarm list).
-        self.reloadTimer = QtCore.QTimer()
-        self.refreshTimer = QtCore.QTimer()
-        QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
-        QtCore.QObject.connect(self.reloadTimer, QtCore.SIGNAL("timeout()"), self.onReload)
-        self.reloadTimer.start(self.REFRESH_TIME/2.)
-        self.refreshTimer.start(self.REFRESH_TIME)
-          
+        #self.modelsQueue = Queue.Queue()
+        #self.modelsThread = fandango.qt.TauEmitterThread(parent=self,queue=self.modelsQueue,method=self.setAlarmRowModel)
+        #self.modelsThread.start()
+        ##TIMERS (to reload database and refresh alarm list).
+        #self.reloadTimer = QtCore.QTimer()
+        #self.refreshTimer = QtCore.QTimer()
+        #QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
+        #QtCore.QObject.connect(self.reloadTimer, QtCore.SIGNAL("timeout()"), self.onReload)
+        #self.reloadTimer.start(self.REFRESH_TIME/2.)
+        #self.refreshTimer.start(self.REFRESH_TIME)
+        
+    def __del__(self):
+        print('AlarmView(%s).__del__()'%self.name)
+        [self.remove_source(s) for s in self.get_sources()]
+        
+    def get_alarm(self,alarm):
+        #self.info('get_alarm(%s)'%alarm)
+        alarm = alarm.split('tango://')[-1]
+        a = self.alarms.get(alarm,None)
+        if not a:
+            m = self.api.get(alarm.split('/')[-1])
+            assert len(m)<=1, 'MultipleAlarmMatches!'
+            assert m, 'AlarmNotFound!'
+            a = m[0]
+        return a
+        
+    def get_alarms(self, filters = None):
+        """
+        It returns a list with all alarm objects matching 
+        the filter provided
+        Alarms should be returned matching the current sortkey.
+        """
+        if not self.filtered and not filters:
+            r = self.filtered
+        else:
+            r = [a.tag for a in 
+              self.api.filter_alarms(filters or self.filters)]
+        self.info('get_alarms(%s): %d alarms found'%(filters,len(r)))
+        return r
+      
     def apply_filters(self,**filters):
         """
         valid filters are:
@@ -152,10 +189,27 @@ class AlarmView(EventListener,Logger):
         * hierarchy top
         * hierarchy bottom
         """
-        self.filters = filters or self.filters
+        filters = filters or self.filters
+        self.info('apply_filters(%s)'%filters)
+        self.filtered = self.get_alarms(filters)
+        self.filters = filters
+        objs = [self.api[f] for f in self.filtered]
+        models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
+        self.alarms = CaselessDict(models)
+        self.set_sources()
         return self.filtered
+      
+    @staticmethod
+    def sortkey(alarm,priority=('Active','Severity')):
+        result = []
+        for p in priority:
+            p = str(p).lower()
+            #if p=='active': result.append(alarm.get_active())
+            if hasattr(alarm,p): result.append(getattr(alarm,p))
+
+        return result
     
-    def sort(self,*keys):
+    def sort(self,sortkey = None):
         """
         valid keys are:
         * name
@@ -166,20 +220,100 @@ class AlarmView(EventListener,Logger):
         * hierarchy
         * failed
         """
-        self.last_keys = keys or self.last_keys
-        return self.ordered
+        #self.last_keys = keys or self.last_keys
+        sortkey = sortkey or self.sortkey
+        self.ordered = sorted(self.alarms.values(),key=sortkey)
+        return list(reversed([a.get_model() for a in self.ordered]))
     
-    def export(self,to_type=list):
-        if to_type==list:
-            return self.ordered
+    def export(self,
+            keys=('active','severity','device','tag','description','formula')):
+        objs = [self.alarms[a] for a in self.sort()]
+        return [[getattr(o,k) for k in keys] for o in objs]
+          
+    def get_source(self,alarm):
+        for k,v in AlarmView.sources.items():
+            t = k if '/' in alarm else k.split('/')[-1]
+            if matchCl(alarm,t):
+                return v
+        return None
+      
+    def get_model(self,alarm):
+        if '/' not in alarm:
+            alarm = self.get_alarm(alarm).get_model()
+        if ':' not in alarm:
+            alarm = ft.get_tango_host()+'/'+alarm
+        return alarm
+      
+    def get_sources(self):
+        return [s for s,v in AlarmView.sources.items()
+                if self in v.listeners]
+      
+    def set_sources(self):
+        self.info('set_sources(%d)'%len(self.alarms))
+        olds = self.get_sources()
+        news = [self.get_model(s) for s in self.alarms]
+        for o in olds:
+            if o not in news:
+                self.remove_source(o)
+        for s in news:
+            if s not in olds:
+                self.add_source(s)
+        return news
+      
+    def add_source(self,alarm):
+        s = self.get_source(alarm)
+        if s:
+            self.warning('%s already sourced as %s'%(alarm,s))
+            return None
+        else:
+            alarm = self.get_model(alarm)
+            self.info('add_source(%s)'%alarm)
+            ta = TangoAttribute(alarm)
+            self.sources[ta.full_name] = ta
+            self.sources[ta.full_name].addListener(self)
+            
+    def remove_source(self,alarm):
+        s = self.get_source(alarm)
+        s.removeListener(self)
+        if not s.hasListeners():
+          AlarmView.sources.pop(s.full_name)
+          
+    def error_hook(self,src,type_,value):
+        pass
+      
+    def value_hook(self,src,type_,value):
+        pass
+        
+    def event_hook(self, src, type_, value):
+        """ 
+        EventListener.eventReceived will jump to this method
+        Method to implement the event notification
+        Source will be an object, type a PyTango EventType, evt_value an AttrValue
+        """
+        self.debug('AlarmView(%s).event_hook(%s,%s,...)'%(
+          self.name,src,type_))
+        
+        if src.simple_name == 'activealarms':
+            pass
+        elif not getattr(value,'error',False):
+            rvalue = getAttrValue(value,None)
+            if rvalue is not None:
+                av = self.get_alarm(src.full_name)
+                av.active = rvalue
+                if src.full_name not in self.values:
+                    pass
+                else:
+                    prev = getAttrValue(self.values[src.full_name])
+                    if rvalue != prev:
+                        self.info('event_hook(%s): %s => %s'%(
+                          src.simple_name,prev,rvalue))
+                        
+                self.values[src.full_name] = value
       
     
     ###########################################################################
             
-    def getAlarms(self):
-        #It returns a list with all alarm objects matching the filter provided at startup
-        return self.api.filter_alarms(self.filters)
-    
+
     def getCurrents(self):
         return self._ordered
         
@@ -518,12 +652,5 @@ class AlarmView(EventListener,Logger):
         self.updateStatusLabel()
         #self._ui.listWidget.blockSignals(False)      
     
-    def event_hook(self, src, type_, value):
-        """ 
-        EventListener.eventReceived will jump to this method
-        Method to implement the event notification
-        Source will be an object, type a PyTango EventType, evt_value an AttrValue
-        """
-        src = src.full_name
-        value = getAttrValue(value,True)
+
    
