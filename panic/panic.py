@@ -49,7 +49,7 @@ import traceback,re,time,os,sys
 import fandango
 from fandango import first,searchCl,matchCl,isString,isSequence
 from fandango import isFalse,xor,str2time,time2str,END_OF_TIME
-from fandango.tango import CachedAttributeProxy,PyTango
+from fandango.tango import CachedAttributeProxy,PyTango,get_tango_host
 
 from .properties import *
 
@@ -323,7 +323,7 @@ class Alarm(object):
         return str(self.to_dict().items())
 
     def __repr__(self):
-        return 'Alarm(%s:%s)' % (self.tag,self.description)
+        return 'Alarm(%s:%s:%s)' % (self.tag,self.device,self.active)
 
 class AlarmDS(object):
     """ This Class allows to manage the PyAlarm devices from the AlarmAPI """
@@ -494,7 +494,7 @@ class AlarmAPI(fandango.SingletonMap):
         self.log('In AlarmAPI(%s)'%filters)
         self.alarms = {}
         self.filters = filters
-        self.tango_host = tango_host or os.getenv('TANGO_HOST')
+        self.tango_host = tango_host or get_tango_host()
         self._global_receivers = [],0
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
@@ -936,7 +936,7 @@ class AlarmAPI(fandango.SingletonMap):
         try:
             if formula.strip().lower() in ('and','or'):
                 return None
-            if device and not checkTangoDevice(device):
+            if device and not fandango.tango.check_device(device):
                 device = None
             if device and device in self.devices:
                 d = self.devices[device].get()
