@@ -31,7 +31,7 @@ import fandango.tango as ft
 import panic
 from panic import *
 from fandango.functional import *
-from fandango.threads import ThreadedObject
+from fandango.threads import ThreadedObject,RLock
 from fandango.callbacks import EventSource, EventListener, TangoAttribute
 from fandango.excepts import Catched
 from fandango.objects import Cached,Struct
@@ -48,58 +48,77 @@ class FilterStack(SortedDict):
     String will be like "key:regexp,key:regexp,key:regexp"
     Regexp uses the fandango Careless extended syntax ('!\ &')
     """
+    def __init__(self,filters=None):
+        SortedDict.__init__(self)
+        if filters:
+            print filters
+            if isSequence(filters): #It doesn't matter which types
+                [self.add(str(i),f) for i,f in enumerate(filters)]
+                
+            elif isMapping(filters) and isMapping(filters.values()[0]):
+                    [self.add(k,v) for k,v in filters.items()]
+            
+            else:
+                self.add('default',filters)
+        pass
+      
     def add(self,name,s):
-        self[name] = str2dict(s)
+        self[name] = str2dict(s) if not isMapping(s) else s
         
     def match(self,value,strict=False,trace=False):
         is_map = isMapping(value)
         m = None
         f = searchCl if not strict else matchCl
         for k,v in self.items():
+            if trace: print('apply((%s,%s),%s)'%(k,v,value))
             for p,r in v.items():
                 t = value.get(p,'') if is_map else getattr(value,p,'')
-                m = f(r,t,extend=True)
+                m = f(str(r),str(t),extend=True) if r else True
                 if not m: 
                     if trace: print('%s doesnt match %s'%(t,r))
                     return m
         return m
         
-    def apply(self,sequence,strict=False):
-        return filter(partial(self.match,strict=strict),sequence)
+    def apply(self,sequence,strict=False,trace=False):
+        return filter(partial(self.match,strict=strict,trace=trace),sequence)
     
 
-class AlarmView(EventListener,Logger):
+class AlarmView(ThreadedObject,EventListener,Logger):
     #ThreadedObject,
     
     sources = {} #Dictionary for Alarm sources    
   
-    def __init__(self,name='AlarmView',filters={}):
+    def __init__(self,name='AlarmView',filters={},refresh=3.):
 
+        self.lock = RLock()
+
+        ThreadedObject.__init__(self,target=self.sort,
+                                period=refresh,start=False)
         Logger.__init__(self,name)
         self.setLogLevel('INFO')
         #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
         EventListener.__init__(self,name)
 
-        if isString(filters):
-            if ',' in filters: filters = filters.split(',')
-            else: filters = {'regexp':filters}
+        self.filters = FilterStack(filters)
+        #if isString(filters):
+            #if ',' in filters: filters = filters.split(',')
+            #else: filters = {'regexp':filters}
 
-        if isSequence(filters):
-            filters = dict(iif('=' in k,k.split('=',1),(k,True)) 
-                        for k in filters)
+        #if isSequence(filters):
+            #filters = dict(iif('=' in k,k.split('=',1),(k,True)) 
+                        #for k in filters)
 
-        # These can be modified using apply_filters
-        self.filters = filters
         ## default_filters should never change
         self.defaults = Struct(dict((k,'') for k in 
               ('device','active','severity','regexp','receivers',
                'formula','attribute','history','failed','hierarchy')))
-        self.defaults.update(**self.filters)
-        self.filters.update(self.defaults.dict())
+        [self.defaults.update(**f) for f in self.filters.values()]
+        self.filters.insert(0,'default',self.defaults.dict())
         
         self.info('AlarmView(%s)'%self.filters)
                 
         self.ordered=[] #Alarms list ordered
+        self.last_sort = 0
         self.filtered = [] # vs alarms?
         self.values = CaselessDefaultDict(dict)
         
@@ -126,10 +145,10 @@ class AlarmView(EventListener,Logger):
         N = len(self.alarms)
         
         ## How often should the ordered list be renewed?
-        if len(self.alarms)<150: 
-            self.REFRESH_TIME = 3000
-        else:
-            self.REFRESH_TIME = 6000
+        #if len(self.alarms)<150: 
+            #self.REFRESH_TIME = 3000
+        #else:
+            #self.REFRESH_TIME = 6000
 
         #if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
         
@@ -144,6 +163,9 @@ class AlarmView(EventListener,Logger):
         #QtCore.QObject.connect(self.reloadTimer, QtCore.SIGNAL("timeout()"), self.onReload)
         #self.reloadTimer.start(self.REFRESH_TIME/2.)
         #self.refreshTimer.start(self.REFRESH_TIME)
+        
+
+        self.start()
         
     def __del__(self):
         print('AlarmView(%s).__del__()'%self.name)
@@ -169,8 +191,9 @@ class AlarmView(EventListener,Logger):
         if not self.filtered and not filters:
             r = self.filtered
         else:
-            r = [a.tag for a in 
-              self.api.filter_alarms(filters or self.filters)]
+            #r = [a.tag for a in #self.api.filter_alarms(filters or self.filters)]
+            filters = FilterStack(filters) if filters else self.filters
+            r = [a.tag for a in filters.apply(self.api.values())]
         self.info('get_alarms(%s): %d alarms found'%(filters,len(r)))
         return r
       
@@ -189,15 +212,21 @@ class AlarmView(EventListener,Logger):
         * hierarchy top
         * hierarchy bottom
         """
-        filters = filters or self.filters
-        self.info('apply_filters(%s)'%filters)
-        self.filtered = self.get_alarms(filters)
-        self.filters = filters
-        objs = [self.api[f] for f in self.filtered]
-        models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
-        self.alarms = CaselessDict(models)
-        self.set_sources()
-        return self.filtered
+        try:
+            self.lock.acquire()
+            filters = FilterStack(filters) if filters else self.filters
+            self.info('apply_filters(%s)'%filters)
+            self.filtered = self.get_alarms(filters)
+            self.filters = filters
+            objs = [self.api[f] for f in self.filtered]
+            models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
+            self.alarms = CaselessDict(models)
+            self.set_sources()
+            return self.filtered
+        except:
+            self.error(traceback.format_exc())
+        finally:
+            self.lock.release()
       
     @staticmethod
     def sortkey(alarm,priority=('Active','Severity')):
@@ -220,10 +249,20 @@ class AlarmView(EventListener,Logger):
         * hierarchy
         * failed
         """
-        #self.last_keys = keys or self.last_keys
-        sortkey = sortkey or self.sortkey
-        self.ordered = sorted(self.alarms.values(),key=sortkey)
-        return list(reversed([a.get_model() for a in self.ordered]))
+        try:
+            self.lock.acquire()
+            if (now()-self.last_sort) < self.get_period():
+                #self.last_keys = keys or self.last_keys
+                sortkey = sortkey or self.sortkey
+                self.ordered = sorted(self.alarms.values(),key=sortkey)
+                
+            r = list(reversed([a.get_model() for a in self.ordered]))
+            self.last_sort = now()
+            return r
+        except:
+            self.error(traceback.format_exc())
+        finally:
+            self.lock.release()
     
     def export(self,
             keys=('active','severity','device','tag','description','formula')):
@@ -295,23 +334,41 @@ class AlarmView(EventListener,Logger):
         
         if src.simple_name == 'activealarms':
             pass
+          
         elif not getattr(value,'error',False):
             rvalue = getAttrValue(value,None)
+            
             if rvalue is not None:
-                av = self.get_alarm(src.full_name)
-                av.active = rvalue
-                if src.full_name not in self.values:
-                    pass
-                else:
-                    prev = getAttrValue(self.values[src.full_name])
-                    if rvalue != prev:
-                        self.info('event_hook(%s): %s => %s'%(
-                          src.simple_name,prev,rvalue))
-                        
-                self.values[src.full_name] = value
+                try:
+                    self.lock.acquire()
+                    av = self.get_alarm(src.full_name)
+                    av.active = rvalue
+                    if src.full_name not in self.values:
+                        pass
+                    else:
+                        prev = getAttrValue(self.values[src.full_name])
+                        if isBool(prev): 
+                          last = rvalue
+                          
+                        else: 
+                            last = value.quality
+                            prev = self.values[src.full_name].quality
+
+                        if last != prev:
+                            self.info('event_hook(%s): %s => %s'%(
+                              src.simple_name,prev,last))
+                            
+                    self.values[src.full_name] = value
+                except:
+                    self.error(traceback.format_exc())
+                finally:
+                    self.lock.release()
       
     
     ###########################################################################
+    
+    
+class QAlarmView(AlarmView):
             
 
     def getCurrents(self):
