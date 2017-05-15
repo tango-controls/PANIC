@@ -418,7 +418,10 @@ class AlarmDS(object):
         return self.get().Status()
 
     def read(self,filters='*'):
-        """ Updates from the database the Alarms related to this device """
+        """ 
+        Updates from the database the Alarms related to this device 
+        Only alarms which AlarmList row matches filters will be loaded
+        """
         props = self.get_alarm_properties()
         self.alarms = {}
         for line in props['AlarmList']:
@@ -524,6 +527,11 @@ class AlarmAPI(fandango.SingletonMap):
         """
         Reloads all alarm properties from the database
         :param filters: is used to specify which devices to be loaded
+        
+        First, the server name must match with filters
+        Second, if the device matches all its alarms are loaded
+        Third, alarm will be loaded if the AlarmList row matches the filter
+        
         """
         #Loading alarm devices list
         filters = filters or self.filters or '*'
@@ -532,20 +540,27 @@ class AlarmAPI(fandango.SingletonMap):
         self.log('Loading PyAlarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
-        all_devices = map(str.lower,fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
+        all_devices = map(str.lower,
+          fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
+
         if exported:
-            dev_exported = map(str.lower,fandango.tango.get_database().get_device_exported('*'))
+            dev_exported = map(str.lower,
+              fandango.tango.get_database().get_device_exported('*'))
             all_devices = [d for d in all_devices if d in dev_exported]
-        all_servers = map(str.lower,self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
+
+        all_servers = map(str.lower,
+            self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
         
         #If filter is the name of a pyalarm device, only those alarms will be loaded
         if filters.lower() in all_devices:
             all_devices = matched = [filters]
+            
         elif filters!='*' and any(matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
             self.servers.load_by_name(filters)
             matched = [d for d in self.servers.get_all_devices() if d.lower() in all_devices]
             #If filter is the name of a pyalarm server, only those devices will be loaded
             if filters.lower() in all_servers: all_devices = matched
+            
         else:
             matched = []
             
@@ -556,11 +571,13 @@ class AlarmAPI(fandango.SingletonMap):
             self.log('Loading device: %s'%d)
             d = d.lower()
             ad = AlarmDS(d,api=self)
+            
             if filters=='*' or d in matched or matchCl(filters,d,terminate=True):
                 self.devices[d],all_alarms[d] = ad,ad.read()
             else:
                 alarms = ad.read(filters=filters)
                 if alarms: self.devices[d],all_alarms[d] = ad,alarms
+                
         tprops=(time.time()-tprops)
         self.log('\t%d PyAlarm devices loaded, %d alarms'%(len(self.devices),sum(len(v) for v in all_alarms.values())))
 
@@ -571,16 +588,20 @@ class AlarmAPI(fandango.SingletonMap):
         #Verifying that previously loaded alarms still exist
         for k,v in self.alarms.items()[:]:
           found = False
+          
           for d,vals in all_alarms.items():
             found = k in vals and d.lower() == v.device.lower()
+            
           if not found:
             self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,v.device))
             self.alarms.pop(k)
         
         #Updating alarms dictionary
         for d,vals in sorted(all_alarms.items()):
+          
             for k,v in vals.items():
                 self.log('Loading alarm %s.%s (new=%s): %s'%(d,k,k not in self.alarms,v))
+                
                 if k in self.alarms: #Updating
                     if self.alarms[k].device.lower()!=d.lower():
                         self.warning('AlarmAPI.load(): WARNING!: Alarm %s duplicated in devices %s and %s' % (k,self.alarms[k].device,d))
