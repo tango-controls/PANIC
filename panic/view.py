@@ -88,14 +88,14 @@ class AlarmView(ThreadedObject,EventListener,Logger):
     
     sources = {} #Dictionary for Alarm sources    
   
-    def __init__(self,name='AlarmView',filters={},refresh=3.):
+    def __init__(self,name='AlarmView',filters={},refresh=3.,verbose=False):
 
         self.lock = RLock()
-
-        ThreadedObject.__init__(self,target=self.sort,
-                                period=refresh,start=False)
+        self.verbose = verbose
         Logger.__init__(self,name)
         self.setLogLevel('INFO')
+        ThreadedObject.__init__(self,target=self.sort,
+                                period=refresh,start=False)
         #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
         EventListener.__init__(self,name)
 
@@ -233,9 +233,18 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         result = []
         for p in priority:
             p = str(p).lower()
-            #if p=='active': result.append(alarm.get_active())
+            #if p=='active': 
             if hasattr(alarm,p): result.append(getattr(alarm,p))
-
+            if p=='active':
+                ## TODO!!! DISABLED SHOULD BE APPLIED HERE AS -2
+                #result[-1] = alarm.get_active()
+                pass
+            if p=='severity':
+                if result[-1]=='ERROR': result[-1] = 0
+                if result[-1]=='ALARM': result[-1] = 1
+                if result[-1]=='WARNING': result[-1] = 2
+                if result[-1]=='DEBUG': result[-1] = 3
+                
         return result
     
     def sort(self,sortkey = None):
@@ -345,7 +354,7 @@ class AlarmView(ThreadedObject,EventListener,Logger):
                     av.active = rvalue
                     if src.full_name not in self.values:
                         pass
-                    else:
+                    elif self.verbose:
                         prev = getAttrValue(self.values[src.full_name])
                         if isBool(prev): 
                           last = rvalue
