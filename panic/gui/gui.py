@@ -2,7 +2,7 @@ import sys, re, os, traceback, time
 import threading, Queue
 
 import PyTango, fandango
-import panic, fandango.qt
+import panic, fandango.qt, panic.view
 from fandango.qt import QtCore, QtGui, Qt
 from fandango.excepts import Catched
 
@@ -29,6 +29,7 @@ widgets.TRACE_LEVEL = 0
 
 PARENT_CLASS = QtGui.QWidget
 class AlarmGUI(PARENT_CLASS,iValidatedWidget):
+  
     REFRESH_TIME = 5000 #Default period between list order updates
     RELOAD_TIME = 60000 #Default period between database reloads
     MAX_REFRESH = 3 #Controls the new interval set by hurry()
@@ -37,10 +38,13 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
     __pyqtSignals__ = ("valueChanged",)
     
     def __init__(self, parent=None, filters='*', options=None, mainwindow=None):
+      
         trace('>>>> AlarmGUI()')
         options = options or {}
+        
         if not fandango.isDictionary(options):
             options = dict((o.replace('--','').split('=')[0],o.split('=',1)[-1]) for o in options)
+            
         trace( 'In AlarmGUI(%s): %s'%(filters,options))
         PARENT_CLASS.__init__(self,parent)
         self._ui = Ui_AlarmList()
@@ -75,12 +79,18 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
             print 'Setting RegExp filter: %s'%self.regEx
             self._ui.regExLine.setText(str(self.regEx))
         self.severities=['alarm', 'error', 'warning', 'debug', '']
+        
+        self.view = panic.view.AlarmView(filters='device:'+self.regEx)
+        
         self.setExpertView(False)
         self.setExpertView(True) #checked=('expert' in options))
         
         if self.mainwindow:
-            #self.mainwindow.setWindowTitle(str(os.getenv('TANGO_HOST')).split(':',1)[0]+' Alarm Widget (%s)'%self.filters)
-            self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(self.filters or self.regEx or '',str(os.getenv('TANGO_HOST')).split(':',1)[0]))
+            
+            self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(
+                self.filters or self.regEx or '',
+                str(os.getenv('TANGO_HOST')).split(':',1)[0]))
+            
             url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6.svg'
             px = QtGui.QPixmap(url)
             self.mainwindow.setWindowIcon(Qt.QIcon(px))
@@ -107,7 +117,9 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
         #self.buildList()
         self._connected = False
         self.modelsQueue = Queue.Queue()
-        self.modelsThread = fandango.qt.TauEmitterThread(parent=self,queue=self.modelsQueue,method=self.setAlarmRowModel)
+        self.modelsThread = fandango.qt.TauEmitterThread(
+          parent=self,queue=self.modelsQueue,method=self.setAlarmRowModel)
+        
         self.modelsThread.start()
         #TIMERS (to reload database and refresh alarm list).
         self.reloadTimer = QtCore.QTimer()
@@ -124,6 +136,8 @@ class AlarmGUI(PARENT_CLASS,iValidatedWidget):
         self._ui.infoLabel0_1.setText(self._ui.contextComboBox.currentText())
         self.updateStatusLabel()
         trace('AlarmGUI(): done')
+        
+        
         
         #if not SNAP_ALLOWED:
             #Qt.QMessageBox.critical(self,"Unable to load SNAP",'History Viewer Disabled!', QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
