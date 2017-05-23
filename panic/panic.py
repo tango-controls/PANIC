@@ -47,9 +47,11 @@
 
 import traceback,re,time,os,sys
 import fandango
-from fandango import first,searchCl,matchCl,isString,isSequence
+#import fandango as fn
+from fandango import first,searchCl,matchCl,isString,isSequence,now
 from fandango import isFalse,xor,str2time,time2str,END_OF_TIME
-from fandango.tango import CachedAttributeProxy,PyTango,get_tango_host
+from fandango.tango import CachedAttributeProxy
+from fandango.tango import PyTango,get_tango_host
 
 from .properties import *
 
@@ -109,6 +111,7 @@ def setAlarmDeviceProperty(device, prop, value):
 # Alarm object used by API
 
 class Alarm(object):
+  
     def __init__(self,tag,device='',formula='',description='',receivers='',config='', severity='',api=None):
         #Info from the database
         self.api = api
@@ -128,6 +131,7 @@ class Alarm(object):
     def clear(self):
         """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
         self.active = 0 #Last timestamp it was activated
+        self.updated = 0 #Last value check
         self.recovered = 0 #Last time it was recovered
         self.counter = 0 #N cycles being active
         self.sent = 0 #Messages sent
@@ -165,11 +169,33 @@ class Alarm(object):
         """ Gets and AlarmDS object related to this alarm """
         try: return self.api.devices[self.device]
         except: return AlarmDS(self.device,api=self.api)
+      
+    def set_active(self,value,count=1):
+        """
+        Will increment/decrement counter and set active if
+        the count value has been reached
+        """
+        self.updated = now()
+        #print('%s.set_active(%s,%s)'%(self.tag,value,self.counter))
+        if value:
+            if not self.active: 
+                self.counter+=1
+        elif self.counter>0:
+            self.counter-=1
+        
+        if value and self.counter>=count and not self.active:
+            self.last_sent = self.updated
+            self.active = value
+
+        if not value and not self.counter:
+            self.active = 0
+            if not self.recovered:
+                #print('%s => %s'%(self.tag,0))
+                self.recovered = self.updated      
 
     def get_active(self):
         """ This method connects to the Device to get the value and timestamp of the alarm attribute """
         try:
-            #self.active = int(self.get_ds().get().read_attribute(self.get_attribute()).value)
             self.active = self.get_time()
         except:
             self.active = None
@@ -181,7 +207,7 @@ class Alarm(object):
         It returns 0 if the alarm is not active.
         """
         if attr_value is None:
-            attr_value = self.get_ds().get_active_alarms()#get().read_attribute('ActiveAlarms').value
+            attr_value = self.get_ds().get_active_alarms()
         elif not isSequence(attr_value):
             attr_value = [attr_value]
         lines = [l for l in (attr_value or []) if l.startswith(self.tag+':')]
@@ -405,7 +431,7 @@ class AlarmDS(object):
     def get_active_alarms(self):
         """ Returns the list of currently active alarms """
         if self._actives is None:
-          self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',keeptime=1000.)
+          self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',keeptime=3000.)
         return self._actives.read().value
 
     def state(self):
@@ -1275,6 +1301,7 @@ try:
     from fandango.doc import get_fn_autodoc
     __doc__ = get_fn_autodoc(__name__,vars())
 except:
-    import traceback
-    traceback.print_exc()
+    #import traceback
+    #traceback.print_exc()
+    pass
   
