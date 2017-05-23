@@ -86,9 +86,28 @@ class FilterStack(SortedDict):
 class AlarmView(ThreadedObject,EventListener,Logger):
     #ThreadedObject,
     
-    sources = {} #Dictionary for Alarm sources    
+    sources = CaselessDict() #Dictionary for Alarm sources    
+    
+    ALARM_FORMATTERS = {
+        'tag' : lambda s,l=10: ('{:<%d}'%l).format(s),
+        #'time' : lambda s,l=25: ('{:^%d}'%l).format(s),
+        'device' : lambda s,l=25: ('{:^%d}'%l).format(s),
+
+        'description' : lambda s,l=50: ('{:<}').format(s),
+
+        'severity' : lambda s,l=10: ('{:^%d}'%l).format(s),
+
+        'active' : lambda s,l=30: (('{:^%d}'%l).format(
+          'FAILED!' if s is None else (
+            'Not Active' if not s else (
+              s if s in (1,True) else (
+                time2str(s)))))),
+              
+        'formula' : lambda s,l=100: ('{:^%d}'%l).format(s),
+        #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
+        }
   
-    def __init__(self,name='AlarmView',filters={},refresh=3.,verbose=False):
+    def __init__(self,name='AlarmView',filters={},domain='*',refresh=3.,verbose=False):
 
         self.lock = RLock()
         self.verbose = verbose
@@ -98,7 +117,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
                                 period=refresh,start=False)
         #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
         EventListener.__init__(self,name)
-
+        self.setLogLevel('INFO')
+        
         self.filters = FilterStack(filters)
         #if isString(filters):
             #if ',' in filters: filters = filters.split(',')
@@ -125,11 +145,11 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         self.timeSortingEnabled=None
         self.changed = True
         
-        self.api = panic.AlarmAPI()
+        self.api = panic.AlarmAPI(filters=domain)
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
             
-        self.apply_filters() #get_alarms()
+        self.apply_filters()
         
         #self.default_regEx=options.get('filter',None) or filters or None
         #self.regEx = self.default_regEx
@@ -177,8 +197,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         a = self.alarms.get(alarm,None)
         if not a:
             m = self.api.get(alarm.split('/')[-1])
-            assert len(m)<=1, 'MultipleAlarmMatches!'
-            assert m, 'AlarmNotFound!'
+            assert len(m)<=1, '%s_MultipleAlarmMatches!'%m
+            assert m, '%s_AlarmNotFound!'%m
             a = m[0]
         return a
         
@@ -237,8 +257,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
             if hasattr(alarm,p): result.append(getattr(alarm,p))
             if p=='active':
                 ## TODO!!! DISABLED SHOULD BE APPLIED HERE AS -2
-                #result[-1] = alarm.get_active()
-                pass
+                result[-1] = alarm.get_active()
+
             if p=='severity':
                 if result[-1]=='ERROR': result[-1] = 0
                 if result[-1]=='ALARM': result[-1] = 1
@@ -262,6 +282,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
             self.lock.acquire()
             if (now()-self.last_sort) < self.get_period():
                 #self.last_keys = keys or self.last_keys
+                [a.get_active() for a in self.alarms.values()
+                    if a.active in (1,True)]
                 sortkey = sortkey or self.sortkey
                 self.ordered = sorted(self.alarms.values(),key=sortkey)
                 
@@ -273,39 +295,95 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         finally:
             self.lock.release()
     
-    def export(self,
-            keys=('active','severity','device','tag','description','formula')):
+    def export(self,keys=('active','severity','device',
+                          'tag','description','formula'),to_type=list):
         objs = [self.alarms[a] for a in self.sort()]
-        return [[getattr(o,k) for k in keys] for o in objs]
+        if to_type is list:
+            return [[getattr(o,k) for k in keys] for o in objs]
+        if to_type is str or isString(to_type):
+            to_type = str
+            sep = to_type if isString(to_type) else '\t'
+            return ['\t'.join(to_type(getattr(o,k)) for k in keys)
+                    for o in objs]
+          
+    def get_alarm_as_text(self,alarm=None,cols=None,formatters=None,lengths=[],sep=' - '):
+        alarm = self.get_alarm(alarm)
+        cols = cols or ['tag','active','description']
+        formatters = formatters or self.ALARM_FORMATTERS
+        s = '  '
+        try:
+            for i,r in enumerate(cols):
+                if s.strip(): s+=sep
+                args = [getattr(alarm,r)]
+                if lengths: args.append(lengths[i])
+                s += formatters[r](*args)
+            return s
+        except:
+            print traceback.format_exc()
+            return s          
           
     def get_source(self,alarm):
-        for k,v in AlarmView.sources.items():
-            t = k if '/' in alarm else k.split('/')[-1]
-            if matchCl(alarm,t):
-                return v
-        return None
+        try:alarm = self.get_model(alarm)
+        except:pass
+        
+        if alarm not in AlarmView.sources:
+            alarm = alarm.replace('tango://','')
+            if '/' not in alarm: alarm = '/'+alarm
+            match = [s for s in AlarmView.sources if s.endswith(alarm)]
+            assert len(match)<2, '%s_MultipleAlarmMatches'%alarm
+            if not match:
+                #self.debug('No alarm ends with %s'%alarm)
+                return None
+            alarm = match[0]
+          
+        return AlarmView.sources[alarm]
+      
+    def get_value(self,alarm):
+        alarm = self.get_model(alarm)
+        value = self.values.get(alarm,None)
+        if value is None:
+            try:
+                alarm = self.get_source(alarm).full_name
+                value = self.values.get(alarm,None)
+            except Exception,e:
+                self.warning('get_model(%s): %s'%(alarm,e))
+        return value
       
     def get_model(self,alarm):
-        if '/' not in alarm:
-            alarm = self.get_alarm(alarm).get_model()
-        if ':' not in alarm:
-            alarm = ft.get_tango_host()+'/'+alarm
-        return alarm
+        alarm = getattr(alarm,'tag',str(alarm))
+        try:
+            if '/' not in alarm:
+                alarm = self.get_alarm(alarm).get_model()
+            if ':' not in alarm:
+                alarm = ft.get_tango_host()+'/'+alarm
+
+        except Exception,e:
+            self.warning('get_model(%s): %s'%(alarm,e))
+
+        return str(alarm).lower()
       
     def get_sources(self):
         return [s for s,v in AlarmView.sources.items()
-                if self in v.listeners]
+                if any(l() is self for l in v.listeners)]
       
     def set_sources(self):
         self.info('set_sources(%d)'%len(self.alarms))
         olds = self.get_sources()
         news = [self.get_model(s) for s in self.alarms]
+        devs = set(s.rsplit('/',1)[0] for s in news)
+        news.extend(d+'/activealarms' for d in devs)
+
         for o in olds:
             if o not in news:
                 self.remove_source(o)
+                
         for s in news:
             if s not in olds:
-                self.add_source(s)
+                ta = self.add_source(s)
+            if '/activealarms' in s:
+                d = ft.parse_tango_model(s)['device']
+                self.api.devices[d]._actives = self.get_source(s)
+        
         return news
       
     def add_source(self,alarm):
@@ -315,10 +393,12 @@ class AlarmView(ThreadedObject,EventListener,Logger):
             return None
         else:
             alarm = self.get_model(alarm)
-            self.info('add_source(%s)'%alarm)
+            self.debug('add_source(%s)'%alarm)
             ta = TangoAttribute(alarm)
+            ta.setLogLevel('WARNING')
             self.sources[ta.full_name] = ta
             self.sources[ta.full_name].addListener(self)
+            return ta
             
     def remove_source(self,alarm):
         s = self.get_source(alarm)
@@ -342,18 +422,22 @@ class AlarmView(ThreadedObject,EventListener,Logger):
           self.name,src,type_))
         
         if src.simple_name == 'activealarms':
-            pass
+            return
           
-        elif not getattr(value,'error',False):
-            rvalue = getAttrValue(value,None)
-            
-            if rvalue is not None:
-                try:
-                    self.lock.acquire()
-                    av = self.get_alarm(src.full_name)
-                    av.active = rvalue
+        av = self.get_alarm(src.full_name)
+        av.updated = now()
+        
+        try:
+            if not getattr(value,'err',False):
+                rvalue = getAttrValue(value,None)
+                
+                self.lock.acquire()
+                if rvalue is not None:
+                    av.set_active(rvalue)
+                
                     if src.full_name not in self.values:
                         pass
+                      
                     elif self.verbose:
                         prev = getAttrValue(self.values[src.full_name])
                         if isBool(prev): 
@@ -366,12 +450,12 @@ class AlarmView(ThreadedObject,EventListener,Logger):
                         if last != prev:
                             self.info('event_hook(%s): %s => %s'%(
                               src.simple_name,prev,last))
-                            
-                    self.values[src.full_name] = value
-                except:
-                    self.error(traceback.format_exc())
-                finally:
-                    self.lock.release()
+                        
+            self.values[src.full_name] = value
+        except:
+            self.error(traceback.format_exc())
+        finally:
+            self.lock.release()
       
     
     ###########################################################################
