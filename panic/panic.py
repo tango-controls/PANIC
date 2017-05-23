@@ -616,7 +616,11 @@ class AlarmAPI(fandango.SingletonMap):
           found = False
           
           for d,vals in all_alarms.items():
-            found = k in vals and d.lower() == v.device.lower()
+              if d.lower() == v.device.lower():
+                  if k in vals:
+                      found = True
+                  else:
+                      self.warning('%s not in %s: %s'%(k,d,vals))
             
           if not found:
             self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,v.device))
