@@ -31,13 +31,18 @@ import fandango.tango as ft
 import panic
 from panic import *
 from fandango.functional import *
-from fandango.threads import ThreadedObject,RLock
+from fandango.threads import ThreadedObject,Lock,RLock
 from fandango.callbacks import EventSource, EventListener, TangoAttribute
 from fandango.excepts import Catched
 from fandango.objects import Cached,Struct
 from fandango.log import Logger
 from fandango.dicts import SortedDict,CaselessDict, \
         CaselessSortedDict, CaselessDefaultDict
+
+
+import fandango.callbacks
+fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
+ft.check_device_cached.expire = 60.
 
 class FilterStack(SortedDict):
     """
@@ -83,38 +88,40 @@ class FilterStack(SortedDict):
         return filter(partial(self.match,strict=strict,trace=trace),sequence)
     
 
-class AlarmView(ThreadedObject,EventListener,Logger):
+class AlarmView(EventListener,Logger):
     #ThreadedObject,
     
     sources = CaselessDict() #Dictionary for Alarm sources    
     
     ALARM_FORMATTERS = {
-        'tag' : lambda s,l=10: ('{:<%d}'%l).format(s),
+        'tag' : lambda s,l=10: ('{0:<%d}'%(l or 4)).format(s),
         #'time' : lambda s,l=25: ('{:^%d}'%l).format(s),
-        'device' : lambda s,l=25: ('{:^%d}'%l).format(s),
+        'device' : lambda s,l=25: ('{0:^%d}'%(l or 4)).format(s),
 
-        'description' : lambda s,l=50: ('{:<}').format(s),
+        'description' : lambda s,l=50: ('{0:<}').format(s),
 
-        'severity' : lambda s,l=10: ('{:^%d}'%l).format(s),
+        'severity' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
 
-        'active' : lambda s,l=30: (('{:^%d}'%l).format(
+        'active' : lambda s,l=30: (('{0:^%d}'%(l or 4)).format(
           'FAILED!' if s is None else (
             'Not Active' if not s else (
               s if s in (1,True) else (
                 time2str(s)))))),
               
-        'formula' : lambda s,l=100: ('{:^%d}'%l).format(s),
+        'formula' : lambda s,l=100: ('{0:^%d}'%(l or 4)).format(s),
         #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
         }
   
     def __init__(self,name='AlarmView',filters={},domain='*',refresh=3.,verbose=False):
 
-        self.lock = RLock()
+        self.t_init = now()
+        self.lock = Lock()
         self.verbose = verbose
         Logger.__init__(self,name)
         self.setLogLevel('INFO')
-        ThreadedObject.__init__(self,target=self.sort,
-                                period=refresh,start=False)
+        self.get_period = lambda *s: refresh
+        #ThreadedObject.__init__(self,target=self.sort,
+                                #period=refresh,start=False)
         #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
         EventListener.__init__(self,name)
         self.setLogLevel('INFO')
@@ -144,12 +151,13 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         
         self.timeSortingEnabled=None
         self.changed = True
-        
+        self.info('parent init done, +%s'%(now()-self.t_init))
         self.api = panic.AlarmAPI(filters=domain)
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
-            
+        self.info('api init done, +%s'%(now()-self.t_init))
         self.apply_filters()
+        self.info('apply filter done, +%s'%(now()-self.t_init))
         
         #self.default_regEx=options.get('filter',None) or filters or None
         #self.regEx = self.default_regEx
@@ -185,7 +193,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         #self.refreshTimer.start(self.REFRESH_TIME)
         
 
-        self.start()
+        #self.start()
+        self.info('view init done, +%s'%(now()-self.t_init))
         
     def __del__(self):
         print('AlarmView(%s).__del__()'%self.name)
@@ -194,6 +203,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
     def get_alarm(self,alarm):
         #self.info('get_alarm(%s)'%alarm)
         alarm = alarm.split('tango://')[-1]
+        if alarm in self.api:
+            return self.api[alarm]
         a = self.alarms.get(alarm,None)
         if not a:
             m = self.api.get(alarm.split('/')[-1])
@@ -233,7 +244,7 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         * hierarchy bottom
         """
         try:
-            self.lock.acquire()
+            #self.lock.acquire()
             filters = FilterStack(filters) if filters else self.filters
             self.info('apply_filters(%s)'%filters)
             self.filtered = self.get_alarms(filters)
@@ -246,7 +257,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         except:
             self.error(traceback.format_exc())
         finally:
-            self.lock.release()
+            #self.lock.release()
+            pass
       
     @staticmethod
     def sortkey(alarm,priority=('Active','Severity')):
@@ -257,7 +269,7 @@ class AlarmView(ThreadedObject,EventListener,Logger):
             if hasattr(alarm,p): result.append(getattr(alarm,p))
             if p=='active':
                 ## TODO!!! DISABLED SHOULD BE APPLIED HERE AS -2
-                result[-1] = alarm.get_active()
+                result[-1] = alarm.active #get_active()
 
             if p=='severity':
                 if result[-1]=='ERROR': result[-1] = 0
@@ -279,11 +291,17 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         * failed
         """
         try:
-            self.lock.acquire()
+            updated = [a for a in self.alarms.values() if a.updated]
+            if len(updated) == len(self.alarms):
+                [a.get_active() for a in self.alarms.values() 
+                    if a.active in (1,True)]
+            else:
+                self.info('sort(): %d alarms not updated yet'%(
+                  len(self.alarms)-len(updated)))
+                
+            #self.lock.acquire()
             if (now()-self.last_sort) < self.get_period():
                 #self.last_keys = keys or self.last_keys
-                [a.get_active() for a in self.alarms.values()
-                    if a.active in (1,True)]
                 sortkey = sortkey or self.sortkey
                 self.ordered = sorted(self.alarms.values(),key=sortkey)
                 
@@ -293,7 +311,8 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         except:
             self.error(traceback.format_exc())
         finally:
-            self.lock.release()
+            #self.lock.release()
+            pass
     
     def export(self,keys=('active','severity','device',
                           'tag','description','formula'),to_type=list):
@@ -371,7 +390,7 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         olds = self.get_sources()
         news = [self.get_model(s) for s in self.alarms]
         devs = set(s.rsplit('/',1)[0] for s in news)
-        news.extend(d+'/activealarms' for d in devs)
+        news = [d+'/activealarms' for d in devs] #discard single attributes
 
         for o in olds:
             if o not in news:
@@ -394,10 +413,13 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         else:
             alarm = self.get_model(alarm)
             self.debug('add_source(%s)'%alarm)
-            ta = TangoAttribute(alarm)
+            ta = TangoAttribute(alarm,tango_asynch=True)
             ta.setLogLevel('WARNING')
             self.sources[ta.full_name] = ta
-            self.sources[ta.full_name].addListener(self)
+            self.sources[ta.full_name].addListener(self,
+                  use_events=['CHANGE_EVENT'],
+                  use_polling=10., #<<< asynchronous attr reading is faster than event subscribing
+                  )
             return ta
             
     def remove_source(self,alarm):
@@ -418,389 +440,398 @@ class AlarmView(ThreadedObject,EventListener,Logger):
         Method to implement the event notification
         Source will be an object, type a PyTango EventType, evt_value an AttrValue
         """
-        self.debug('AlarmView(%s).event_hook(%s,%s,...)'%(
-          self.name,src,type_))
-        
-        if src.simple_name == 'activealarms':
-            return
-          
-        av = self.get_alarm(src.full_name)
-        av.updated = now()
-        
-        try:
-            if not getattr(value,'err',False):
-                rvalue = getAttrValue(value,None)
-                
-                self.lock.acquire()
-                if rvalue is not None:
-                    av.set_active(rvalue)
-                
-                    if src.full_name not in self.values:
-                        pass
-                      
-                    elif self.verbose:
-                        prev = getAttrValue(self.values[src.full_name])
-                        if isBool(prev): 
-                          last = rvalue
-                          
-                        else: 
-                            last = value.quality
-                            prev = self.values[src.full_name].quality
 
-                        if last != prev:
-                            self.info('event_hook(%s): %s => %s'%(
-                              src.simple_name,prev,last))
-                        
-            self.values[src.full_name] = value
+        self.info('AlarmView(%s).event_hook(%s,%s,...)'%(
+          self.name,src,type_))        
+        try:
+            #self.lock.acquire()
+            if src.simple_name != 'activealarms':
+                av = self.get_alarm(src.full_name)
+                alarms = [av.tag]
+            else:
+                dev = self.api.devices.get(src.device,None)
+                if dev is None: 
+                    dev = self.api.devices.get(src.device.split('/',1)[1],None)
+                alarms = dev.alarms.keys()
+                
+            for a in alarms:
+                av = self.get_alarm(a)
+                av.updated = now()
+
+                if not getattr(value,'err',False):
+                    rvalue = getAttrValue(value,None)
+                    
+                    if rvalue is not None:
+                        #av.set_active(rvalue)) 
+                        rvalue = av.get_active()
+                    
+                        if av.get_model() not in self.values:
+                            pass
+                          
+                        elif self.verbose:
+                            prev = getAttrValue(self.values[av.get_model()])
+                            if isBool(prev): 
+                              last = rvalue
+                              
+                            else: 
+                                last = value.quality
+                                prev = self.values[av.get_model()].quality
+
+                            if last != prev:
+                                self.info('event_hook(%s): %s => %s'%(
+                                  av.tag,prev,last))
+                            
+                self.values[av.get_model()] = value
         except:
             self.error(traceback.format_exc())
         finally:
-            self.lock.release()
+            #self.lock.release()
+            pass
       
     
     ###########################################################################
     
     
-class QAlarmView(AlarmView):
+#class QAlarmView(AlarmView):
             
 
-    def getCurrents(self):
-        return self._ordered
+    #def getCurrents(self):
+        #return self._ordered
         
-    def saveToFile(self):
-        filename = str(QtGui.QFileDialog.getSaveFileName(self.mainwindow,'File to save','.','*.csv'))
-        self.api.export_to_csv(filename,alarms=self.getCurrents())
-        return filename
+    #def saveToFile(self):
+        #filename = str(QtGui.QFileDialog.getSaveFileName(self.mainwindow,'File to save','.','*.csv'))
+        #self.api.export_to_csv(filename,alarms=self.getCurrents())
+        #return filename
       
-    def setModel(self,model):
-        # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
-        try:
-            if model!= self.regEx:
-                print('AlarmGUI.setModel(%s)'%model)
-                self._ui.regExLine.setText(model or self.default_regEx)
-                self.onRegExUpdate()
-        except:
-            print traceback.format_exc()
+    #def setModel(self,model):
+        ## THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
+        #try:
+            #if model!= self.regEx:
+                #print('AlarmGUI.setModel(%s)'%model)
+                #self._ui.regExLine.setText(model or self.default_regEx)
+                #self.onRegExUpdate()
+        #except:
+            #print traceback.format_exc()
 
-    def setAlarmRowModel(self,nr,obj,alarm,use_list):
-        #print '%d/%d rows, %d models' % (nr,len(self.AlarmRows),len(taurus.Factory().tango_attrs.keys()))
-        obj.setAlarmModel(alarm,use_list)
-        self.updateStatusLabel()
+    #def setAlarmRowModel(self,nr,obj,alarm,use_list):
+        ##print '%d/%d rows, %d models' % (nr,len(self.AlarmRows),len(taurus.Factory().tango_attrs.keys()))
+        #obj.setAlarmModel(alarm,use_list)
+        #self.updateStatusLabel()
         
-    def connectAll(self):
-        trace('connecting')
-        #QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
-        if self.USE_EVENT_REFRESH: QtCore.QObject.connect(self,QtCore.SIGNAL("valueChanged"),self.hurry)
-        #Qt.QObject.connect(self._ui.actionExpert,Qt.SIGNAL("changed()"),self.setExpertView)
+    #def connectAll(self):
+        #trace('connecting')
+        ##QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
+        #if self.USE_EVENT_REFRESH: QtCore.QObject.connect(self,QtCore.SIGNAL("valueChanged"),self.hurry)
+        ##Qt.QObject.connect(self._ui.actionExpert,Qt.SIGNAL("changed()"),self.setExpertView)
         
-    def printRows(self):
-        for row in self._ui.listWidget.selectedItems():
-          print row.__repr__()
+    #def printRows(self):
+        #for row in self._ui.listWidget.selectedItems():
+          #print row.__repr__()
         
-    def removeAlarmRow(self,alarm_tag):
-        #Removing listeners to this alarm attribute
-        trace('In removeAlarmRow(%s)'%alarm_tag)
-        try:
-            row = self.AlarmRows.pop(alarm_tag)
-            ta = taurus.Attribute(row.getModel())
-            ta.removeListener(row)
-            row.setModel(None)
-        except:
-            trace('Unable to %s.removeListener():\n\t%s'%(alarm_tag,traceback.format_exc()))
+    #def removeAlarmRow(self,alarm_tag):
+        ##Removing listeners to this alarm attribute
+        #trace('In removeAlarmRow(%s)'%alarm_tag)
+        #try:
+            #row = self.AlarmRows.pop(alarm_tag)
+            #ta = taurus.Attribute(row.getModel())
+            #ta.removeListener(row)
+            #row.setModel(None)
+        #except:
+            #trace('Unable to %s.removeListener():\n\t%s'%(alarm_tag,traceback.format_exc()))
     
-    def hurry(self):
-        """
-        on ValueChanged event a refresh will be scheduled in 1 second time
-        (so all events received in a single second will be summarized)
-        """
-        if not self.changed: 
-            trace('hurry(), changed = True')
-            self.changed = True
-            self.reloadTimer.setInterval(self.MAX_REFRESH*1000.)
+    #def hurry(self):
+        #"""
+        #on ValueChanged event a refresh will be scheduled in 1 second time
+        #(so all events received in a single second will be summarized)
+        #"""
+        #if not self.changed: 
+            #trace('hurry(), changed = True')
+            #self.changed = True
+            #self.reloadTimer.setInterval(self.MAX_REFRESH*1000.)
 
-    @Catched
-    def onReload(self):
-        # THIS METHOD WILL NOT MODIFY THE LIST IF JUST FILTERS HAS CHANGED; TO UPDATE FILTERS USE onRefresh INSTEAD
-        try:
-            trace('onReload(%s)'%self.RELOAD_TIME)
-            print '+'*80
-            now = time.time()
-            trace('%s -> AlarmGUI.onReload() after %f seconds'%(now,now-self.last_reload))
-            self.last_reload=now
-            self.api.load()
+    #@Catched
+    #def onReload(self):
+        ## THIS METHOD WILL NOT MODIFY THE LIST IF JUST FILTERS HAS CHANGED; TO UPDATE FILTERS USE onRefresh INSTEAD
+        #try:
+            #trace('onReload(%s)'%self.RELOAD_TIME)
+            #print '+'*80
+            #now = time.time()
+            #trace('%s -> AlarmGUI.onReload() after %f seconds'%(now,now-self.last_reload))
+            #self.last_reload=now
+            #self.api.load()
             
-            if self.api.keys():
-                AlarmRow.TAG_SIZE = 1+max(len(k) for k in self.api.keys())
+            #if self.api.keys():
+                #AlarmRow.TAG_SIZE = 1+max(len(k) for k in self.api.keys())
                 
-            #Removing deleted/renamed alarms
-            for tag in self.AlarmRows.keys():
-                if tag not in self.api:
-                    self.removeAlarmRow(tag)
+            ##Removing deleted/renamed alarms
+            #for tag in self.AlarmRows.keys():
+                #if tag not in self.api:
+                    #self.removeAlarmRow(tag)
                     
-            #Updating the alarm list
-            self.buildList(changed=False)
-            if self.changed: self.showList()
+            ##Updating the alarm list
+            #self.buildList(changed=False)
+            #if self.changed: self.showList()
             
-            #Triggering refresh timers
-            self.reloadTimer.setInterval(self.RELOAD_TIME)
-            self.refreshTimer.setInterval(self.REFRESH_TIME)
+            ##Triggering refresh timers
+            #self.reloadTimer.setInterval(self.RELOAD_TIME)
+            #self.refreshTimer.setInterval(self.REFRESH_TIME)
 
-            if not self._connected:
-                self._connected = True
-                self.connectAll()
-        except:
-            trace(traceback.format_exc())
+            #if not self._connected:
+                #self._connected = True
+                #self.connectAll()
+        #except:
+            #trace(traceback.format_exc())
     
-    @Catched
-    def onRefresh(self):
-        """Just checks order, no reload, no filters"""
-        trace('onRefresh(%s)'%self.REFRESH_TIME)
-        self.buildList(changed=False)
-        if self.changed: self.showList()
-        self.refreshTimer.setInterval(self.REFRESH_TIME)
+    #@Catched
+    #def onRefresh(self):
+        #"""Just checks order, no reload, no filters"""
+        #trace('onRefresh(%s)'%self.REFRESH_TIME)
+        #self.buildList(changed=False)
+        #if self.changed: self.showList()
+        #self.refreshTimer.setInterval(self.REFRESH_TIME)
     
-    @Catched
-    def onFilter(self,*args):
-        """Forces an update of alarm list order and applies filters (do not reload database)."""
-        trace('onFilter()')
-        self.buildList(changed=True)
-        self.showList()
-        self.refreshTimer.setInterval(self.REFRESH_TIME)
+    #@Catched
+    #def onFilter(self,*args):
+        #"""Forces an update of alarm list order and applies filters (do not reload database)."""
+        #trace('onFilter()')
+        #self.buildList(changed=True)
+        #self.showList()
+        #self.refreshTimer.setInterval(self.REFRESH_TIME)
 
-    def onSevFilter(self):
-        # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
-        self.getSeverities()
-        self.onFilter()
+    #def onSevFilter(self):
+        ## THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
+        #self.getSeverities()
+        #self.onFilter()
 
-    def onRegExUpdate(self):
-        # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
-        self.regEx = str(self._ui.regExLine.text()).strip() or self.default_regEx
-        self._ui.activeCheckBox.setChecked(False)
-        self.onFilter()
+    #def onRegExUpdate(self):
+        ## THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
+        #self.regEx = str(self._ui.regExLine.text()).strip() or self.default_regEx
+        #self._ui.activeCheckBox.setChecked(False)
+        #self.onFilter()
 
-    @Catched
-    def regExFiltering(self, source):
-        alarms,regexp=[],str(self.regEx).lower().strip()
-        exclude = regexp.startswith('!')
-        if exclude: regexp = regexp.replace('!','').strip()
-        for a in source:
-            match = fandango.searchCl(regexp, a.receivers.lower()+' '+a.severity.lower()+' '+a.description.lower()+' '+a.tag.lower()+' '+a.formula.lower()+' '+a.device.lower())
-            if (exclude and not match) or (not exclude and match): alarms.append(a)
-        trace('\tregExFiltering(%d): %d alarms returned'%(len(source),len(alarms)))
-        return alarms
+    #@Catched
+    #def regExFiltering(self, source):
+        #alarms,regexp=[],str(self.regEx).lower().strip()
+        #exclude = regexp.startswith('!')
+        #if exclude: regexp = regexp.replace('!','').strip()
+        #for a in source:
+            #match = fandango.searchCl(regexp, a.receivers.lower()+' '+a.severity.lower()+' '+a.description.lower()+' '+a.tag.lower()+' '+a.formula.lower()+' '+a.device.lower())
+            #if (exclude and not match) or (not exclude and match): alarms.append(a)
+        #trace('\tregExFiltering(%d): %d alarms returned'%(len(source),len(alarms)))
+        #return alarms
       
-    def setRowModels(self):
-        trace('AlarmGUI.setRowModels()')
-        for alarm in self.getAlarms():
-            self.AlarmRows[alarm.tag].setAlarmModel(alarm)
+    #def setRowModels(self):
+        #trace('AlarmGUI.setRowModels()')
+        #for alarm in self.getAlarms():
+            #self.AlarmRows[alarm.tag].setAlarmModel(alarm)
             
-    def setFirstCombo(self):
-        self.setComboBox(self._ui.contextComboBox,['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],sort=False)
+    #def setFirstCombo(self):
+        #self.setComboBox(self._ui.contextComboBox,['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],sort=False)
 
-    def setSecondCombo(self):
-        source = str(self._ui.contextComboBox.currentText())
-        trace("AlarmGUI.setSecondCombo(%s)"%source)
-        if source == self.source: return
-        else: self.source = source
-        self._ui.comboBoxx.clear()
-        self._ui.comboBoxx.show()
-        self._ui.infoLabel0_1.show()
-        self._ui.comboBoxx.setEnabled(True)
-        if source =='Devices':
-            r,sort,values = 1,True,sorted(set(a.device for a in self.getAlarms()))
-        elif source =='Receiver':
-            #r,sort,values = 2,True,list(set(a for a in self.api.phonebook.keys() for l in self.api.values() if a in l.receivers))
-            r,sort,values = 2,True,list(set(s for a in self.getAlarms() for s in ['SNAP','SMS']+[r.strip() for r in a.receivers.split(',')]))
-        elif source =='Severity':
-            r,sort,values = 3,False,['DEBUG', 'WARNING', 'ALARM', 'ERROR']
-        elif source =='Hierarchy':
-            r,sort,values = 4,False,['ALL', 'TOP', 'BOTTOM']
-        elif source =='Time':
-            r,sort,values = 5,False,['DESC', 'ASC']
-        else: #"Alarm Status"
-            r,sort,values = 0,False,['ALL', 'AVAILABLE', 'FAILED','HISTORY']
-        self.setComboBox(self._ui.comboBoxx,values=values,sort=sort)
-        return r      
+    #def setSecondCombo(self):
+        #source = str(self._ui.contextComboBox.currentText())
+        #trace("AlarmGUI.setSecondCombo(%s)"%source)
+        #if source == self.source: return
+        #else: self.source = source
+        #self._ui.comboBoxx.clear()
+        #self._ui.comboBoxx.show()
+        #self._ui.infoLabel0_1.show()
+        #self._ui.comboBoxx.setEnabled(True)
+        #if source =='Devices':
+            #r,sort,values = 1,True,sorted(set(a.device for a in self.getAlarms()))
+        #elif source =='Receiver':
+            ##r,sort,values = 2,True,list(set(a for a in self.api.phonebook.keys() for l in self.api.values() if a in l.receivers))
+            #r,sort,values = 2,True,list(set(s for a in self.getAlarms() for s in ['SNAP','SMS']+[r.strip() for r in a.receivers.split(',')]))
+        #elif source =='Severity':
+            #r,sort,values = 3,False,['DEBUG', 'WARNING', 'ALARM', 'ERROR']
+        #elif source =='Hierarchy':
+            #r,sort,values = 4,False,['ALL', 'TOP', 'BOTTOM']
+        #elif source =='Time':
+            #r,sort,values = 5,False,['DESC', 'ASC']
+        #else: #"Alarm Status"
+            #r,sort,values = 0,False,['ALL', 'AVAILABLE', 'FAILED','HISTORY']
+        #self.setComboBox(self._ui.comboBoxx,values=values,sort=sort)
+        #return r      
       
-    def findListSource(self, dev=None):
-        combo1, combo2 = str(self._ui.contextComboBox.currentText()), str(self._ui.comboBoxx.currentText())
-        #print "findListSource(%s,%s), filtering ..."%(combo1,combo2)
-        self.timeSortingEnabled=None
-        self.source = combo1
-        alarms = self.getAlarms()
-        if self.source == "Devices":
-            self._alarmsList = self.api.get(device=combo2,alarms=alarms) if combo2 else []
-        elif self.source == 'Receiver':
-            self._alarmsList = self.api.get(receiver=combo2,alarms=alarms) if combo2 else []
-        elif self.source == 'Severity':
-            self._alarmsList = self.api.filter_severity(combo2,alarms=alarms)
-        elif self.source == 'Hierarchy':
-            self._alarmsList = self.api.filter_hierarchy(combo2,alarms=alarms)
-        elif self.source == 'Time':
-            self.timeSortingEnabled=combo2
-        else:
-            self._alarmsList = alarms
+    #def findListSource(self, dev=None):
+        #combo1, combo2 = str(self._ui.contextComboBox.currentText()), str(self._ui.comboBoxx.currentText())
+        ##print "findListSource(%s,%s), filtering ..."%(combo1,combo2)
+        #self.timeSortingEnabled=None
+        #self.source = combo1
+        #alarms = self.getAlarms()
+        #if self.source == "Devices":
+            #self._alarmsList = self.api.get(device=combo2,alarms=alarms) if combo2 else []
+        #elif self.source == 'Receiver':
+            #self._alarmsList = self.api.get(receiver=combo2,alarms=alarms) if combo2 else []
+        #elif self.source == 'Severity':
+            #self._alarmsList = self.api.filter_severity(combo2,alarms=alarms)
+        #elif self.source == 'Hierarchy':
+            #self._alarmsList = self.api.filter_hierarchy(combo2,alarms=alarms)
+        #elif self.source == 'Time':
+            #self.timeSortingEnabled=combo2
+        #else:
+            #self._alarmsList = alarms
 
-        self.api.servers.states()
-        failed = [s.lower() for s in self.api.servers if self.api.servers[s].state is None]
-        if failed:
-            pass #trace('findListSource(%s,%s): %d servers are not running: %s'%(combo1, combo2,len(failed),failed))
+        #self.api.servers.states()
+        #failed = [s.lower() for s in self.api.servers if self.api.servers[s].state is None]
+        #if failed:
+            #pass #trace('findListSource(%s,%s): %d servers are not running: %s'%(combo1, combo2,len(failed),failed))
         
-        #timeSorting Filter moved to showList() method
-        #self._alarmsList = [a for a in self._alarmsList if not self.timeSortingEnabled or self.api.servers.get_device_server(a.device).lower() not in failed]
-        #print '\tfiltering done, returning %d/%d alarms'%(len(self._alarmsList),len(self.api.alarms.keys()))
-        return self._alarmsList
+        ##timeSorting Filter moved to showList() method
+        ##self._alarmsList = [a for a in self._alarmsList if not self.timeSortingEnabled or self.api.servers.get_device_server(a.device).lower() not in failed]
+        ##print '\tfiltering done, returning %d/%d alarms'%(len(self._alarmsList),len(self.api.alarms.keys()))
+        #return self._alarmsList
 
-    def filterByState(self, source):
-        result=[]
-        stateFilter=self._ui.comboBoxx.currentText()
-        for a in source:
-            if stateFilter=='AVAILABLE':
-                if a.tag in self.AlarmRows and (str(self.AlarmRows[a.tag].quality) in ['ATTR_VALID', 'ATTR_ALARM', 'ATTR_CHANGING', 'ATTR_WARNING']): result.append(a)
-            elif stateFilter=='FAILED':
-                if a.tag not in self.AlarmRows or (str(self.AlarmRows[a.tag].quality) == 'ATTR_INVALID'): result.append(a)
-            elif stateFilter=='HISTORY':
-                if not self.snapi: 
-                  self.snapi = get_snap_api()
-                if self.snapi:
-                  self.ctx_names = [c.name for c in self.snapi.get_contexts().values()]
-                  if SNAP_ALLOWED and a.tag in self.ctx_names: result.append(a)
-            else:
-                result.append(a)
-        trace('filterByState(%d): %d alarms returned'%(len(source),len(result)))
-        return result
+    #def filterByState(self, source):
+        #result=[]
+        #stateFilter=self._ui.comboBoxx.currentText()
+        #for a in source:
+            #if stateFilter=='AVAILABLE':
+                #if a.tag in self.AlarmRows and (str(self.AlarmRows[a.tag].quality) in ['ATTR_VALID', 'ATTR_ALARM', 'ATTR_CHANGING', 'ATTR_WARNING']): result.append(a)
+            #elif stateFilter=='FAILED':
+                #if a.tag not in self.AlarmRows or (str(self.AlarmRows[a.tag].quality) == 'ATTR_INVALID'): result.append(a)
+            #elif stateFilter=='HISTORY':
+                #if not self.snapi: 
+                  #self.snapi = get_snap_api()
+                #if self.snapi:
+                  #self.ctx_names = [c.name for c in self.snapi.get_contexts().values()]
+                  #if SNAP_ALLOWED and a.tag in self.ctx_names: result.append(a)
+            #else:
+                #result.append(a)
+        #trace('filterByState(%d): %d alarms returned'%(len(source),len(result)))
+        #return result
 
-    def alarmSorter(self,obj):
-        """obj is a panic.Alarm object """
-        #Quality/Value should be managed by EventReceived, not read here!
-        quality = obj.get_quality()
-        if obj.tag in self.AlarmRows and self.AlarmRows[obj.tag].alarm is not None:
-            row =  self.AlarmRows[obj.tag]
-            if row.alarm.active!=obj.active:
-                print '>'*80
-                trace('ALARM API NOT UPDATED? : %s vs %s ' %(obj,row.alarm))
-                print '>'*80
-            acknowledged,disabled,active = row.alarmAcknowledged,row.alarmDisabled,row.alarm.active
-            if self.AlarmRows[obj.tag].quality == PyTango.AttrQuality.ATTR_INVALID: #It will update only INVALID ones, the rest will keep DB severity
-                quality = PyTango.AttrQuality.ATTR_INVALID
-        else: acknowledged,disabled,active,quality = False,False,False,PyTango.AttrQuality.ATTR_INVALID #Not updated will be invalid
+    #def alarmSorter(self,obj):
+        #"""obj is a panic.Alarm object """
+        ##Quality/Value should be managed by EventReceived, not read here!
+        #quality = obj.get_quality()
+        #if obj.tag in self.AlarmRows and self.AlarmRows[obj.tag].alarm is not None:
+            #row =  self.AlarmRows[obj.tag]
+            #if row.alarm.active!=obj.active:
+                #print '>'*80
+                #trace('ALARM API NOT UPDATED? : %s vs %s ' %(obj,row.alarm))
+                #print '>'*80
+            #acknowledged,disabled,active = row.alarmAcknowledged,row.alarmDisabled,row.alarm.active
+            #if self.AlarmRows[obj.tag].quality == PyTango.AttrQuality.ATTR_INVALID: #It will update only INVALID ones, the rest will keep DB severity
+                #quality = PyTango.AttrQuality.ATTR_INVALID
+        #else: acknowledged,disabled,active,quality = False,False,False,PyTango.AttrQuality.ATTR_INVALID #Not updated will be invalid
 
-        ACT = 0 if disabled else (-2 if (acknowledged and active) else (-1 if obj.active else 1))
+        #ACT = 0 if disabled else (-2 if (acknowledged and active) else (-1 if obj.active else 1))
 
-        if self.timeSortingEnabled:
-            #Ordered by active first, then time ASC, then name
-            sorting = self._ui.comboBoxx.currentText()
-            date = self.AlarmRows[obj.tag].get_alarm_time()
-            return (-1*date if sorting=='DESC' else date, obj.tag)
-        else:
-            #Ordered by active first, then severity, then active time, then name
-            if quality==PyTango.AttrQuality.ATTR_ALARM:
-                return (ACT, 0, obj.active, obj.tag)
-            elif quality==PyTango.AttrQuality.ATTR_WARNING:
-                return (ACT, 1, obj.active, obj.tag)
-            elif quality==PyTango.AttrQuality.ATTR_VALID:
-                return (ACT, 2, obj.active, obj.tag)
-            elif quality==PyTango.AttrQuality.ATTR_INVALID:
-                return (ACT, 3, obj.active, obj.tag)
+        #if self.timeSortingEnabled:
+            ##Ordered by active first, then time ASC, then name
+            #sorting = self._ui.comboBoxx.currentText()
+            #date = self.AlarmRows[obj.tag].get_alarm_time()
+            #return (-1*date if sorting=='DESC' else date, obj.tag)
+        #else:
+            ##Ordered by active first, then severity, then active time, then name
+            #if quality==PyTango.AttrQuality.ATTR_ALARM:
+                #return (ACT, 0, obj.active, obj.tag)
+            #elif quality==PyTango.AttrQuality.ATTR_WARNING:
+                #return (ACT, 1, obj.active, obj.tag)
+            #elif quality==PyTango.AttrQuality.ATTR_VALID:
+                #return (ACT, 2, obj.active, obj.tag)
+            #elif quality==PyTango.AttrQuality.ATTR_INVALID:
+                #return (ACT, 3, obj.active, obj.tag)
 
-    @Catched
-    def buildList(self,changed=False):
-        self._ui.listWidget.blockSignals(True)
-        self.changed = changed or self.changed
-        trace('buildList(%s)'%self.changed)
-        #print "%s -> AlarmGUI.buildList(%s)"%(time.ctime(), ['%s=%s'%(s,getattr(self,s,None)) for s in ('regEx','severities','timeSortingEnabled','changed',)])
-        try:
-            l = [a for a in self.findListSource() if a.severity.lower() in self.severities]
-            l = [getattr(self.AlarmRows.get(a.tag,None),'alarm',None) or a for a in l]
-            if (self.regEx!=None): 
-                trace('\tFiltering by regEx: %s'%self.regEx)
-                l=self.regExFiltering(l)
-            if str(self._ui.comboBoxx.currentText()) != 'ALL': 
-                l=self.filterByState(l)
-            
-            #print '\tSorting %d alarms ...'%len(l)
-            qualities = dict((x,self.alarmSorter(x)) for x in l)
-            ordered = filter(bool,sorted(l,key=(lambda x: qualities[x])))
-            if len(ordered)!=len(self._ordered): 
-                print('Length of alarm list changed; changed = True')
-                self.changed = True
-            #print '\tAlarms in list are:\n'+'\n'.join(('\t\t%s;%s'%(x,qualities[x])) for x in ordered)
-            
-            #Updating alarms from api
-            for nr, alarm in list(enumerate(ordered)):
-                if not self.changed and self._ordered[nr]!=alarm: 
-                    trace('\tRow %s moved; changed = True'%alarm.tag)
-                    self.changed = True
-                if alarm is None:
-                    trace('\tEmpty alarm found at %d'%nr)
-                    continue
-                if alarm.tag not in self.AlarmRows:
-                    #print '\t%s,%s,%s: Creating AlarmRow ...'%(alarm.tag,bool(alarm.active),alarm.get_quality())
-                    row = self.AlarmRows[alarm.tag] = AlarmRow(api=self.api,qtparent=self)
-                    trace('\tNew alarm: %s; changed = True'%alarm.tag)
-                    try: 
-                        self.modelsQueue.put((nr,row,alarm,(len(ordered)>self.MAX_ALARMS)))
-                        #self.AlarmRows[alarm.tag].setAlarmModel(alarm,use_list=(len(self.ordered)>MAX_ALARMS))
-                        self.changed = True
-                    except Exception,e: trace('===> AlarmRow.setModel(%s) FAILED!: %s' %(alarm.tag,e))
-                else:
-                    row = self.AlarmRows[alarm.tag]
-                    try:
-                        model = AttributeNameValidator().getUriGroups(row.getModel())
-                        olddev = model['devname'] if model else None
-                    except:
-                        #Taurus 3
-                        #traceback.print_exc()
-                        model = AttributeNameValidator().getParams(row.getModel())
-                        olddev = model['devicename'] if model else None
-                    if alarm.device != olddev:
-                        trace('\t%s device changed: %s => %s; changed = True'%(alarm.tag,alarm.device,olddev))
-                        self.modelsQueue.put((nr,row,alarm,(len(ordered)>self.MAX_ALARMS)))
-                        self.changed = True
-            if self.changed: self._ordered = ordered
-            if self.modelsQueue.qsize(): 
-                self.modelsThread.next()
-        except:
-            trace('AlarmGUI.buildList(): Failed!\n%s'%traceback.format_exc())
-        #if not self.changed: print '\tAlarm list not changed'
-        self._ui.listWidget.blockSignals(False)
-        #print '*'*80
-
-    @Catched
-    def showList(self):
-        """
-        This method just redraws the list keeping the currently selected items
-        """
-        trace('%s -> AlarmGUI.showList()'%time.ctime())
+    #@Catched
+    #def buildList(self,changed=False):
         #self._ui.listWidget.blockSignals(True)
-        currents = self._ui.listWidget.selectedItems()
-        trace('\t\t%d items selected'%len(currents))
-        trace('\t\tremoving objects from the list ...')
-        while self._ui.listWidget.count():
-            delItem = self._ui.listWidget.takeItem(0)
-            #del delItem
-        trace('\t\tdisplaying the list ...')
-        ActiveCheck = self._ui.activeCheckBox.isChecked() or self.timeSortingEnabled
-        for alarm in self._ordered:
-            obj = self.AlarmRows[alarm.tag]
-            if not ActiveCheck or (obj.alarm and not obj.alarmAcknowledged and (obj.alarm.active or (not self.timeSortingEnabled and str(obj.quality) == 'ATTR_INVALID'))):
-                self._ui.listWidget.addItem(obj)
-            obj.updateIfChanged()
-        try:
-            #THIS SHOULD BE DONE EMITTING A SIGNAL!
-            if currents is not None and len(currents):
-                self._ui.listWidget.setCurrentItem(currents[0])
-                for current in currents:
-                    trace('\t\tselecting %s item'%current.tag)
-                    #self._ui.listWidget.setCurrentItem(current)
-                    current.setSelected(True)
-                #if self.expert: self.setAlarmData(current) #Not necessary
-        except:
-            print traceback.format_exc()
-        self.changed = False
-        trace('\t\tshowList(): %d alarms added to listWidget.'%self._ui.listWidget.count())
-        self.updateStatusLabel()
-        #self._ui.listWidget.blockSignals(False)      
+        #self.changed = changed or self.changed
+        #trace('buildList(%s)'%self.changed)
+        ##print "%s -> AlarmGUI.buildList(%s)"%(time.ctime(), ['%s=%s'%(s,getattr(self,s,None)) for s in ('regEx','severities','timeSortingEnabled','changed',)])
+        #try:
+            #l = [a for a in self.findListSource() if a.severity.lower() in self.severities]
+            #l = [getattr(self.AlarmRows.get(a.tag,None),'alarm',None) or a for a in l]
+            #if (self.regEx!=None): 
+                #trace('\tFiltering by regEx: %s'%self.regEx)
+                #l=self.regExFiltering(l)
+            #if str(self._ui.comboBoxx.currentText()) != 'ALL': 
+                #l=self.filterByState(l)
+            
+            ##print '\tSorting %d alarms ...'%len(l)
+            #qualities = dict((x,self.alarmSorter(x)) for x in l)
+            #ordered = filter(bool,sorted(l,key=(lambda x: qualities[x])))
+            #if len(ordered)!=len(self._ordered): 
+                #print('Length of alarm list changed; changed = True')
+                #self.changed = True
+            ##print '\tAlarms in list are:\n'+'\n'.join(('\t\t%s;%s'%(x,qualities[x])) for x in ordered)
+            
+            ##Updating alarms from api
+            #for nr, alarm in list(enumerate(ordered)):
+                #if not self.changed and self._ordered[nr]!=alarm: 
+                    #trace('\tRow %s moved; changed = True'%alarm.tag)
+                    #self.changed = True
+                #if alarm is None:
+                    #trace('\tEmpty alarm found at %d'%nr)
+                    #continue
+                #if alarm.tag not in self.AlarmRows:
+                    ##print '\t%s,%s,%s: Creating AlarmRow ...'%(alarm.tag,bool(alarm.active),alarm.get_quality())
+                    #row = self.AlarmRows[alarm.tag] = AlarmRow(api=self.api,qtparent=self)
+                    #trace('\tNew alarm: %s; changed = True'%alarm.tag)
+                    #try: 
+                        #self.modelsQueue.put((nr,row,alarm,(len(ordered)>self.MAX_ALARMS)))
+                        ##self.AlarmRows[alarm.tag].setAlarmModel(alarm,use_list=(len(self.ordered)>MAX_ALARMS))
+                        #self.changed = True
+                    #except Exception,e: trace('===> AlarmRow.setModel(%s) FAILED!: %s' %(alarm.tag,e))
+                #else:
+                    #row = self.AlarmRows[alarm.tag]
+                    #try:
+                        #model = AttributeNameValidator().getUriGroups(row.getModel())
+                        #olddev = model['devname'] if model else None
+                    #except:
+                        ##Taurus 3
+                        ##traceback.print_exc()
+                        #model = AttributeNameValidator().getParams(row.getModel())
+                        #olddev = model['devicename'] if model else None
+                    #if alarm.device != olddev:
+                        #trace('\t%s device changed: %s => %s; changed = True'%(alarm.tag,alarm.device,olddev))
+                        #self.modelsQueue.put((nr,row,alarm,(len(ordered)>self.MAX_ALARMS)))
+                        #self.changed = True
+            #if self.changed: self._ordered = ordered
+            #if self.modelsQueue.qsize(): 
+                #self.modelsThread.next()
+        #except:
+            #trace('AlarmGUI.buildList(): Failed!\n%s'%traceback.format_exc())
+        ##if not self.changed: print '\tAlarm list not changed'
+        #self._ui.listWidget.blockSignals(False)
+        ##print '*'*80
+
+    #@Catched
+    #def showList(self):
+        #"""
+        #This method just redraws the list keeping the currently selected items
+        #"""
+        #trace('%s -> AlarmGUI.showList()'%time.ctime())
+        ##self._ui.listWidget.blockSignals(True)
+        #currents = self._ui.listWidget.selectedItems()
+        #trace('\t\t%d items selected'%len(currents))
+        #trace('\t\tremoving objects from the list ...')
+        #while self._ui.listWidget.count():
+            #delItem = self._ui.listWidget.takeItem(0)
+            ##del delItem
+        #trace('\t\tdisplaying the list ...')
+        #ActiveCheck = self._ui.activeCheckBox.isChecked() or self.timeSortingEnabled
+        #for alarm in self._ordered:
+            #obj = self.AlarmRows[alarm.tag]
+            #if not ActiveCheck or (obj.alarm and not obj.alarmAcknowledged and (obj.alarm.active or (not self.timeSortingEnabled and str(obj.quality) == 'ATTR_INVALID'))):
+                #self._ui.listWidget.addItem(obj)
+            #obj.updateIfChanged()
+        #try:
+            ##THIS SHOULD BE DONE EMITTING A SIGNAL!
+            #if currents is not None and len(currents):
+                #self._ui.listWidget.setCurrentItem(currents[0])
+                #for current in currents:
+                    #trace('\t\tselecting %s item'%current.tag)
+                    ##self._ui.listWidget.setCurrentItem(current)
+                    #current.setSelected(True)
+                ##if self.expert: self.setAlarmData(current) #Not necessary
+        #except:
+            #print traceback.format_exc()
+        #self.changed = False
+        #trace('\t\tshowList(): %d alarms added to listWidget.'%self._ui.listWidget.count())
+        #self.updateStatusLabel()
+        ##self._ui.listWidget.blockSignals(False)      
     
 
    
