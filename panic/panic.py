@@ -68,8 +68,18 @@ The _proxies object allows to retrieve either DeviceProxy or DeviceServer object
 
 """
 
-SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4}
+SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4,'CONTROL':-1}
 
+AlarmStates = {
+  'NORM':0, #Normal state
+  'ACTIVE':1, #Active and unacknowledged
+  'ACKED':2, #Acknowledged by operator
+  'RTNUN':3, #Active but returned to normal
+  'ERROR':4, #PyAlarm not working properly  
+  'SHLVD':-1, #Silenced, hidden, ignored, (DEBUG), temporary state
+  'DSUPR':-2, #Disabled by a process condition, failed not throwed
+  'OOSRV':-3, #Unconditionally disabled, Enable = False
+  }
 
 ###############################################################################
 #@todo: Tango access methods
