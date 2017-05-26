@@ -538,81 +538,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 for tag_name,alarm in myAlarms: #Format is:    TAG3:LT/VC/Dev1/Pressure > 1e-4
                     self.pause.wait(timewait) #Pause should be done at the start of the loop
                     ##########################################################
-                    now = self.last_attribute_check = time.time()
-                    ##########################################################
-                    WAS_OK = alarm.counter<self.AlarmThreshold
-                    self.info('Checking alarm tag %s'%tag_name)
-                    self.debug(alarm.formula)
-
-                    variables = {}
-                    VALUE = self.EvaluateFormula(alarm.formula,
-                            tag_name=tag_name,as_string=False,lock=True,
-                            _locals=_locals,variables=variables)
-                    self.debug('was_ok/counter/active/VALUE: %s,%s,%s,%s'%(WAS_OK,alarm.counter,alarm.active,VALUE))
-                    if WAS_OK:
-                      self.info('\tupdateAlarms(%s) = %s' % (tag_name,type(VALUE) if isinstance(VALUE,Exception) else VALUE))
-                              
-                    # ALARM May be failed or removed during the thread iteration
-                    if (  tag_name not in self.Alarms or 
-                        (VALUE is None and tag_name in self.FailedAlarms) ):
-                        continue
-
-                    if VALUE:
-                        # The alarm condition is ACTIVE
-                        ###################################################
-                        #WAS_OK = alarm.counter<self.AlarmThreshold
-                        
-                        # counter and active will not have same values if the alarm is not acknowledged for a while
-                        if WAS_OK:
-                            #Alarm counters are not increased above Threshold
-                            alarm.counter+=1
-                        
-                        if WAS_OK: self.info(
-                          'Alarm %s triggered for %d/%d cycles'%(tag_name,alarm.counter,self.AlarmThreshold))
-
-                        if alarm.counter>=self.AlarmThreshold:
-                            # Sending ALARM
-                            ########################################################
-                            if not alarm.active:
-                                #Alarm is sent only if it was not active or it was recovered and just came back to alarm or has passed the reminder cycle
-                                self.set_alarm(tag_name)
-                                self.LastAlarms.append(time.ctime(now)+': '+tag_name)
-                                self.PastValues[tag_name] = variables.copy() if hasattr(variables,'copy') else None #Storing the values that will be sent in the report
-                                if alarm.tag not in self.AcknowledgedAlarms: 
-                                    # <=== HERE IS WHERE THE ALARM IS SENT!
-                                    self.send_alarm(tag_name,message='ALARM',values=variables or None) 
-
-                            # Sending REMINDER
-                            ########################################################
-                            elif not alarm.acknowledged and self.Reminder and ((alarm.recovered and WAS_OK and self.AlertOnRecovery) or alarm.last_sent<(now-self.Reminder)):
-                                self.info('==========> ALARM %s reminder is sent after %s seconds being active.'%(alarm.tag,self.Reminder))
-                                if alarm.tag not in self.AcknowledgedAlarms: 
-                                  self.send_alarm(tag_name,message='REMINDER',values=variables or None)
-                            alarm.recovered = 0
-                    else:
-                        # The alarm is NOT active
-                        ###################################################
-                        if alarm.counter: 
-                            alarm.counter-=1
-                        if not alarm.counter and alarm.active: #The alarm condition was active in the previous cycle
-                            self.PastValues[tag_name] = variables.copy() if hasattr(variables,'copy') else None #Storing the values that will be sent in the report
-                            # Alarm RECOVERED
-                            #####################################################
-                            if not alarm.recovered:
-                                self.info('The alarm is still active ... but values came back to reality!')
-                                alarm.recovered = now
-                                if self.AlertOnRecovery and alarm.tag not in self.AcknowledgedAlarms: 
-                                    self.send_alarm(tag_name,message='RECOVERED',values=variables)
-                            # Alarm AUTO-RESET
-                            #####################################################
-                            elif self.AutoReset and alarm.recovered<(now-self.AutoReset):
-                                    self.info('==========> ALARM %s has been reset automatically after %s seconds being inactive.'%(alarm.tag,self.AutoReset))
-                                    self.free_alarm(alarm.tag,notify=False)
-                                    if alarm.tag not in self.AcknowledgedAlarms: 
-                                      self.send_alarm(tag_name,message='AUTORESET',values=variables)
-
-                    self.debug( 'Alarm %s counter is : %s' %(tag_name, alarm.counter))
-                    if tag_name in self.FailedAlarms: self.FailedAlarms.pop(tag_name)
+                    self.process_alarm(tag_name,alarm,_locals)
                     ##########################################################
                     # END OF ALARMS LOOP
                 
@@ -635,6 +561,98 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             
         self.info( 'In updateAlarms(): Thread finished')
         return
+      
+    def process_alarm(self,tag_name,alarm,_locals):
+        """
+        Process method called from updateAlarms for each alarm 
+        """
+        
+        now = self.last_attribute_check = time.time()
+        ##########################################################
+        WAS_OK = alarm.counter<self.AlarmThreshold
+        self.info('Checking alarm tag %s'%tag_name)
+        self.debug(alarm.formula)
+
+        variables = {}
+        VALUE = self.EvaluateFormula(alarm.formula,
+                tag_name=tag_name,as_string=False,lock=True,
+                _locals=_locals,variables=variables)
+        
+        self.debug('was_ok/counter/active/VALUE: %s,%s,%s,%s'%(WAS_OK,alarm.counter,alarm.active,VALUE))
+        if WAS_OK:
+          self.info('\tupdateAlarms(%s) = %s' % (tag_name,type(VALUE) if isinstance(VALUE,Exception) else VALUE))
+                  
+        # ALARM May be failed or removed during the thread iteration
+        if (  tag_name not in self.Alarms or 
+            (VALUE is None and tag_name in self.FailedAlarms) ):
+
+            return
+
+        elif VALUE:
+            # The alarm condition is ACTIVE
+            ###################################################
+            #WAS_OK = alarm.counter<self.AlarmThreshold
+            
+            # counter and active will not have same values if the alarm is not acknowledged for a while
+            
+            if WAS_OK:
+                #Alarm counters are not increased above Threshold
+                alarm.counter+=1
+            
+            if WAS_OK: self.info(
+              'Alarm %s triggered for %d/%d cycles'%(tag_name,alarm.counter,self.AlarmThreshold))
+
+            if alarm.counter>=self.AlarmThreshold:
+
+                # Sending ALARM
+                ########################################################
+                if not alarm.active:
+                    #Alarm is sent only if it was not active or it was recovered and just came back to alarm or has passed the reminder cycle
+                    self.set_alarm(tag_name)
+                    self.LastAlarms.append(time.ctime(now)+': '+tag_name)
+                    self.PastValues[tag_name] = variables.copy() if hasattr(variables,'copy') else None #Storing the values that will be sent in the report
+                    if alarm.tag not in self.AcknowledgedAlarms: 
+                        # <=== HERE IS WHERE THE ALARM IS SENT!
+                        self.send_alarm(tag_name,message='ALARM',values=variables or None) 
+
+                # Sending REMINDER
+                ########################################################
+                elif not alarm.acknowledged and self.Reminder and ((alarm.recovered and WAS_OK and self.AlertOnRecovery) or alarm.last_sent<(now-self.Reminder)):
+                    self.info('==========> ALARM %s reminder is sent after %s seconds being active.'%(alarm.tag,self.Reminder))
+                    if alarm.tag not in self.AcknowledgedAlarms: 
+                      self.send_alarm(tag_name,message='REMINDER',values=variables or None)
+                alarm.recovered = 0
+        else:
+            # The alarm is NOT active
+            ###################################################
+
+            if alarm.counter: 
+                alarm.counter-=1
+            if not alarm.counter and alarm.active: #The alarm condition was active in the previous cycle
+                self.PastValues[tag_name] = variables.copy() if hasattr(variables,'copy') else None #Storing the values that will be sent in the report
+
+                # Alarm RECOVERED
+                #####################################################
+                if not alarm.recovered:
+                    self.info('The alarm is still active ... but values came back to reality!')
+                    alarm.recovered = alarm.set_time()
+                    if self.AlertOnRecovery and alarm.tag not in self.AcknowledgedAlarms: 
+                        self.send_alarm(tag_name,message='RECOVERED',values=variables)
+
+                # Alarm AUTO-RESET
+                #####################################################
+                elif self.AutoReset and alarm.recovered<(now-self.AutoReset):
+                        self.info('==========> ALARM %s has been reset automatically after %s seconds being inactive.'%(alarm.tag,self.AutoReset))
+                        self.free_alarm(alarm.tag,notify=False)
+                        if alarm.tag not in self.AcknowledgedAlarms: 
+                          self.send_alarm(tag_name,message='AUTORESET',values=variables)
+
+        self.debug('Alarm %s counter is : %s' % (tag_name, alarm.counter))
+
+        if tag_name in self.FailedAlarms: 
+            self.FailedAlarms.pop(tag_name)
+              
+        return
 
     #@self_locked
     def set_alarm(self,tag_name):
@@ -644,8 +662,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         try:
             self.lock.acquire()
             if not self.Alarms[tag_name].active:
-                self.Alarms[tag_name].active = time.time()
+                now = time.time()
+                self.Alarms[tag_name].active = now
                 self.Alarms[tag_name].recovered = 0
+                self.Alarms[tag_name].set_time(now)
                 result = True
         finally:
             self.lock.release()
@@ -670,13 +690,19 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if not was_active:
                 result = False
             else:
-                if message!='ACKNOWLEDGED': #RESETING THE ALARM (Acknowledge just puts it in "Silent mode")
+                #RESETING THE ALARM (Acknowledge just puts it in "Silent mode")
+                if message!='ACKNOWLEDGED': 
                     date = self.Alarms[tag_name].active
+                    #Storing the values that triggered the alarm
                     self.PastAlarms[date].append(tag_name)
-                    self.PastValues[tag_name] = None #Storing the values that triggered the alarm
+                    self.PastValues[tag_name] = None 
                     self.Alarms[tag_name].clear()
-                    self.info("Alarm %s cleared: %s"%(tag_name,self.Alarms[tag_name].active))
-                    if tag_name in self.AcknowledgedAlarms: self.AcknowledgedAlarms.remove(tag_name)
+                    self.Alarms[tag_name].set_time()
+                    self.info("Alarm %s:%s cleared"%(date,tag_name))
+                    
+                    if tag_name in self.AcknowledgedAlarms: 
+                      self.AcknowledgedAlarms.remove(tag_name)
+                      
         except:
             s = traceback.format_exc()
             self.warning( 'free_alarm(%s) failed!:1: %s' % (tag_name,s))
@@ -1394,7 +1420,15 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #self.debug( "In "+self.get_name()+"::read_AlarmList()")
 
         #    Add your own code here
-        attr_AlarmList_read = sorted('%s:%s:%s'%(alarm.tag,alarm.description,alarm.formula) for alarm in self.Alarms.values())
+        sep = ';' #':'
+        #setup = 'tag','description','formula'
+        setup = 'tag','state','severity','time','description'
+        
+        attr_AlarmList_read = sorted(
+          sep.join((str if s!='time' else time2str)(getattr(alarm,s))
+                   for s in setup)
+          for alarm in self.Alarms.values())
+        
         attr.set_value(attr_AlarmList_read, len(self.Alarms))
 
 #------------------------------------------------------------------
@@ -1770,7 +1804,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         alnum = '[a-zA-Z0-9-_.]+'
         ##email = '(' + alnum + '@' + '(?:' + alnum + r"[\.]" + ')+' + alnum + ')'
         email = '(' + alnum + '@' + alnum + ')'
-        print('mail_receivers',mail_receivers)
+
         for m in mail_receivers:
             addresses = re.findall(email,m)
             self.info( 'in %s, addresses=%s'%(m,addresses))
@@ -2136,6 +2170,8 @@ class PyAlarmClass(PyTango.DeviceClass):
                 'Display level':PyTango.DispLevel.EXPERT,
                 'description':"Returns Property:Value list",
             } ],
+        
+        
         'ActiveAlarms':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
@@ -2164,18 +2200,6 @@ class PyAlarmClass(PyTango.DeviceClass):
             {
                 'description':"Returns the list of Receivers for each Alarm",
             } ],
-        'PhoneBook':
-            [[PyTango.DevString,
-            PyTango.SPECTRUM,
-            PyTango.READ, 512]],
-        'SentEmails':
-            [[PyTango.DevString,
-            PyTango.IMAGE,
-            PyTango.READ, 512,512]],
-        'SentSMS':
-            [[PyTango.DevString,
-            PyTango.IMAGE,
-            PyTango.READ, 512,512]],
         'AcknowledgedAlarms':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
@@ -2188,6 +2212,22 @@ class PyAlarmClass(PyTango.DeviceClass):
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 512]],
+        
+        
+        
+        'PhoneBook':
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ, 512]],
+        'SentEmails':
+            [[PyTango.DevString,
+            PyTango.IMAGE,
+            PyTango.READ, 512,512]],
+        'SentSMS':
+            [[PyTango.DevString,
+            PyTango.IMAGE,
+            PyTango.READ, 512,512]],
+
         'MemUsage':
             [[PyTango.DevDouble,
             PyTango.SCALAR,
