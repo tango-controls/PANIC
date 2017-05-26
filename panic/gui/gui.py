@@ -278,52 +278,52 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     @staticmethod
     def setFontsAndColors(alarm,item):
       
-        if isinstance(alarm.active,(Exception,type(None))):
-            icon = None
-            bold = False
-            color = QtGui.QColor("grey").light()
-            background = QtGui.QColor("white")
+        #if isinstance(alarm.active,(Exception,type(None))):
+            #icon = None
+            #bold = False
+            #color = QtGui.QColor("grey").light()
+            #background = QtGui.QColor("white")
             
-        if self.alarm.active and not self.alarmDisabled:
+        #if self.alarm.active and not self.alarmDisabled:
           
-            if self.quality==PyTango.AttrQuality.ATTR_ALARM:
-                trace('alarm')
-                if self.alarmAcknowledged:
-                    self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
-                else:
-                    self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"software-update-urgent",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
-            elif self.quality==PyTango.AttrQuality.ATTR_WARNING:
-                trace('warning')
-                if self.alarmAcknowledged:
-                    self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
-                else:
-                    self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-important",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
-            elif self.quality==PyTango.AttrQuality.ATTR_VALID:
-                trace('debug')
-                if self.alarmAcknowledged:
-                    self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
-                else:
-                    self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"applications-development",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter()
+            #if self.quality==PyTango.AttrQuality.ATTR_ALARM:
+                #trace('alarm')
+                #if self.alarmAcknowledged:
+                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
+                #else:
+                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"software-update-urgent",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
+            #elif self.quality==PyTango.AttrQuality.ATTR_WARNING:
+                #trace('warning')
+                #if self.alarmAcknowledged:
+                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
+                #else:
+                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-important",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
+            #elif self.quality==PyTango.AttrQuality.ATTR_VALID:
+                #trace('debug')
+                #if self.alarmAcknowledged:
+                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
+                #else:
+                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"applications-development",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter()
                                         
-            if self.alarm.counter<2:
-                self.font.setBold(True)
+            #if self.alarm.counter<2:
+                #self.font.setBold(True)
             
-        elif alarm.active in (False,0) and not alarm.disabled:
-            if alarm.acknowledged:
-                "media-playback-pause",False,QtGui.QColor("green").lighter(),QtGui.QColor("white")
-            else:
-                "emblem-system",False,QtGui.QColor("green").lighter(),QtGui.QColor("white")
-            if not alarm.recovered and alarm.counter>1:
-                bold = True
+        #elif alarm.active in (False,0) and not alarm.disabled:
+            #if alarm.acknowledged:
+                #"media-playback-pause",False,QtGui.QColor("green").lighter(),QtGui.QColor("white")
+            #else:
+                #"emblem-system",False,QtGui.QColor("green").lighter(),QtGui.QColor("white")
+            #if not alarm.recovered and alarm.counter>1:
+                #bold = True
                 
-        else: #AlarmDisabled or value = None
-            "dialog-error",False,QtGui.QColor("black"),QtGui.QColor("grey").lighter()
+        #else: #AlarmDisabled or value = None
+            #"dialog-error",False,QtGui.QColor("black"),QtGui.QColor("grey").lighter()
         
-        alarmicon=getThemeIcon(icon) if icon else none
-        item.setIcon(alarmicon or Qt.QIcon())
-        item.font.setBold(bold)
-        item.setTextColor(color)
-        item.setBackgroundColor(background)
+        #alarmicon=getThemeIcon(icon) if icon else none
+        #item.setIcon(alarmicon or Qt.QIcon())
+        #item.font.setBold(bold)
+        #item.setTextColor(color)
+        #item.setBackgroundColor(background)
 
         return
 
@@ -407,13 +407,13 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             if text!=alarm:
                 item.setText(alarm)
                 self.setFontsAndColors(alarm,item)
+                font = Qt.QFont(Qt.QString("Courier"))
+                self._ui.listWidget.item(i).setFont(font)
                 
                 
             #font = self._ui.listWidget.item(i).font()
             #font.setFixedPitch(True)
-            if changed:
-              font = Qt.QFont(Qt.QString("Courier"))
-              self._ui.listWidget.item(i).setFont(font)
+
             #obj.updateIfChanged()
             
         try:
