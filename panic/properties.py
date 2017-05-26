@@ -206,7 +206,7 @@ DEVICE_CONFIG = {
         [ ":" ] ],
     'StartupDelay':
         [PyTango.DevLong,
-        "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
+        "Number of seconds that PyAlarm will wait before starting.",
         [ 0 ] ],
     'EvalTimeout':
         [PyTango.DevLong,
@@ -220,6 +220,13 @@ DEVICE_CONFIG = {
         [PyTango.DevBoolean,
         "Use Taurus to connect to devices instead of plain PyTango.",
         [ False ] ],
+    }
+        
+TODO_LIST = {
+    'PushEvents':
+        [PyTango.DevVarStringArray,
+         "Events to be pushed by Alarm and AlarmLists attributes",
+         [] ] ,
     }
     
 PyAlarmDefaultProperties = dict(join(d.items() for d in (ALARM_CYCLE,ALARM_ARCHIVE,ALARM_LOGS,DEVICE_CONFIG)))
