@@ -112,20 +112,16 @@ class AlarmView(EventListener,Logger):
         #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
         }
   
-    def __init__(self,name='AlarmView',filters={},domain='*',refresh=3.,verbose=False):
+    def __init__(self,name='AlarmView',filters={},domain='*',
+                 refresh=3.,asynch=False,verbose=False):
 
         self.t_init = now()
         self.lock = Lock()
         self.verbose = verbose
         Logger.__init__(self,name)
         self.setLogLevel('INFO')
-        self.get_period = lambda *s: refresh
-        #ThreadedObject.__init__(self,target=self.sort,
-                                #period=refresh,start=False)
-        #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
-        EventListener.__init__(self,name)
-        self.setLogLevel('INFO')
         
+        if isString(filters): filters = {'tag':filters}
         self.filters = FilterStack(filters)
         #if isString(filters):
             #if ',' in filters: filters = filters.split(',')
@@ -151,13 +147,13 @@ class AlarmView(EventListener,Logger):
         
         self.timeSortingEnabled=None
         self.changed = True
+        #self.changes = CaselessDefaultDict(int)
         self.info('parent init done, +%s'%(now()-self.t_init))
         self.api = panic.AlarmAPI(filters=domain)
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
-        self.info('api init done, +%s'%(now()-self.t_init))
         self.apply_filters()
-        self.info('apply filter done, +%s'%(now()-self.t_init))
+        self.info('api init done, +%s'%(now()-self.t_init))
         
         #self.default_regEx=options.get('filter',None) or filters or None
         #self.regEx = self.default_regEx
@@ -173,32 +169,31 @@ class AlarmView(EventListener,Logger):
         N = len(self.alarms)
         
         ## How often should the ordered list be renewed?
-        #if len(self.alarms)<150: 
-            #self.REFRESH_TIME = 3000
-        #else:
-            #self.REFRESH_TIME = 6000
-
-        #if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
+        if len(self.alarms)>150: 
+            refresh = max((6.,refresh))
+            self.warning('%s alarms on display, polling set to %s'%(refresh))
         
+        self.__asynch = asynch #Unmodifiable once started
+        self.__refresh = refresh #Unmodifiable once started?
+        self.get_period = lambda s=self: refresh
+        #ThreadedObject.__init__(self,target=self.sort,
+                                #period=refresh,start=False)
+        #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
         
-        #self.modelsQueue = Queue.Queue()
-        #self.modelsThread = fandango.qt.TauEmitterThread(parent=self,queue=self.modelsQueue,method=self.setAlarmRowModel)
-        #self.modelsThread.start()
-        ##TIMERS (to reload database and refresh alarm list).
-        #self.reloadTimer = QtCore.QTimer()
-        #self.refreshTimer = QtCore.QTimer()
-        #QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.onRefresh)
-        #QtCore.QObject.connect(self.reloadTimer, QtCore.SIGNAL("timeout()"), self.onReload)
-        #self.reloadTimer.start(self.REFRESH_TIME/2.)
-        #self.refreshTimer.start(self.REFRESH_TIME)
+        EventListener.__init__(self,name)
+        self.setLogLevel('INFO')
         
+        self.update_sources()
+        self.info('event sources updated, +%s'%(now()-self.t_init))
+        
+        ######################################################################
 
         #self.start()
         self.info('view init done, +%s'%(now()-self.t_init))
         
     def __del__(self):
         print('AlarmView(%s).__del__()'%self.name)
-        [self.remove_source(s) for s in self.get_sources()]
+        self.disconnect()
         
     def get_alarm(self,alarm):
         #self.info('get_alarm(%s)'%alarm)
@@ -251,8 +246,7 @@ class AlarmView(EventListener,Logger):
             self.filters = filters
             objs = [self.api[f] for f in self.filtered]
             models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
-            self.alarms = CaselessDict(models)
-            self.set_sources()
+            self.alarms = self.models = CaselessDict(models)
             return self.filtered
         except:
             self.error(traceback.format_exc())
@@ -300,7 +294,7 @@ class AlarmView(EventListener,Logger):
                   len(self.alarms)-len(updated)))
                 
             #self.lock.acquire()
-            if (now()-self.last_sort) < self.get_period():
+            if not self.ordered or (now()-self.last_sort) > self.get_period():
                 #self.last_keys = keys or self.last_keys
                 sortkey = sortkey or self.sortkey
                 self.ordered = sorted(self.alarms.values(),key=sortkey)
@@ -385,12 +379,12 @@ class AlarmView(EventListener,Logger):
         return [s for s,v in AlarmView.sources.items()
                 if any(l() is self for l in v.listeners)]
       
-    def set_sources(self):
-        self.info('set_sources(%d)'%len(self.alarms))
+    def update_sources(self):
+        self.info('update_sources(%d)'%len(self.alarms))
         olds = self.get_sources()
         news = [self.get_model(s) for s in self.alarms]
         devs = set(s.rsplit('/',1)[0] for s in news)
-        news = [d+'/activealarms' for d in devs] #discard single attributes
+        news = [d+'/alarmlist' for d in devs] #discard single attributes
 
         for o in olds:
             if o not in news:
@@ -399,7 +393,7 @@ class AlarmView(EventListener,Logger):
         for s in news:
             if s not in olds:
                 ta = self.add_source(s)
-            if '/activealarms' in s:
+            if '/alarmlist' in s:
                 d = ft.parse_tango_model(s)['device']
                 self.api.devices[d]._actives = self.get_source(s)
         
@@ -413,20 +407,25 @@ class AlarmView(EventListener,Logger):
         else:
             alarm = self.get_model(alarm)
             self.debug('add_source(%s)'%alarm)
-            ta = TangoAttribute(alarm,tango_asynch=True)
+            ta = TangoAttribute(alarm,
+                  log_level = 'INFO',
+                  #asynchronous attr reading is faster than event subscribing
+                  use_events=['CHANGE_EVENT'],
+                  tango_asynch = self.__asynch,
+                  enable_polling = 1e3*self.__refresh,
+                  )
             ta.setLogLevel('WARNING')
             self.sources[ta.full_name] = ta
-            self.sources[ta.full_name].addListener(self,
-                  use_events=['CHANGE_EVENT'],
-                  use_polling=10., #<<< asynchronous attr reading is faster than event subscribing
-                  )
+            self.sources[ta.full_name].addListener(self)
             return ta
             
-    def remove_source(self,alarm):
-        s = self.get_source(alarm)
-        s.removeListener(self)
-        if not s.hasListeners():
-          AlarmView.sources.pop(s.full_name)
+    def disconnect(self,alarm=None):
+        sources = self.sources if alarm is None else [self.get_source(alarm)]
+        for s in sources:
+            s.removeListener(self)
+            if not s.hasListeners():
+                AlarmView.sources.pop(s.full_name)
+        return
           
     def error_hook(self,src,type_,value):
         pass
@@ -441,11 +440,14 @@ class AlarmView(EventListener,Logger):
         Source will be an object, type a PyTango EventType, evt_value an AttrValue
         """
 
-        self.info('AlarmView(%s).event_hook(%s,%s,...)'%(
-          self.name,src,type_))        
         try:
+            rvalue = getAttrValue(value,None)
+            error = getattr(value,'err',False) or rvalue is None
+            self.debug('AlarmView(%s).event_hook(%s,%s,%s)'%(
+              self.name,src,type_, rvalue))
+            
             #self.lock.acquire()
-            if src.simple_name != 'activealarms':
+            if src.simple_name != 'alarmlist':
                 av = self.get_alarm(src.full_name)
                 alarms = [av.tag]
             else:
@@ -454,35 +456,47 @@ class AlarmView(EventListener,Logger):
                     dev = self.api.devices.get(src.device.split('/',1)[1],None)
                 alarms = dev.alarms.keys()
                 
+            if not getattr(value,'err',False):
+                array = dict((l.split(';')[0],l) for l in rvalue)
+                
+            assert len(alarms), 'EventUnprocessed!'
+                
             for a in alarms:
+              
                 av = self.get_alarm(a)
                 av.updated = now()
 
-                if not getattr(value,'err',False):
-                    rvalue = getAttrValue(value,None)
-                    
-                    if rvalue is not None:
+                if error:
+                    rvalue = None
+                else:
+                    try:
+                        av.set_state(array[av.tag])
+                        rvalue = av.active
                         #av.set_active(rvalue)) 
-                        rvalue = av.get_active()
-                    
-                        if av.get_model() not in self.values:
-                            pass
-                          
-                        elif self.verbose:
-                            prev = getAttrValue(self.values[av.get_model()])
-                            if isBool(prev): 
-                              last = rvalue
-                              
-                            else: 
-                                last = value.quality
-                                prev = self.values[av.get_model()].quality
+                        #rvalue = av.get_active() ###< Parsing from property
+                        #print av.tag,time.ctime(),rvalue
+                    except:
+                        self.warning(array[av.tag])
+                        self.warning(traceback.format_exc())
+                        rvalue = None
+                
+                if av.get_model() not in self.values:
+                    self.info('%s has no cache'%(av.get_model()))
+                    self.values[av.get_model()] = None
+                  
+                prev = self.values[av.get_model()]
+                last = rvalue
 
-                            if last != prev:
-                                self.info('event_hook(%s): %s => %s'%(
-                                  av.tag,prev,last))
-                            
-                self.values[av.get_model()] = value
+                if last != prev:
+                    (self.info if self.verbose else self.debug)(
+                      'event_hook(%s,%s): %s => %s'%(
+                      av.tag,av.get_state(),prev,last))
+                        
+                self.values[av.get_model()] = rvalue
+                    
         except:
+            self.error('AlarmView(%s).event_hook(%s,%s,%s)'%(
+              self.name,src,type_, value))
             self.error(traceback.format_exc())
         finally:
             #self.lock.release()
