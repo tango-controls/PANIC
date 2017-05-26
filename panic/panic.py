@@ -47,7 +47,8 @@
 
 import traceback,re,time,os,sys
 import fandango
-#import fandango as fn
+import fandango as fn
+
 from fandango import first,searchCl,matchCl,isString,isSequence,now
 from fandango import isFalse,xor,str2time,time2str,END_OF_TIME
 from fandango.tango import CachedAttributeProxy
@@ -70,7 +71,7 @@ The _proxies object allows to retrieve either DeviceProxy or DeviceServer object
 
 SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4,'CONTROL':-1}
 
-AlarmStates = {
+AlarmStates = fn.Struct({
   'NORM':0, #Normal state
   'ACTIVE':1, #Active and unacknowledged
   'ACKED':2, #Acknowledged by operator
@@ -79,7 +80,7 @@ AlarmStates = {
   'SHLVD':-1, #Silenced, hidden, ignored, (DEBUG), temporary state
   'DSUPR':-2, #Disabled by a process condition, failed not throwed
   'OOSRV':-3, #Unconditionally disabled, Enable = False
-  }
+  })
 
 ###############################################################################
 #@todo: Tango access methods
@@ -127,7 +128,7 @@ class Alarm(object):
         self.api = api
         self.setup(tag,device,formula,description,receivers,config,severity,write=False)
         self.clear()
-
+        
     def setup(self,tag=None,device=None,formula=None,description=None,receivers=None,config=None, severity=None,write=False):
         """ Assigns values to Alarm struct """
         notNone = lambda v,default:  default
@@ -140,14 +141,16 @@ class Alarm(object):
 
     def clear(self):
         """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
+        self._state = None
+        self._time = None
+        self.counter = 0 #N cycles being active
         self.active = 0 #Last timestamp it was activated
         self.updated = 0 #Last value check
         self.recovered = 0 #Last time it was recovered
-        self.counter = 0 #N cycles being active
-        self.sent = 0 #Messages sent
-        self.last_sent = 0 #Time when last message was sent
         self.acknowledged = 0 #If active no more reminders will be sent
         self.disabled = 0 #If disabled the alarm is not evaluated
+        self.sent = 0 #Messages sent
+        self.last_sent = 0 #Time when last message was sent
 
     @staticmethod
     def parse_formula(formula):
@@ -182,6 +185,8 @@ class Alarm(object):
       
     def set_active(self,value,count=1):
         """
+        BE CAREFUL, IT MAY INTERFERE WITH COUNTER MANAGEMENT WITHIN PYALARM
+        
         Will increment/decrement counter and set active if
         the count value has been reached
         """
@@ -196,12 +201,15 @@ class Alarm(object):
         if value and self.counter>=count and not self.active:
             self.last_sent = self.updated
             self.active = value
+            self.set_time(value if value>1 else 0)
 
         if not value and not self.counter:
             self.active = 0
+            self.set_time()
             if not self.recovered:
                 #print('%s => %s'%(self.tag,0))
-                self.recovered = self.updated      
+                #self.recovered = self.get_time()
+                pass
 
     def get_active(self):
         """ This method connects to the Device to get the value and timestamp of the alarm attribute """
@@ -210,19 +218,97 @@ class Alarm(object):
         except:
             self.active = None
         return self.active
-            
+      
+    def set_state(self,state=None):
+        o = self._state
+        if state is None:
+            self.get_state(True)
+        elif state in AlarmStates:
+            self._state = AlarmStates[state]
+        elif isString(state):
+            tag,state,severity,stamp,desc = state.split(';')
+            self._state = AlarmStates[state]
+            stamp = stamp or 0
+            try: stamp = float(stamp)
+            except: stamp = str2time(stamp)
+            if state in ('NORM'):
+                self.active = 0
+                self.recovered = stamp
+                self.acknowledged = 0
+            if state in ('ACTIVE'): 
+                self.active = stamp
+                self.recovered = 0
+                self.acknowledged = 0
+            if state in ('RTNUN'): 
+                self.active = stamp-1
+                self.counter = 0
+                self.recovered = stamp
+            if state in ('ACKED'):
+                self.active = stamp-1
+                self.acknowledged = stamp
+            if state in ('DSUPR,OOSRV,SHLVD'):
+                self.active = 0
+                self.disabled = stamp
+            if state in ('ERROR'):
+                self.active = None
+        else:
+            self._state = AlarmStates.get_key(state)
+
+        if o != self._state:
+            return self.set_time()
+      
+    def get_state(self,force=True):
+
+        if force or self._state is None:
+            if self.disabled:
+                if time.time() < self.disabled:
+                    self._state = AlarmStates.SHLVD
+                elif self.disabled < 0:
+                    self._state = AlarmStates.OOSRV
+                else:
+                    self._state = AlarmStates.DSUPR
+                    
+            elif self.active:
+                if self.recovered > self.active:
+                    self._state = AlarmStates.RTNUN
+                if self.acknowledged:
+                    self._state = AlarmStates.ACKED
+                else:
+                    self._state = AlarmStates.ACTIVE
+                    
+            elif self.active is None:
+                self._state = AlarmStates.ERROR
+                
+            else:
+                self._state = AlarmStates.NORM
+        
+        return AlarmStates.get_key(self._state)
+      
+    state = property(fget=get_state,fset=set_state)
+      
+    def set_time(self,t=None):
+        self._time =  t or time.time()
+        return self._time
+    
     def get_time(self,attr_value=None):
         """
         This method extracts alarm activation timestamp from the ActiveAlarms array.
         It returns 0 if the alarm is not active.
         """
-        if attr_value is None:
+        if attr_value is None and self._time is not None:
+            return self._time
+
+        ## Parsing ActiveAlarms attribute
+        if attr_value in (None,True):
             attr_value = self.get_ds().get_active_alarms()
+            
         elif not isSequence(attr_value):
             attr_value = [attr_value]
+            
         lines = [l for l in (attr_value or []) if l.startswith(self.tag+':')]
         if lines: 
-            date = str((lines[0].replace(self.tag+':','').split('|')[0]).rsplit(':',1)[0].strip())
+            date = str((lines[0].replace(self.tag+':','').split('|')[0]
+                        ).rsplit(':',1)[0].strip())
             try:
                 return time.mktime(time.strptime(date))
             except:
@@ -231,6 +317,8 @@ class Alarm(object):
                 except:
                     return END_OF_TIME
         else: return 0
+      
+    time = property(get_time,set_time)
         
     def get_quality(self):
         """ it just translates severity to the equivalent Tango quality, but does NOT get actual attribute quality (which may be INVALID) """
@@ -520,23 +608,20 @@ class AlarmAPI(fandango.SingletonMap):
     """
     CURRENT = None
     
-    def __init__(self,filters='*',tango_host=None,logger=fandango.log.WARNING):
+    def __init__(self,filters='*',tango_host=None,
+                 extended=False,
+                 logger=fandango.log.WARNING):
       
-        if fandango.isCallable(logger):
-          self.log = self.debug = self.info = self.warning = self.error = logger
-        elif fandango.isNumber(logger) or fandango.isString(logger):
-          self._logger = fandango.log.Logger('PANIC',level=logger)
-          for l in fandango.log.LogLevels:
-            setattr(self,l.lower(),getattr(self._logger,l.lower()))
-          self.log = self.debug
-          
+        self.__init_logger(logger)
         self.log('In AlarmAPI(%s)'%filters)
         self.alarms = {}
         self.filters = filters
         self.tango_host = tango_host or get_tango_host()
         self._global_receivers = [],0
+        
         for method in ['__getitem__','__setitem__','keys','values','__iter__','items','__len__']:
             setattr(self,method,getattr(self.alarms,method))
+            
         self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
         self.macros = [
             ('GROUP(%s)',self.GROUP_EXP,self.group_macro)
@@ -546,7 +631,17 @@ class AlarmAPI(fandango.SingletonMap):
         try: self.servers = fandango.servers.ServersDict(tango_host=tango_host)
         except: self.servers = fandango.servers.ServersDict()
         
-        self.load(self.filters)
+        self.load(self.filters,extended=extended)
+        
+    def __init_logger(self,logger):
+        if fandango.isCallable(logger):
+            self.log = self.debug = self.info = \
+              self.warning = self.error = logger
+        elif fandango.isNumber(logger) or fandango.isString(logger):
+          self._logger = fandango.log.Logger('PANIC',level=logger)
+          for l in fandango.log.LogLevels:
+            setattr(self,l.lower(),getattr(self._logger,l.lower()))
+          self.log = self.debug
 
     ## Dictionary-like methods
     def __getitem__(self,*a,**k): return self.alarms.__getitem__(*a,**k)
@@ -559,43 +654,45 @@ class AlarmAPI(fandango.SingletonMap):
     def values(self): return self.alarms.values()
     def items(self): return self.alarms.items()
 
-    def load(self,filters=None,exported=False):
+    def load(self,filters=None,exported=False,extended=False):
         """
         Reloads all alarm properties from the database
-        :param filters: is used to specify which devices to be loaded
         
-        First, the server name must match with filters
-        Second, if the device matches all its alarms are loaded
-        Third, alarm will be loaded if the AlarmList row matches the filter
+        Alarms will be loaded if filters match the device or server name
+
+        If exported, only running devices will be checked.
+        
+        If extended, other alarms will be loaded if the AlarmList row 
+          matches the filter
         
         """
         #Loading alarm devices list
         filters = filters or self.filters or '*'
         if isSequence(filters): filters = '|'.join(filters)
+        filters = filters.lower()
         self.devices,all_alarms = fandango.CaselessDict(),{}
         self.log('Loading PyAlarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
-        all_devices = map(str.lower,
-          fandango.tango.get_database_device().DbGetDeviceList(['*','PyAlarm']))
+        dbd = fandango.tango.get_database_device()
+        all_devices = map(str.lower,dbd.DbGetDeviceList(['*','PyAlarm']))
 
         if exported:
-            dev_exported = map(str.lower,
-              fandango.tango.get_database().get_device_exported('*'))
+            dev_exported = fandango.get_all_devices(exported=True)
             all_devices = [d for d in all_devices if d in dev_exported]
-
-        all_servers = map(str.lower,
-            self.servers.get_db_device().DbGetServerList('PyAlarm/*'))
         
-        #If filter is the name of a pyalarm device, only those alarms will be loaded
-        if filters.lower() in all_devices:
+        all_servers = map(str.lower,dbd.DbGetServerList('PyAlarm/*'))
+        
+        #If filter is the name of a pyalarm device, only this will be loaded
+        if filters in all_devices:
             all_devices = matched = [filters]
             
-        elif filters!='*' and any(matchCl(filters,s) for s in all_servers): #filters.lower() in all_servers:
+        elif filters!='*' and any(matchCl(filters,s) for s in all_servers):
             self.servers.load_by_name(filters)
-            matched = [d for d in self.servers.get_all_devices() if d.lower() in all_devices]
-            #If filter is the name of a pyalarm server, only those devices will be loaded
-            if filters.lower() in all_servers: all_devices = matched
+            matched = [d.lower() for d in self.servers.get_all_devices() 
+                       if d.lower() in all_devices]
+            if filters in self.servers:
+                all_devices = matched
             
         else:
             matched = []
@@ -605,17 +702,22 @@ class AlarmAPI(fandango.SingletonMap):
 
         for d in all_devices:
             self.log('Loading device: %s'%d)
-            d = d.lower()
             ad = AlarmDS(d,api=self)
             
-            if filters=='*' or d in matched or matchCl(filters,d,terminate=True):
+            if filters=='*' or d in matched or matchCl(filters,d):
                 self.devices[d],all_alarms[d] = ad,ad.read()
-            else:
+            
+            elif extended:
+                #Parsing also if the filters are referenced in the formula
+                #This kind of extended filter exceeds the domain concept
                 alarms = ad.read(filters=filters)
                 if alarms: self.devices[d],all_alarms[d] = ad,alarms
                 
         tprops=(time.time()-tprops)
-        self.log('\t%d PyAlarm devices loaded, %d alarms'%(len(self.devices),sum(len(v) for v in all_alarms.values())))
+        self.log('\t%d PyAlarm devices loaded, %d alarms'%(
+            len(self.devices),sum(len(v) for v in all_alarms.values())))
+        
+        ######################################################################
 
         tcheck = time.time()
         #Loading phonebook
@@ -633,28 +735,43 @@ class AlarmAPI(fandango.SingletonMap):
                       self.warning('%s not in %s: %s'%(k,d,vals))
             
           if not found:
-            self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been removed from device %s' % (k,v.device))
+            self.warning('AlarmAPI.load(): WARNING!: Alarm %s has been '
+              'removed from device %s' % (k,v.device))
             self.alarms.pop(k)
         
         #Updating alarms dictionary
         for d,vals in sorted(all_alarms.items()):
           
             for k,v in vals.items():
-                self.log('Loading alarm %s.%s (new=%s): %s'%(d,k,k not in self.alarms,v))
+                self.log('Loading alarm %s.%s (new=%s): %s'%(
+                  d,k,k not in self.alarms,v))
                 
                 if k in self.alarms: #Updating
+                  
                     if self.alarms[k].device.lower()!=d.lower():
-                        self.warning('AlarmAPI.load(): WARNING!: Alarm %s duplicated in devices %s and %s' % (k,self.alarms[k].device,d))
-                    #ALARM State is not changed here, if the formula changed something it will be managed by the AutoReset/Reminder/Recovered cycle
-                    self.alarms[k].setup(k,device=d,formula=v['formula'],description=v['description'],receivers=v['receivers'],severity=v['severity'])
+                        self.warning('AlarmAPI.load(): WARNING!: Alarm %s '
+                          'duplicated in devices %s and %s' % 
+                          (k,self.alarms[k].device,d))
+                        
+                    #ALARM State is not changed here, if the formula changed 
+                    # something it will be managed by the 
+                    # AutoReset/Reminder/Recovered cycle
+                    self.alarms[k].setup(k,device=d,formula=v['formula'],
+                        description=v['description'],receivers=v['receivers'],
+                        severity=v['severity'])
+                    
                 else: #Creating a new alarm
-                    self.alarms[k] = Alarm(k,api=self,device=d,formula=v['formula'],description=v['description'],receivers=v['receivers'],severity=v['severity'])
+                    self.alarms[k] = Alarm(k,api=self,device=d,
+                        formula=v['formula'],description=v['description'],
+                        receivers=v['receivers'],severity=v['severity'])
                     
         tcheck = time.time()-tcheck
-        self.log('AlarmAPI.load(%s): %d alarms loaded'%(filters,len(self.alarms)))
+        self.log('AlarmAPI.load(%s): %d alarms loaded'%(
+            filters,len(self.alarms)))
         AlarmAPI.CURRENT = self
         
-        self.info('%ss dedicated to,\n load devices %s\n load properties %s\nother checks %s'% (time.time()-t0,tdevs,tprops,tcheck))
+        self.info('%ss dedicated to,\n load devices %s\n load properties %s\n'
+          'other checks %s'% (time.time()-t0,tdevs,tprops,tcheck))
         return
     
     CSV_COLUMNS = 'tag,device,description,severity,receivers,formula'.split(',')
