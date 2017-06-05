@@ -4,7 +4,8 @@ PANIC=$(python -c "import imp;print(imp.find_module('panic')[1])")
 
 PANIC_DEFAULT="--filter=!EXCLUDEDALARMS"
 
-HASSCREEN=$(which screen 2>/dev/null)
+HASSCREEN=
+#$(which screen 2>/dev/null)
 CMD="python $PANIC/gui/gui.py $PANIC_DEFAULT"
 
 if [ "$( echo $1 | grep '\?\|\-h' )" ] ; then
@@ -22,14 +23,14 @@ else
     CMD=${CMD}
 
   elif [ "$*" ] && [ "$( echo "$*" | grep 'attach' )" ] ; then
-    echo "screen"
+    echo "run attached"
     if [ "${HASSCREEN}" ] ; then
       CMD="screen -S panic-gui ${CMD}"
     fi
     
   else
-    echo "run detached"
     if [ "${HASSCREEN}" ] ; then
+      echo "run detached"
       CMD="screen -dm -S panic-gui ${CMD}"
     else
       CMD="${CMD} > /dev/null"
