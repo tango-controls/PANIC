@@ -72,14 +72,12 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.expert = False
         self.tools = {} #Widgets dictionary
         
+        self.init_ui(parent,mainwindow)
         self.default_regEx=options.get('filter',None) or filters or None
         self.regEx = self.default_regEx
         if self.regEx and str(self.regEx)!=os.getenv('PANIC_DEFAULT'): 
             print 'Setting RegExp filter: %s'%self.regEx
             self._ui.regExLine.setText(str(self.regEx))
-        
-        
-        self.init_ui(parent,mainwindow)
         
         self.api = panic.AlarmAPI()
         trace('AlarmGUI(): api done')
