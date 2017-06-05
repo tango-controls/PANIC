@@ -5,7 +5,8 @@ from fandango import Catched
 from widgets import QtCore, QtGui, Qt, TRACE_LEVEL
 from taurus.core import TaurusEventType
 from taurus.qt.qtgui.base import TaurusBaseComponent
-from widgets import getAlarmTimestamp,trace,clean_str,getThemeIcon,getAttrValue
+from widgets import getAlarmTimestamp,trace,clean_str,\
+  getThemeIcon,getAttrValue, SNAP_ALLOWED
 #from htmlview import *
 
 REFRESH_TIME = 10000
