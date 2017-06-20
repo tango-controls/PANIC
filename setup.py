@@ -35,6 +35,16 @@ entry_points = {
 
 author = 'Sergi Rubio'
 email = 'srubio@cells.es'
+download_url = 'https://github.com/tango-controls/panic'
+description = 'PANIC, a python Alarm System for TANGO'
+long_description = """PANIC is a set of tools (api, Tango device server, user interface) that provides:
+
+ * Periodic evaluation of a set of conditions.
+ * Notification (email, sms, pop-up, speakers)
+ * Keep a log of what happened. (files, Tango Snapshots)
+ * Taking automated actions (Tango commands / attributes)
+ * Tools for configuration/visualization
+"""
 
 setup(
     name="panic",
@@ -43,6 +53,9 @@ setup(
     author_email = email,
     maintainer = author,
     maintainer_email = email,
+    description = description,
+    long_description = long_description,
+    download_url = download_url,
     packages=find_packages(),
     package_data=package_data,
     install_requires=install_requires,
