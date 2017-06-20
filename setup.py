@@ -33,10 +33,16 @@ entry_points = {
         ],
 }
 
+author = 'Sergi Rubio'
+email = 'srubio@cells.es'
 
 setup(
     name="panic",
     version=open('panic/VERSION').read().strip(),
+    author = author,
+    author_email = email,
+    maintainer = author,
+    maintainer_email = email,
     packages=find_packages(),
     package_data=package_data,
     install_requires=install_requires,
