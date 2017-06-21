@@ -82,6 +82,30 @@ AlarmStates = fn.Struct({
   'OOSRV':-3, #Unconditionally disabled, Enable = False
   })
 
+def shortstr(msg,maxlen=144,line=';'):
+    msg = str(msg).replace('\n',line).replace('\r',line)
+    if 4 < len(msg) < maxlen: msg = msg[:maxlen-4]+' ...'
+    return msg
+
+def intversion(version):
+    try:
+        if type(version) in (list,tuple): 
+            return map(int,version[:3])
+        else:
+            return map(int,str(version).split('-')[0].split('.'))
+    except:
+        return None
+    
+def intersect(a,b):
+    a,b = str(a).lower(),str(b).lower()
+    return a in b or b in a
+
+def anyendswith(a,b):
+    a,b = str(a).lower(),str(b).lower()
+    if '/' not in a: a = '/'+a
+    if '/' not in b: b = '/'+b
+    return a.endswith(b) or b.endswith(a)
+
 ###############################################################################
 #@todo: Tango access methods
 
@@ -225,7 +249,7 @@ class Alarm(object):
             self.get_state(True)
         elif state in AlarmStates:
             self._state = AlarmStates[state]
-        elif isString(state):
+        elif isString(state) and ';' in state:
             tag,state,severity,stamp,desc = state.split(';')
             self._state = AlarmStates[state]
             stamp = stamp or 0
@@ -251,6 +275,8 @@ class Alarm(object):
                 self.disabled = stamp
             if state in ('ERROR'):
                 self.active = None
+        elif isString(state) and ':' in state:
+            self.set_state('ACTIVE' if self.get_time(True) else 'NORM')
         else:
             self._state = AlarmStates.get_key(state)
 
@@ -456,14 +482,26 @@ class AlarmDS(object):
         self.api = api
         self.alarms = {}
         self._actives = None
-        self.get_config(True)
         self.proxy = None
+        self.version = None        
+        self.get_config(True)
+        
+    def get(self,alarm=None):
+        """ Returns alarm object or device proxy 
+        (for backwards compatibility) """
+        return self.alarms.get(alarm) if alarm else self.get_proxy()
 
-    def get(self):
+    def get_proxy(self):
         """ Returns a device proxy """
         if self.proxy is None:
             self.proxy = self.api.get_ds_proxy(self.name)
         return self.proxy
+    
+    def get_version(self):
+        """ Returns the VersionNumber for this device """
+        v = self.config.get('VersionNumber',None)
+        self.version = intversion(v)
+        return self.version
       
     def ping(self):
         try:
@@ -525,6 +563,17 @@ class AlarmDS(object):
                 print('%s: AlarmsList property renamed to AlarmList'%self.name)
                 self.api.put_db_properties(self.name,{'AlarmList':props['AlarmList'],'AlarmsList':[]})
         return props
+    
+    def get_model(self):
+        """ 
+        Returns the proper alarm summary attribute to subscribe.
+        It depends on the PyAlarm version
+        """
+        if self.get_version() >= intversion('6.1.0'):
+            model = self.name+'/alarmlist'
+        else:
+            model = self.name+'/activealarms'
+        return model.lower()
       
     def get_active_alarms(self):
         """ Returns the list of currently active alarms """
@@ -883,8 +932,22 @@ class AlarmAPI(fandango.SingletonMap):
         """ Shortcut to force alarm update in database """
         self[self.has_tag(tag,True)].write()
         
+    def get_device(self,key,full=False):        
+        """ Given a device or alarm name returns an AlarmDS object """
+        if key in self.alarms:
+            return self.devices[self.alarms[key].device]
+        if not full and ':' in key:
+            key = key.split(':',1)[-1].split('/',1)[1]        
+        if key in self.devices:
+            return self.devices[key]
+        return None
+
     def get_ds_proxy(self,dev):
-        return self.servers.proxies[dev]
+        try:
+            return self.servers.proxies[dev]
+        except:
+            # If failed, convert into a local tango name
+            return self.get_device(dev).get_proxy()
     
     def get_db_properties(self,ref,props):
         if '/' not in ref:
