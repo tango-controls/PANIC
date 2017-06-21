@@ -31,6 +31,7 @@ import fandango.tango as ft
 import panic
 from panic import *
 from fandango.functional import *
+from fandango.tango import parse_tango_model
 from fandango.threads import ThreadedObject,Lock,RLock
 from fandango.callbacks import EventSource, EventListener, TangoAttribute
 from fandango.excepts import Catched
@@ -171,7 +172,8 @@ class AlarmView(EventListener,Logger):
         ## How often should the ordered list be renewed?
         if len(self.alarms)>150: 
             refresh = max((6.,refresh))
-            self.warning('%s alarms on display, polling set to %s'%(refresh))
+            self.warning('%s alarms on display, polling set to %s'%(
+                len(self.alarms),refresh))
         
         self.__asynch = asynch #Unmodifiable once started
         self.__refresh = refresh #Unmodifiable once started?
@@ -383,8 +385,9 @@ class AlarmView(EventListener,Logger):
         self.info('update_sources(%d)'%len(self.alarms))
         olds = self.get_sources()
         news = [self.get_model(s) for s in self.alarms]
-        devs = set(s.rsplit('/',1)[0] for s in news)
-        news = [d+'/alarmlist' for d in devs] #discard single attributes
+        devs = set(parse_tango_model(s)['device'] for s in news)
+        news = [self.api.devices[d].get_model()
+                for d in devs] #discard single attributes
 
         for o in olds:
             if o not in news:
@@ -393,9 +396,10 @@ class AlarmView(EventListener,Logger):
         for s in news:
             if s not in olds:
                 ta = self.add_source(s)
-            if '/alarmlist' in s:
-                d = ft.parse_tango_model(s)['device']
-                self.api.devices[d]._actives = self.get_source(s)
+
+            d = self.api.get_device(parse_tango_model(s)['device'])
+            if anyendswith(s,d.get_model()):
+                d._actives = self.get_source(s)
         
         return news
       
@@ -439,7 +443,7 @@ class AlarmView(EventListener,Logger):
         Method to implement the event notification
         Source will be an object, type a PyTango EventType, evt_value an AttrValue
         """
-
+        array = {}
         try:
             rvalue = getAttrValue(value,None)
             error = getattr(value,'err',False) or rvalue is None
@@ -447,17 +451,18 @@ class AlarmView(EventListener,Logger):
               self.name,src,type_, rvalue))
             
             #self.lock.acquire()
-            if src.simple_name != 'alarmlist':
+            if src.simple_name in self.api.alarms:
                 av = self.get_alarm(src.full_name)
                 alarms = [av.tag]
             else:
-                dev = self.api.devices.get(src.device,None)
-                if dev is None: 
-                    dev = self.api.devices.get(src.device.split('/',1)[1],None)
+                #if anyendswith(src.simple_name,dev.get_model()):
+                dev = self.api.get_device(src.device)
                 alarms = dev.alarms.keys()
                 
             if not getattr(value,'err',False):
-                array = dict((l.split(';')[0],l) for l in rvalue)
+                r = rvalue[0] if rvalue else ''
+                splitter = ';' if ';' in r else ':'
+                array = dict((l.split(splitter)[0],l) for l in rvalue)
                 
             assert len(alarms), 'EventUnprocessed!'
                 
@@ -470,13 +475,13 @@ class AlarmView(EventListener,Logger):
                     rvalue = None
                 else:
                     try:
-                        av.set_state(array[av.tag])
+                        row = array.get(av.tag,None)
+                        av.set_state(row)
+                        if not row: 
+                            self.warning('%s Not found in %s'%(
+                                av.tag,src.full_name))
                         rvalue = av.active
-                        #av.set_active(rvalue)) 
-                        #rvalue = av.get_active() ###< Parsing from property
-                        #print av.tag,time.ctime(),rvalue
                     except:
-                        self.warning(array[av.tag])
                         self.warning(traceback.format_exc())
                         rvalue = None
                 
@@ -496,7 +501,7 @@ class AlarmView(EventListener,Logger):
                     
         except:
             self.error('AlarmView(%s).event_hook(%s,%s,%s)'%(
-              self.name,src,type_, value))
+              self.name,src,type_, shortstr(value)))
             self.error(traceback.format_exc())
         finally:
             #self.lock.release()
