@@ -196,6 +196,10 @@ __doc__+="""
 DEVICE_CONFIG: PyAlarm/PanicDS instance configuration.
 """    
 DEVICE_CONFIG = {
+    'VersionNumber':
+        [PyTango.DevString,
+         "API version used (device-managed)",
+         [ "?.?" ] ],
     'LogLevel':
         [PyTango.DevString,
         "stdout log filter",

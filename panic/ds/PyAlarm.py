@@ -1080,6 +1080,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         panic._proxies[name] = self
         fandango.tango.get_all_devices.set_keeptime(180)
         self.db = PyTango.Database()
+        self.db.put_device_property(name,{'VersionNumber':__RELEASE__})
         self.snap = None
         
         #Persistent data:
@@ -1248,8 +1249,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
             if not self._initialized: 
                 self.set_state(PyTango.DevState.ON)
+                
             if not self.updateThread or not self.updateThread.isAlive(): 
                 self.start()
+                
             self.info( 'Ready to accept request ...'+'<'*40)
             self.setLogLevel(self.LogLevel)
         except Exception,e:
@@ -2160,7 +2163,8 @@ class PyAlarmClass(PyTango.DeviceClass):
             PyTango.READ],
             {
                 'Display level':PyTango.DispLevel.EXPERT,
-                'description':"Returns Alarm:AlarmDate for last alarms until each is read once, then it's cleared (used for archiving)",
+                'description':"Returns Alarm:AlarmDate for last alarms until "
+                              "each is read once, then it's cleared (used for archiving)",
             } ],
         'AlarmConfiguration':
             [[PyTango.DevString,
@@ -2177,21 +2181,24 @@ class PyAlarmClass(PyTango.DeviceClass):
             PyTango.SPECTRUM,
             PyTango.READ, 512],
             {
-                'description':"Retrieves a list of Active Alarms showing AlarmDate:AlarmDescription",
+                'description':"Retrieves a list of Active Alarms showing "
+                              "AlarmDate:AlarmDescription",
             } ],
         'PastAlarms':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 512],
             {
-                'description':"Returns AlarmDate:ACKDate:AlarmDescription for all OLD alarms already acknowledged",
+                'description':"Returns AlarmDate:ACKDate:AlarmDescription for all "
+                              "OLD alarms already acknowledged",
             } ],
         'AlarmList':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 512],
             {
-                'description':"Returns the content of the AlarmList property",
+                'description':"Returns the current state and definition of alarms "
+                              "managed by this device",
             } ],
         'AlarmReceivers':
             [[PyTango.DevString,
