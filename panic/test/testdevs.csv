@@ -1,153 +1,153 @@
-server	class	device	property	value
-				
-SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
-				
-			DynamicAttributes	T=S and (now()-S)%60
-				T30=now()%30
-				R=RW
-				S=GET('Start',default=0)
-				RW=VAR('rwattr',default=10.,WRITE=True)
-				F=1/0.
-				Tout=t<5 or time.sleep(10.)
-				
-			DynamicCommands	Start=str(SET('Start',now()))
-				Stop=str(SET('Start',0))
-				Hung=time.sleep(float(ARGS[0]))
-				
-			DynamicStates	FAULT=ATTR('S') and ATTR('T')>45
-				RUNNING=ATTR('S')
-				ON=1 #t<5 and ATTR(‘RW’) or 1/0.
-				
-			DynamicQualities	T30=ATTR_ALARM if ATTR('T30')<15 else ATTR_VALID
-				
-			KeepAttributes	Yes
-				
-PyAlarm/*	PyAlarm		AllowedActions	fandango
-				date > /tmp/date
-			StartupDelay	5
-			PhoneBook	
-			SMSConfig	
-			FromAddress	
-			PanicAdminUsers	
-			PanicUserTimeout	
-			UserValidator	
-			GlobalReceivers	tester@localhost
-				
-PyAlarm/*	PyAlarm	*	PollingPeriod	1
-			Enabled	1
-			AutoReset	5
-			AlarmThreshold	3
-			IgnoreExceptions	TRUE
-			EvalTimeout	500
-			UseProcess	FALSE
-			UseTaurus	FALSE
-			RethrowAttribute	FALSE
-			RethrowState	TRUE
-			Reminder	0
-			CreateNewContext	
-			UseSnap	FALSE
-			LogFile	
-			LogLevel	INFO
-			AlertOnRecovery	FALSE
-			LogFile	
-			HtmlFolder	
-			FlagFile	
-			MaxMessagesPerAlarm	3600
-			FromAddress	tester@tango
-				
-				
-				
-PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE
-			RethrowAttribute	FALSE
-			RethrowState	TRUE
-			AlarmList	NOEXCEPT:test/panic/sim-01/F
-			AlarmSeverities	NOEXCEPT:ERROR
-				
-		test/panic/attribute	IgnoreExceptions	TRUE
-			RethrowAttribute	TRUE
-			RethrowState	TRUE
-			AlarmList	REATTR:test/panic/sim-01/F
-			AlarmSeverities	REATTR:ERROR
-				
-		test/panic/except	IgnoreExceptions	FALSE
-			RethrowAttribute	FALSE
-			RethrowState	FALSE
-			AlarmList	EXCEPT:test/panic/sim-01/F
-			AlarmSeverities	EXCEPT:ERROR
-				
-				
-				
-PyAlarm/*	PyAlarm	test/panic/ck*	PollingPeriod	0.2
-			AutoReset	0.2
-				
-				
-PyAlarm/Clock	PyAlarm	test/panic/ck02	AlarmList	CK02:False and not CK02
-			AlarmSeverities	CK02:DEBUG
-			AlarmThreshold	1
-		test/panic/ck05	AlarmList	CK05: False and not CK05
-			AlarmSeverities	CK05:DEBUG
-			AlarmThreshold	2
-			PollingPeriod	0.125
-		test/panic/ck1	AlarmList	CK1: not CK1
-			AlarmSeverities	CK1:DEBUG
-			AlarmThreshold	5
-		test/panic/ck2	AlarmList	CK2: NOW()%2 < 1
-			AlarmSeverities	CK2:DEBUG
-			AlarmThreshold	1
-		test/panic/ck5	AlarmList	CK5: NOW()%5<2.5
-			AlarmSeverities	CK5:DEBUG
-			AlarmThreshold	1
-		test/panic/ck10	AlarmList	CK10:NOW()%10<5
-			AlarmSeverities	CK10:DEBUG
-			AlarmThreshold	1
-				
-				
-PyAlarm/Group	PyAlarm	test/panic/group	AlarmList	GROUP_0: GROUP(test/panic/ck*/ck5|ck10)
-				GROUP_1: GROUP(CK5,CK10)
-				GROUP_OR: GROUP(CK5,CK10;x>=1)
-				GROUP_AND: test/panic/ck2/ck2 and test/panic/ck5/ck5
-				GROUP_ALL: GROUP( GROUP_0,GROUP_1,GROUP_2,GROUP_AND )
-				
-			AlarmSeverities	GROUP_1: ALARM
-				GROUP_OR: ALARM
-				GROUP_AND: ALARM
-				GROUP_ALL:ALARM
-			AutoReset	0.0001
-			PollingPeriod	0.5
-			AlarmThreshold	1
-				
-				
-PyAlarm/Actions	PyAlarm	test/panic/wattr	AlarmList	WATTR:True
-			AlarmReceivers	WATTR:ACTION(alarm:attribute,test/panic/sim-01/rw,int(345)),ACTION(reset:attribute,test/panic/sim-01/rw,int(0))
-			PollingPeriod	3
-		test/panic/comm	AlarmList	COMM:(  NOW() - test/panic/sim-01/rw ) >5
-			AlarmReceivers	COMM:ACTION(alarm:command,test/panic/wattr/ResetAlarm,WATTR,test)
-		test/panic/system	AlarmList	SYSTEM:WATTR
-			AlarmReceivers	SYSTEM:ACTION(alarm:system,date > /tmp/date)
-		test/panic/property	AlarmList	
-			AlarmReceivers	
-				
-				
-				
-				
-				
-PyAlarm/Delay	PyAlarm	test/panic/enabled1	DynamicAttributes	Cycles
-		test/panic/delay	DynamicAttributes	StartedAt
-		test/panic/enabled10		
-		test/panic/reset		
-				
-				
-PyAlarm/Value	PyAlarm	test/panic/value	AlarmList	A_VALUE:test/panic/sim-01/T30>15
-PyAlarm/Quality	PyAlarm	test/panic/quality	AlarmList	A_QUALITY:test/panic/sim-01/T30.quality == ATTR_ALARM
-				
-				
-				
-PanicDS/1	PanicManager	test/panic/manager	DynamicAttributes	AlarmList
-				DeviceAlarms
-				AlarmVariables
-				AlarmReceivers
-				AlarmFormula
-				
-				
-PyAlarm/results	PyAlarm	test/panic/results	AlarmList	EXCEPTS_OK:REATTR AND NOT NOEXCEPT AND NOT EXCEPT AND test/panic/except/state == FAULT
-			AlarmSeverities	EXCEPTS_OK:Debug
+server	class	device	property	value					
+									
+SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100					
+									
+			DynamicAttributes	T=S and (now()-S)%60					
+				T30=now()%30					
+				R=RW					
+				S=GET('Start'	default=0)				
+				RW=VAR('rwattr'	default=10.	WRITE=True)			
+				F=1/0.					
+				Tout=t<5 or time.sleep(VAR('hung',default=0))					
+									
+			DynamicCommands	Start=str(SET('Start'	now()))				
+				Stop=str(SET('Start'	0))				
+				Hung=VAR('hung',float(ARGS[0]))					
+									
+			DynamicStates	FAULT=ATTR('S') and ATTR('T')>45					
+				RUNNING=ATTR('S')					
+				ON=1 #t<5 and ATTR(‘RW’) or 1/0.					
+									
+			DynamicQualities	T30=ATTR_ALARM if ATTR('T30')<15 else ATTR_VALID					
+									
+			KeepAttributes	Yes					
+									
+PyAlarm/*	PyAlarm		AllowedActions	fandango					
+				date > /tmp/date					
+			StartupDelay	5					
+			PhoneBook						
+			SMSConfig						
+			FromAddress						
+			PanicAdminUsers						
+			PanicUserTimeout						
+			UserValidator						
+			GlobalReceivers	tester@localhost					
+									
+PyAlarm/*	PyAlarm	*	PollingPeriod	1					
+			Enabled	1					
+			AutoReset	5					
+			AlarmThreshold	3					
+			IgnoreExceptions	TRUE					
+			EvalTimeout	500					
+			UseProcess	FALSE					
+			UseTaurus	FALSE					
+			RethrowAttribute	FALSE					
+			RethrowState	TRUE					
+			Reminder	0					
+			CreateNewContext						
+			UseSnap	FALSE					
+			LogFile						
+			LogLevel	INFO					
+			AlertOnRecovery	FALSE					
+			LogFile						
+			HtmlFolder						
+			FlagFile						
+			MaxMessagesPerAlarm	3600					
+			FromAddress	tester@tango					
+									
+									
+									
+PyAlarm/exceptions	PyAlarm	test/panic/noexcept	IgnoreExceptions	TRUE					
+			RethrowAttribute	FALSE					
+			RethrowState	TRUE					
+			AlarmList	NOEXCEPT:test/panic/sim-01/F					
+			AlarmSeverities	NOEXCEPT:ERROR					
+									
+		test/panic/attribute	IgnoreExceptions	TRUE					
+			RethrowAttribute	TRUE					
+			RethrowState	TRUE					
+			AlarmList	REATTR:test/panic/sim-01/F					
+			AlarmSeverities	REATTR:ERROR					
+									
+		test/panic/except	IgnoreExceptions	FALSE					
+			RethrowAttribute	FALSE					
+			RethrowState	FALSE					
+			AlarmList	EXCEPT:test/panic/sim-01/F					
+			AlarmSeverities	EXCEPT:ERROR					
+									
+									
+									
+PyAlarm/*	PyAlarm	test/panic/ck*	PollingPeriod	0.2					
+			AutoReset	0.2					
+									
+									
+PyAlarm/Clock	PyAlarm	test/panic/ck02	AlarmList	CK02:False and not CK02					
+			AlarmSeverities	CK02:DEBUG					
+			AlarmThreshold	1					
+		test/panic/ck05	AlarmList	CK05: False and not CK05					
+			AlarmSeverities	CK05:DEBUG					
+			AlarmThreshold	2					
+			PollingPeriod	0.125					
+		test/panic/ck1	AlarmList	CK1: not CK1					
+			AlarmSeverities	CK1:DEBUG					
+			AlarmThreshold	5					
+		test/panic/ck2	AlarmList	CK2: NOW()%2 < 1					
+			AlarmSeverities	CK2:DEBUG					
+			AlarmThreshold	1					
+		test/panic/ck5	AlarmList	CK5: NOW()%5<2.5					
+			AlarmSeverities	CK5:DEBUG					
+			AlarmThreshold	1					
+		test/panic/ck10	AlarmList	CK10:NOW()%10<5					
+			AlarmSeverities	CK10:DEBUG					
+			AlarmThreshold	1					
+									
+									
+PyAlarm/Group	PyAlarm	test/panic/group	AlarmList	GROUP_0: GROUP(test/panic/ck*/ck5|ck10)					
+				GROUP_1: GROUP(CK5	CK10)				
+				GROUP_OR: GROUP(CK5	CK10	x>=1)			
+				GROUP_AND: test/panic/ck2/ck2 and test/panic/ck5/ck5					
+				GROUP_ALL: GROUP( GROUP_0	GROUP_1	GROUP_2	GROUP_AND )		
+									
+			AlarmSeverities	GROUP_1: ALARM					
+				GROUP_OR: ALARM					
+				GROUP_AND: ALARM					
+				GROUP_ALL:ALARM					
+			AutoReset	0.0001					
+			PollingPeriod	0.5					
+			AlarmThreshold	1					
+									
+									
+PyAlarm/Actions	PyAlarm	test/panic/wattr	AlarmList	WATTR:True					
+			AlarmReceivers	WATTR:ACTION(alarm:attribute	test/panic/sim-01/rw	int(345))	ACTION(reset:attribute	test/panic/sim-01/rw	int(0))
+			PollingPeriod	3					
+		test/panic/comm	AlarmList	COMM:(  NOW() - test/panic/sim-01/rw ) >5					
+			AlarmReceivers	COMM:ACTION(alarm:command	test/panic/wattr/ResetAlarm	WATTR	test)		
+		test/panic/system	AlarmList	SYSTEM:WATTR					
+			AlarmReceivers	SYSTEM:ACTION(alarm:system	date > /tmp/date)				
+		test/panic/property	AlarmList						
+			AlarmReceivers						
+									
+									
+									
+									
+									
+PyAlarm/Delay	PyAlarm	test/panic/enabled1	DynamicAttributes	Cycles					
+		test/panic/delay	DynamicAttributes	StartedAt					
+		test/panic/enabled10							
+		test/panic/reset							
+									
+									
+PyAlarm/Value	PyAlarm	test/panic/value	AlarmList	A_VALUE:test/panic/sim-01/T30>15					
+PyAlarm/Quality	PyAlarm	test/panic/quality	AlarmList	A_QUALITY:test/panic/sim-01/T30.quality == ATTR_ALARM					
+									
+									
+									
+PanicDS/1	PanicManager	test/panic/manager	DynamicAttributes	AlarmList					
+				DeviceAlarms					
+				AlarmVariables					
+				AlarmReceivers					
+				AlarmFormula					
+									
+									
+PyAlarm/results	PyAlarm	test/panic/results	AlarmList	EXCEPTS_OK:REATTR AND NOT NOEXCEPT AND NOT EXCEPT AND test/panic/except/state == FAULT					
+			AlarmSeverities	EXCEPTS_OK:Debug					
