@@ -38,6 +38,19 @@ widgets.TRACE_LEVEL = 0
     
 PARENT_CLASS = Qt.QWidget
 class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
+    """    
+    Arguments and options explained:
+    
+    - PANIC_DEFAULT is a default view, overriden by --view
+    - .scope and .default may be defined in the view, and later overriden by arguments
+    - --scope="*regexp*" would be the filter to be passed to the panic.api: gui.scope
+    - --scope=url1,url2,url3 would be used to open multiple api's
+    - --default="*regexp*" would be the default filter for the search bar: gui.default
+    - whenever the search bar is empty, .default is used instead
+    - args will be joined as gui default
+    - gui.current_search: the current contents of the search bar (gui.regEx)
+    - gui.current_view: the currently selected view (?)
+    """
   
     REFRESH_TIME = 5000 #Default period between list order updates
     RELOAD_TIME = 60000 #Default period between database reloads
@@ -52,8 +65,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     
     __pyqtSignals__ = ("valueChanged",)
     
-    def __init__(self, parent=None, filters='*', options=None, mainwindow=None):
-      
+    def __init__(self, parent=None, filters='', options=None, mainwindow=None):
+              
         trace('>>>> AlarmGUI()')
         options = options or {}
         
@@ -63,7 +76,6 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         trace( 'In AlarmGUI(%s): %s'%(filters,options))
 
         self.last_reload = 0
-        self.filters = filters
         self.AlarmRows = {}
         self.timeSortingEnabled=None
         self.changed = True
@@ -72,17 +84,19 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.expert = False
         self.tools = {} #Widgets dictionary
         
+        self.scope = options.get('scope','*')
+        self.default_regEx = options.get('default',filters or '*')
+        self.regEx = ''
         self.init_ui(parent,mainwindow)
-        self.default_regEx=options.get('filter',None) or filters or None
-        self.regEx = self.default_regEx
+        
         if self.regEx and str(self.regEx)!=os.getenv('PANIC_DEFAULT'): 
             print 'Setting RegExp filter: %s'%self.regEx
             self._ui.regExLine.setText(str(self.regEx))
         
-        self.api = panic.AlarmAPI()
-        trace('AlarmGUI(): api done')
+        self.api = panic.AlarmAPI(self.scope)
+        trace('AlarmGUI(%s): api done'%self.scope)
         #self._ordered=[] #Alarms list ordered
-        self.view = panic.view.AlarmView() #filters='device:'+self.regEx)
+        self.view = panic.view.AlarmView(api=self.api,domain=self.scope) 
         trace('AlarmGUI(): view done')
         
         self.snapi = None
@@ -123,10 +137,6 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         It returns a list with all alarms matching the default View filter
         BUT!, ignoring the current filters set by user.
         """
-        #return self.api.filter_alarms(self.filters)
-
-        #self.getFilters()
-        #self.view.apply_filters() #self.filters)
         trace('sorting ...')
         self.view.sort()
         trace('... done')
@@ -165,7 +175,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
 
     @Catched
     def onReload(self):
-        # THIS METHOD WILL NOT MODIFY THE LIST IF JUST FILTERS HAS CHANGED; TO UPDATE FILTERS USE onRefresh INSTEAD
+        # THIS METHOD WILL NOT MODIFY THE LIST IF JUST FILTERS HAS CHANGED; 
+        # TO UPDATE FILTERS USE onRefresh INSTEAD
         try:
             trace('onReload(%s)'%self.RELOAD_TIME)
             print '+'*80
@@ -207,10 +218,10 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         
         if nones or not self._connected: 
             text = 'Loading %s ... %d / %d'%(
-              self.filters,size-nones,size)
+              self.scope,size-nones,size)
         else: 
             text = ('Showing %d %s alarms,'
-              ' %d in database.'%(added,self.filters,size))
+              ' %d in database.'%(added,self.scope,size))
 
         trace(text+', nones = %d'%nones)
         self._ui.statusLabel.setText(text)
@@ -332,7 +343,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.changed = changed or self.changed
         trace('buildList(%s)'%self.changed)
 
-        #print "%s -> AlarmGUI.buildList(%s)"%(time.ctime(), ['%s=%s'%(s,getattr(self,s,None)) for s in ('regEx','severities','timeSortingEnabled','changed',)])
+        #print "%s -> AlarmGUI.buildList(%s)"%(time.ctime(), ['%s=%s'%(
+        #    s,getattr(self,s,None)) for s in ('regEx','severities','timeSortingEnabled','changed',)])
         try:
 
             ## TODO: update filters from GUI and apply to AlarmView
@@ -512,7 +524,8 @@ class QFilterGUI(QAlarmList):
     
     @Catched
     def onFilter(self,*args):
-        """Forces an update of alarm list order and applies filters (do not reload database)."""
+        """Forces an update of alarm list order and applies filters 
+        (do not reload database)."""
         trace('onFilter()')
         self.buildList(changed=True)
         self.showList()
@@ -525,7 +538,8 @@ class QFilterGUI(QAlarmList):
 
     def onRegExUpdate(self):
         # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
-        self.regEx = str(self._ui.regExLine.text()).strip() or self.default_regEx
+        self.regEx = (str(self._ui.regExLine.text()).strip() 
+            or self.default_regEx)
         self._ui.activeCheckBox.setChecked(False)
         self.onFilter()
 
@@ -629,7 +643,7 @@ class AlarmGUI(QFilterGUI):
         if self.mainwindow:
             
             self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(
-                self.filters or self.regEx or '',
+                self.scope or self.default_regEx or '',
                 fn.get_tango_host().split(':')[0]))
             
             url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6.svg'
@@ -689,7 +703,8 @@ def main(args=[]):
     t0 = time.time()
     opts = [a for a in args if a.startswith('-')]
     args = [a for a in args if not a.startswith('-')]
-    URL = 'http://www.cells.es/Intranet/Divisions/Computing/Controls/Help/Alarms/panic'
+    URL = 'http://www.cells.es/Intranet/Divisions/Computing/'\
+        'Controls/Help/Alarms/panic'
     
     #uniqueapp = Qt.QApplication([])
     uniqueapp = TaurusApplication([]) #opts)
@@ -706,7 +721,7 @@ def main(args=[]):
         return
     
     tmw = CleanMainWindow()
-    tmw.setWindowTitle('PANIC') #str(os.getenv('TANGO_HOST')).split(':',1)[0]+' )
+    tmw.setWindowTitle('PANIC')
     tmw.menuBar = Qt.QMenuBar(tmw)
     tmw.toolsMenu = Qt.QMenu('Tools',tmw.menuBar)
     tmw.fileMenu = Qt.QMenu('File',tmw.menuBar)
@@ -719,23 +734,35 @@ def main(args=[]):
     print('AlarmGUI created after %s seconds'%(time.time()-t0))
 
     tmw.setMenuBar(tmw.menuBar)
-    [tmw.menuBar.addAction(a.menuAction()) for a in (tmw.fileMenu,tmw.toolsMenu,tmw.helpMenu,tmw.viewMenu)]
+    [tmw.menuBar.addAction(a.menuAction()) 
+            for a in (tmw.fileMenu,tmw.toolsMenu,tmw.helpMenu,tmw.viewMenu)]
     toolbar = Qt.QToolBar(tmw)
     toolbar.setIconSize(Qt.QSize(20,20))
     
-    tmw.helpMenu.addAction(getThemeIcon("applications-system"),"Webpage",lambda : os.system('konqueror %s &'%URL))
-    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),"Jive",lambda : os.system('jive &'))
-    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),"Astor",lambda : os.system('astor &'))
-    tmw.fileMenu.addAction(getThemeIcon(":/designer/back.png"),"Export to CSV file",alarmApp.saveToFile)
-    tmw.fileMenu.addAction(getThemeIcon(":/designer/forward.png"),"Import from CSV file",alarmApp.loadFromFile)
-    tmw.fileMenu.addAction(getThemeIcon(":/designer/filereader.png"),"Use external editor",alarmApp.editFile)
-    tmw.fileMenu.addAction(getThemeIcon("applications-system"),"Exit",tmw.close)
-    tmw.viewMenu.connect(tmw.viewMenu,Qt.SIGNAL('aboutToShow()'),alarmApp.setViewMenu)
+    tmw.helpMenu.addAction(getThemeIcon("applications-system"),
+        "Webpage",lambda : os.system('konqueror %s &'%URL))
+    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
+        "Jive",lambda : os.system('jive &'))
+    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
+        "Astor",lambda : os.system('astor &'))
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/back.png"),
+        "Export to CSV file",alarmApp.saveToFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/forward.png"),
+        "Import from CSV file",alarmApp.loadFromFile)
+    tmw.fileMenu.addAction(getThemeIcon(":/designer/filereader.png"),
+        "Use external editor",alarmApp.editFile)
+    tmw.fileMenu.addAction(getThemeIcon("applications-system"),
+        "Exit",tmw.close)
+    tmw.viewMenu.connect(tmw.viewMenu,
+        Qt.SIGNAL('aboutToShow()'),alarmApp.setViewMenu)
     
     from phonebook import PhoneBook
-    alarmApp.tools['bookApp'] = WindowManager.addWindow(PhoneBook(container=tmw))
-    tmw.toolsMenu.addAction(getThemeIcon("x-office-address-book"), "PhoneBook", alarmApp.tools['bookApp'].show)
-    toolbar.addAction(getThemeIcon("x-office-address-book") ,"PhoneBook",alarmApp.tools['bookApp'].show)
+    alarmApp.tools['bookApp'] = WindowManager.addWindow(
+        PhoneBook(container=tmw))
+    tmw.toolsMenu.addAction(getThemeIcon("x-office-address-book"), 
+        "PhoneBook", alarmApp.tools['bookApp'].show)
+    toolbar.addAction(getThemeIcon("x-office-address-book") ,
+        "PhoneBook",alarmApp.tools['bookApp'].show)
     
     trend_action = (getThemeIcon(":/designer/qwtplot.png"),
         'Trend',
@@ -744,23 +771,30 @@ def main(args=[]):
     tmw.toolsMenu.addAction(*trend_action)
     toolbar.addAction(*trend_action)
     
-    alarmApp.tools['config'] = WindowManager.addWindow(widgets.dacWidget(container=tmw))
-    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),"Advanced Configuration", alarmApp.tools['config'].show)
-    toolbar.addAction(getThemeIcon("applications-system") ,"Advanced Configuration",alarmApp.tools['config'].show)
+    alarmApp.tools['config'] = WindowManager.addWindow(
+        widgets.dacWidget(container=tmw))
+    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
+        "Advanced Configuration", alarmApp.tools['config'].show)
+    toolbar.addAction(getThemeIcon("applications-system") ,
+        "Advanced Configuration",alarmApp.tools['config'].show)
     
     toolbar.setMovable(False)
     toolbar.setFloatable(False)
     tmw.addToolBar(toolbar)
     
     if SNAP_ALLOWED:
-        alarmApp.tools['history'] = WindowManager.addWindow(widgets.ahWidget(container=tmw))
-        tmw.toolsMenu.addAction(getThemeIcon("office-calendar"),"Alarm History Viewer",alarmApp.tools['history'].show)
-        toolbar.addAction(getThemeIcon("office-calendar") ,"Alarm History Viewer",alarmApp.tools['history'].show)
+        alarmApp.tools['history'] = WindowManager.addWindow(
+            widgets.ahWidget(container=tmw))
+        tmw.toolsMenu.addAction(getThemeIcon("office-calendar"),
+            "Alarm History Viewer",alarmApp.tools['history'].show)
+        toolbar.addAction(getThemeIcon("office-calendar") ,
+            "Alarm History Viewer",alarmApp.tools['history'].show)
     else:
         trace("Unable to load SNAP",'History Viewer Disabled!')
         
-    alarm_preview_action = (getThemeIcon("accessories-calculator"),"Alarm Calculator",
-        lambda g=alarmApp:WindowManager.addWindow(AlarmPreview.showEmptyAlarmPreview(g)))
+    alarm_preview_action = (getThemeIcon("accessories-calculator"),
+        "Alarm Calculator",lambda g=alarmApp:WindowManager.addWindow(
+            AlarmPreview.showEmptyAlarmPreview(g)))
     [o.addAction(*alarm_preview_action) for o in (tmw.toolsMenu,toolbar)]
         
     print('Toolbars created after %s seconds'%(time.time()-t0))
@@ -771,13 +805,15 @@ def main(args=[]):
   
 def main_gui():
     import sys
-    app = main(sys.argv[1:] or ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else []))
+    app = main(sys.argv[1:] or ([os.getenv('PANIC_DEFAULT')] 
+        if os.getenv('PANIC_DEFAULT') else []))
     print('app created')
     n = app.exec_()
     print('exit')
     import fandango.threads
     import fandango.callbacks
-    [s.unsubscribeEvents() for s in fandango.callbacks.EventSource.thread().sources]
+    [s.unsubscribeEvents() for s 
+        in fandango.callbacks.EventSource.thread().sources]
     fandango.threads.ThreadedObject.kill_all()
     sys.exit(n) 
     
