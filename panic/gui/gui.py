@@ -51,14 +51,16 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     - gui.current_search: the current contents of the search bar (gui.regEx)
     - gui.current_view: the currently selected view (?)
     """
-  
-    REFRESH_TIME = 5000 #Default period between list order updates
-    RELOAD_TIME = 60000 #Default period between database reloads
-    
-    MAX_REFRESH = 3000 # new refresh set by hurry()
-    MAX_ALARMS = 30 #AlarmRow.use_list will be enabled only if number of alarms is higher than this number
-    
-    USE_EVENT_REFRESH = False #Controls if alarm events will hurry buildList()
+    #Default period between list order updates
+    REFRESH_TIME = 5000 
+    #Default period between database reloads
+    RELOAD_TIME = 60000 
+    # new refresh set by hurry()
+    MAX_REFRESH = 3000 
+    #AlarmRow.use_list will be enabled only if number of alarms > MAX_ALARMS
+    MAX_ALARMS = 30 
+    #Controls if alarm events will hurry buildList()
+    USE_EVENT_REFRESH = False 
     
     ALARM_ROW = ['tag','active','device','description']
     ALARM_LENGTHS = [50,25,20,200]
@@ -71,7 +73,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         options = options or {}
         
         if not fn.isDictionary(options):
-            options = dict((o.replace('--','').split('=')[0],o.split('=',1)[-1]) for o in options)
+            options = dict((o.replace('-','').split('=')[0],o.split('=',1)[-1]) 
+                for o in options)
             
         trace( 'In AlarmGUI(%s): %s'%(filters,options))
 
