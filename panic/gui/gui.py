@@ -255,10 +255,12 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         except: traceback.print_exc()      
             
     def getCurrentAlarm(self):
-        return self._ui.listWidget.currentItem().get_alarm_object()
+        tag = self.getCurrentTag()
+        return self.api[tag]
     
     def getCurrentTag(self):
-        return self._ui.listWidget.currentItem().get_alarm_tag()
+        row = self._ui.listWidget.currentItem()
+        return self.view.get_alarm_from_text(row.text())
       
     def onSelectAllNone(self):
         if self._ui.selectCheckBox.isChecked():
@@ -434,7 +436,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             if currents is not None and len(currents):
                 self._ui.listWidget.setCurrentItem(currents[0])
                 for current in currents:
-                    trace('\t\tselecting %s item'%current.tag)
+                    trace('\t\tselecting %s item'%current.text())
                     #self._ui.listWidget.setCurrentItem(current)
                     current.setSelected(True)
                 #if self.expert: self.setAlarmData(current) #Not necessary

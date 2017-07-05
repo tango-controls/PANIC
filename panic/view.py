@@ -321,7 +321,8 @@ class AlarmView(EventListener,Logger):
             return ['\t'.join(to_type(getattr(o,k)) for k in keys)
                     for o in objs]
           
-    def get_alarm_as_text(self,alarm=None,cols=None,formatters=None,lengths=[],sep=' - '):
+    def get_alarm_as_text(self,alarm=None,cols=None,
+                          formatters=None,lengths=[],sep=' - '):
         alarm = self.get_alarm(alarm)
         cols = cols or ['tag','active','description']
         formatters = formatters or self.ALARM_FORMATTERS
@@ -335,8 +336,17 @@ class AlarmView(EventListener,Logger):
             return s
         except:
             print traceback.format_exc()
-            return s          
+            return s
           
+    def get_alarm_from_text(self,text,cols=None,
+                            formatters=None,lengths=[],sep=' - ',obj=True):
+        if hasattr(text,'text'): text = text.text()
+        cols = cols or ['tag','active','description']
+        vals = [t.strip() for t in str(text).split(sep)]
+        i = cols.index('tag') if 'tag' in cols else 0
+        return vals[i]
+    
+    
     def get_source(self,alarm):
         try:alarm = self.get_model(alarm)
         except:pass
@@ -461,6 +471,7 @@ class AlarmView(EventListener,Logger):
                 
             if not getattr(value,'err',False):
                 r = rvalue[0] if rvalue else ''
+                self.info('AlarmView(%s): rvalue = %s'%(self.name,str(r)))
                 splitter = ';' if ';' in r else ':'
                 array = dict((l.split(splitter)[0],l) for l in rvalue)
                 

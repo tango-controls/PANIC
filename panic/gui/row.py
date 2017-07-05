@@ -250,39 +250,51 @@ class QAlarm(panic.Alarm):
     
         
 class QAlarmManager(QAlarm):
-        
+  
     @Catched
     def onContextMenu(self, point):
         self.popMenu = QtGui.QMenu(self)
+        view = getattr(self,'view')
         items = self.getSelectedRows(extend=False)
         print('In onContextMenu(%s)'%items)
         row = self._ui.listWidget.currentItem()
         #self.popMenu.addAction(getThemeIcon("face-glasses"), "Preview Attr. Values",self.onSelectAll)
 
-        act = self.popMenu.addAction(getThemeIcon("face-glasses"),"See Alarm Details",self.onView) 
+        act = self.popMenu.addAction(getThemeIcon("face-glasses"),
+                                     "See Alarm Details",self.onView) 
         act.setEnabled(len(items)==1)
-        act = self.popMenu.addAction(getThemeIcon("accessories-calculator"),"Preview Formula/Values",
+        act = self.popMenu.addAction(getThemeIcon("accessories-calculator"),
+                                     "Preview Formula/Values",
             lambda s=self:WindowManager.addWindow(s.showAlarmPreview()))
         act.setEnabled(len(items)==1)
-        self.popMenu.addAction(getThemeIcon("view-refresh"), "Sort/Update List",self.onSevFilter)
+        self.popMenu.addAction(getThemeIcon("view-refresh"), 
+                               "Sort/Update List",self.onSevFilter)
 
-        act = self.popMenu.addAction(getThemeIcon("office-calendar"), "View History",self.viewHistory)
-        act.setEnabled(SNAP_ALLOWED and len(items)==1) # and row.get_alarm_tag() in self.ctx_names)
+        act = self.popMenu.addAction(getThemeIcon("office-calendar"), 
+                                     "View History",self.viewHistory)
+        act.setEnabled(SNAP_ALLOWED and len(items)==1) 
+            # and row.get_alarm_tag() in self.ctx_names)
             
         sevMenu = self.popMenu.addMenu('Change Severity')
         for S in ('ERROR','ALARM','WARNING','DEBUG'):
             action = sevMenu.addAction(S)
             self.connect(action, QtCore.SIGNAL("triggered()"), 
-                lambda ks=items,s=S: self.setSeverity([k.get_alarm_tag() for k in ks],s))
+                lambda ks=items,s=S: 
+                  self.setSeverity([k.get_alarm_tag() for k in ks],s))
         
         # Reset / Acknowledge options
-        act = self.popMenu.addAction(getThemeIcon("edit-undo"), "Reset Alarm(s)",self.ResetAlarm)
-        act.setEnabled(any(i.alarm.active for i in items))
+        act = self.popMenu.addAction(getThemeIcon("edit-undo"), 
+                                     "Reset Alarm(s)",self.ResetAlarm)
 
-        if len([i.alarmAcknowledged for i in items]) in (len(items),0):
+        items = [view.get_alarm_from_text(i.text()) for i in items]
+        print('oncontextMenu(%s)'%items)
+        items = [self.api[a] for a in items]
+        act.setEnabled(any(i.active for i in items))
+
+        if len([i.acknowledged for i in items]) in (len(items),0):
             self.popMenu.addAction(getThemeIcon("media-playback-pause"), "Acknowledge/Renounce Alarm(s)",self.onAckStateChanged)
             #(lambda checked=not row.alarmAcknowledged:self.onAckStateChanged(checked)))
-        if len([i.alarmDisabled for i in items]) in (len(items),0):
+        if len([i.disabled for i in items]) in (len(items),0):
             self.popMenu.addAction(getThemeIcon("dialog-error"), "Disable/Enable Alarm(s)",self.onDisStateChanged)
             
         # Edit options

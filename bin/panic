@@ -3,10 +3,17 @@
 PANIC=$(python -c "import imp;print(imp.find_module('panic')[1])")
 
 PANIC_DEFAULT="--filter=!EXCLUDEDALARMS"
+PANIC_ARGS="$*"
+
+if [ "$(echo $PANIC_ARGS | grep '\-\-')" ] ; then
+  PANIC_ARGS=$PANIC_ARGS
+else
+  PANIC_ARGS=$PANIC_DEFAULT
+fi
 
 HASSCREEN=
 #$(which screen 2>/dev/null)
-CMD="python $PANIC/gui/gui.py $PANIC_DEFAULT"
+CMD="python $PANIC/gui/gui.py $PANIC_ARGS"
 
 if [ "$( echo $1 | grep '\?\|\-h' )" ] ; then
   echo "Usage:"
@@ -36,8 +43,8 @@ else
       CMD="${CMD} > /dev/null"
     fi
   fi
-  echo $CMD $*
-  $CMD $*
+  echo $CMD
+  $CMD
 fi
 
 
