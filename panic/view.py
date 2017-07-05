@@ -113,7 +113,7 @@ class AlarmView(EventListener,Logger):
         #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
         }
   
-    def __init__(self,name='AlarmView',filters={},domain='*',
+    def __init__(self,name='AlarmView',filters={},domain='*',api=None,
                  refresh=3.,asynch=False,verbose=False):
 
         self.t_init = now()
@@ -150,7 +150,7 @@ class AlarmView(EventListener,Logger):
         self.changed = True
         #self.changes = CaselessDefaultDict(int)
         self.info('parent init done, +%s'%(now()-self.t_init))
-        self.api = panic.AlarmAPI(filters=domain)
+        self.api = api or panic.AlarmAPI(filters=domain)
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
         self.apply_filters()
