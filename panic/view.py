@@ -503,6 +503,7 @@ class AlarmView(EventListener,Logger):
             self.error('AlarmView(%s).event_hook(%s,%s,%s)'%(
               self.name,src,type_, shortstr(value)))
             self.error(traceback.format_exc())
+            self.error(array)
         finally:
             #self.lock.release()
             pass
