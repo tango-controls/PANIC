@@ -53,18 +53,18 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     - gui.current_view: the currently selected view (?)
     """
     #Default period between list order updates
-    REFRESH_TIME = 5000 
+    REFRESH_TIME = 1000
     #Default period between database reloads
     RELOAD_TIME = 60000 
     # new refresh set by hurry()
-    MAX_REFRESH = 3000 
+    MAX_REFRESH = 500 
     #AlarmRow.use_list will be enabled only if number of alarms > MAX_ALARMS
     MAX_ALARMS = 30 
     #Controls if alarm events will hurry buildList()
     USE_EVENT_REFRESH = False 
     
-    ALARM_ROW = ['tag','active','device','description']
-    ALARM_LENGTHS = [50,25,20,200]
+    ALARM_ROW = ['tag','get_state','get_time','device','description']
+    ALARM_LENGTHS = [50,10,20,25,200]
     
     __pyqtSignals__ = ("valueChanged",)
     
@@ -185,7 +185,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             trace('onReload(%s)'%self.RELOAD_TIME)
             print '+'*80
             now = time.time()
-            trace('%s -> AlarmGUI.onReload() after %f seconds'%(now,now-self.last_reload))
+            trace('%s -> AlarmGUI.onReload() after %f seconds'%(
+              now,now-self.last_reload))
             self.last_reload=now
             self.api.load()
             #self.checkAlarmRows()
@@ -398,7 +399,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         
         data = self.view.sort()
         self.ALARM_LENGTHS[0] = max(len(str(t).split('/')[-1]) for t in data)
-        self.ALARM_LENGTHS[2] = max(len(str(t).rsplit('/',1)[0]) for t in data)
+        self.ALARM_LENGTHS[3] = max(len(str(t).rsplit('/',1)[0]) for t in data)
         for i in range(len(data)): #self.getVisibleRows():
             t = data[i]
             try:
@@ -666,9 +667,11 @@ class AlarmGUI(QFilterGUI):
         #TIMERS (to reload database and refresh alarm list).
         self.reloadTimer = Qt.QTimer()
         self.refreshTimer = Qt.QTimer()
-        Qt.QObject.connect(self.refreshTimer, Qt.SIGNAL("timeout()"), self.onRefresh)
-        Qt.QObject.connect(self.reloadTimer, Qt.SIGNAL("timeout()"), self.onReload)
-        self.reloadTimer.start(self.REFRESH_TIME/2.)
+        Qt.QObject.connect(self.refreshTimer, 
+                           Qt.SIGNAL("timeout()"), self.onRefresh)
+        Qt.QObject.connect(self.reloadTimer, 
+                           Qt.SIGNAL("timeout()"), self.onReload)
+        self.reloadTimer.start(self.REFRESH_TIME/2.) #first fast loading
         self.refreshTimer.start(self.REFRESH_TIME)
         
     def connectAll(self):

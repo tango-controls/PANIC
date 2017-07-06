@@ -7,7 +7,7 @@ from taurus.core import TaurusEventType
 from taurus.qt.qtgui.base import TaurusBaseComponent
 from editor import AlarmForm
 from widgets import getAlarmTimestamp,trace,clean_str,\
-  getThemeIcon,getAttrValue, SNAP_ALLOWED, WindowManager
+  getThemeIcon,getAttrValue, SNAP_ALLOWED, WindowManager, AlarmPreview
 #from htmlview import *
 
 REFRESH_TIME = 10000
