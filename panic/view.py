@@ -26,7 +26,7 @@
 __doc__ = "panic.view will contain the AlarmView class for managing"\
           "updated views of the panic system state"
 
-import fandango as fn
+import fandango as fd
 import fandango.tango as ft
 import panic
 from panic import *
@@ -196,6 +196,12 @@ class AlarmView(EventListener,Logger):
     def __del__(self):
         print('AlarmView(%s).__del__()'%self.name)
         self.disconnect()
+        
+    @staticmethod
+    def __test__(*args):
+        args = args or ['*value*']
+        view = AlarmView('Test',api=AlarmAPI(args[0]),verbose=4)
+        fd.wait(15.)
         
     def get_alarm(self,alarm):
         #self.info('get_alarm(%s)'%alarm)
@@ -428,7 +434,8 @@ class AlarmView(EventListener,Logger):
                   tango_asynch = self.__asynch,
                   enable_polling = 1e3*self.__refresh,
                   )
-            ta.setLogLevel('WARNING')
+            ta.setLogLevel(self.verbose>3 and 'DEBUG' or 
+                (self.verbose>1 and 'INFO' or 'WARNING'))
             self.sources[ta.full_name] = ta
             self.sources[ta.full_name].addListener(self)
             return ta
@@ -469,11 +476,16 @@ class AlarmView(EventListener,Logger):
                 dev = self.api.get_device(src.device)
                 alarms = dev.alarms.keys()
                 
+            #print(sorted(a for a in dir(value) if 'value' in a))
+            #print((hasattr(value,'rvalue'),getattr(value,'rvalue',2)))
             if not getattr(value,'err',False):
+                self.debug('AlarmView(%s): rvalue = %s(%s)'%(
+                  src,type(rvalue),str(rvalue)))
                 r = rvalue[0] if rvalue else ''
-                self.info('AlarmView(%s): rvalue = %s'%(self.name,str(r)))
                 splitter = ';' if ';' in r else ':'
                 array = dict((l.split(splitter)[0],l) for l in rvalue)
+                self.debug('AlarmView(%s): rvalue = %s'
+                  %(self.source,fd.log.pprint(array)))
                 
             assert len(alarms), 'EventUnprocessed!'
                 
@@ -489,8 +501,11 @@ class AlarmView(EventListener,Logger):
                         row = array.get(av.tag,None)
                         av.set_state(row)
                         if not row: 
-                            self.warning('%s Not found in %s'%(
-                                av.tag,src.full_name))
+                            self.warning('%s Not found in %s(%s)'%(
+                                av.tag,src.full_name,splitter))
+                        else:
+                            self.info('%s active since %s'
+                              %(av.tag,fd.time2str(av.active or 0)))
                         rvalue = av.active
                     except:
                         self.warning(traceback.format_exc())
@@ -864,5 +879,7 @@ class AlarmView(EventListener,Logger):
         #self.updateStatusLabel()
         ##self._ui.listWidget.blockSignals(False)      
     
-
+if __name__ == '__main__': 
+        import sys
+        AlarmView.__test__(*sys.argv[1:])
    
