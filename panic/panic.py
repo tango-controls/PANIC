@@ -51,7 +51,7 @@ import fandango as fn
 
 from fandango import first,searchCl,matchCl,isString,isSequence,now
 from fandango import isFalse,xor,str2time,time2str,END_OF_TIME
-from fandango.tango import CachedAttributeProxy
+from fandango.tango import CachedAttributeProxy, AttrDataFormat
 from fandango.tango import PyTango,get_tango_host
 
 from .properties import *
@@ -114,10 +114,24 @@ def getAttrValue(obj,default=None):
     Extracts rvalue in tango/taurus3/4 compatible way
     If default = True, obj is returned
     """
-    return getattr(obj,'rvalue',
-             getattr(obj,'value',
-               obj if default is True 
-                 else default))
+    #r = getattr(obj,'rvalue',
+             #getattr(obj,'value',
+               #obj if default is True 
+                 #else default))
+    #print([(m,getattr(obj,m)) for m in dir(obj) if 'value' in m.lower()])
+    r,v,d = getattr(obj,'rvalue',None),None,None
+    if r is None:
+        v = getattr(obj,'value',None)
+        if v is None:
+            d = obj if default is True else default
+    #print('getAttrValue(%s)'%fd.shortstr(obj)
+          #+': %s,%s,%s'%(r,v,d))
+    r = r or v or d
+    if r is None and \
+        getattr(obj,'data_format',None) == AttrDataFormat.SPECTRUM \
+        and obj.is_empty:
+        r = []
+    return r
 
 def getAlarmDeviceProperties(device):
     """ Method used in all panic classes """
@@ -146,6 +160,17 @@ def setAlarmDeviceProperty(device, prop, value):
 # Alarm object used by API
 
 class Alarm(object):
+    """
+    Alarm object used by API's to keep the state of alarms
+    
+    It maintains 3 time variables:
+      self.updated : last time that set_active was called (active or not)
+      self.active : time at which the alarm was activated (only if active)
+      self._time : last time that the alarm state changed
+
+      
+      
+    """
   
     def __init__(self,tag,device='',formula='',description='',receivers='',config='', severity='',api=None):
         #Info from the database
@@ -162,6 +187,9 @@ class Alarm(object):
               ('receivers',receivers),('config',config),
               ('severity',severity))]
         if write: self.write()
+        
+    def trace(self,msg):
+        print('%s: Alarm(%s): %s'%(fn.time2str(),self.tag,msg))
 
     def clear(self):
         """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
@@ -276,7 +304,13 @@ class Alarm(object):
             if state in ('ERROR'):
                 self.active = None
         elif isString(state) and ':' in state:
-            self.set_state('ACTIVE' if self.get_time(True) else 'NORM')
+            tt = self.get_time(True)
+            if tt: 
+                self.set_state('ACTIVE')
+                self.set_active(tt)
+            else:
+                self.set_state('NORM')
+                self.set_active(0)
         else:
             self._state = AlarmStates.get_key(state)
 
@@ -284,7 +318,6 @@ class Alarm(object):
             return self.set_time()
       
     def get_state(self,force=True):
-
         if force or self._state is None:
             if self.disabled:
                 if time.time() < self.disabled:
@@ -341,6 +374,7 @@ class Alarm(object):
                 try:
                     return str2time(date)
                 except:
+                    self.trace('failed to parse date from %s'%(str(lines)))
                     return END_OF_TIME
         else: return 0
       
