@@ -78,7 +78,11 @@ class AlarmValueLabel(TaurusValueLabel):
             
     def updateStyle(self,extra=''):
         self.setAlignment(QtCore.Qt.AlignCenter)
-        value = getattr(self.getModelValueObj(), 'value', None)
+        obj = self.getModelValueObj()
+        if hasattr('rvalue',obj):
+            value = obj.rvalue
+        else:
+            value = getattr(obj,'value',None)
         if value:
             self.ss = "background-color:red; color:black;"
             self.setText("ALARM")
