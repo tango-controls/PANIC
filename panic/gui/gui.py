@@ -25,6 +25,7 @@ except:
 
 from row import AlarmRow, QAlarm, QAlarmManager
 from widgets import * #< getThemeIcon imported here
+from widgets import WindowManager
 from editor import FormulaEditor,AlarmForm
 from core import Ui_AlarmList
 from alarmhistory import *
