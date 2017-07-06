@@ -304,7 +304,7 @@ class Alarm(object):
             if state in ('ERROR'):
                 self.active = None
         elif isString(state) and ':' in state:
-            tt = self.get_time(True)
+            tt = self.get_time(True) #array cache reading from ds
             if tt: 
                 self.set_state('ACTIVE')
                 self.set_active(tt)

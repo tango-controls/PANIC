@@ -102,8 +102,12 @@ class AlarmView(EventListener,Logger):
         'description' : lambda s,l=50: ('{0:<}').format(s),
 
         'severity' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
+        
+        'get_state' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
+        
+        'get_time' : lambda s,l=20: ('{0:^%d}'%(l or 4)).format(time2str(s)),
 
-        'active' : lambda s,l=30: (('{0:^%d}'%(l or 4)).format(
+        'active' : lambda s,l=20: (('{0:^%d}'%(l or 4)).format(
           'FAILED!' if s is None else (
             'Not Active' if not s else (
               s if s in (1,True) else (
@@ -336,7 +340,8 @@ class AlarmView(EventListener,Logger):
         try:
             for i,r in enumerate(cols):
                 if s.strip(): s+=sep
-                args = [getattr(alarm,r)]
+                v = getattr(alarm,r)
+                args = [v() if fd.isCallable(v) else v]
                 if lengths: args.append(lengths[i])
                 s += formatters[r](*args)
             return s
@@ -499,13 +504,15 @@ class AlarmView(EventListener,Logger):
                 else:
                     try:
                         row = array.get(av.tag,None)
-                        av.set_state(row)
                         if not row: 
+                            if 'activealarms' in str(src).lower():
+                                av.set_active(0)
                             self.warning('%s Not found in %s(%s)'%(
                                 av.tag,src.full_name,splitter))
                         else:
                             self.info('%s active since %s'
                               %(av.tag,fd.time2str(av.active or 0)))
+                        av.set_state(row)
                         rvalue = av.active
                     except:
                         self.warning(traceback.format_exc())
