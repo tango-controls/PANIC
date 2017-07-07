@@ -233,9 +233,12 @@ TODO_LIST = {
          [] ] ,
     }
     
-PyAlarmDefaultProperties = dict(join(d.items() for d in (ALARM_CYCLE,ALARM_ARCHIVE,ALARM_LOGS,DEVICE_CONFIG)))
-DEVICE_PROPERTIES = dict(join(v.items() for v in (PyAlarmDefaultProperties,ALARM_TABLES)))
-ALARM_CONFIG = ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()+ALARM_LOGS.keys()+DEVICE_CONFIG.keys()
+PyAlarmDefaultProperties = dict(join(d.items() for d in 
+                        (ALARM_CYCLE,ALARM_ARCHIVE,ALARM_LOGS,DEVICE_CONFIG)))
+DEVICE_PROPERTIES = dict(join(v.items() for v in 
+                              (PyAlarmDefaultProperties,ALARM_TABLES)))
+ALARM_CONFIG = (ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()
+                                +ALARM_LOGS.keys()+DEVICE_CONFIG.keys())
 
 ALARM_SEVERITIES = ['ERROR','ALARM','WARNING','DEBUG']
 

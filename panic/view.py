@@ -59,7 +59,6 @@ class FilterStack(SortedDict):
     def __init__(self,filters=None):
         SortedDict.__init__(self)
         if filters:
-            print filters
             if isSequence(filters): #It doesn't matter which types
                 [self.add(str(i),f) for i,f in enumerate(filters)]
                 
@@ -89,6 +88,15 @@ class FilterStack(SortedDict):
         
     def apply(self,sequence,strict=False,trace=False):
         return filter(partial(self.match,strict=strict,trace=trace),sequence)
+      
+    def __repr__(self):
+        dct = {}
+        for k,v in self.items():
+            for kk,vv in v.items():
+                if vv:
+                    dct[k] = dct.get(k,{})
+                    dct[k][kk] = vv
+        return fd.log.pformat(dct)
     
 
 class AlarmView(EventListener,Logger):
@@ -126,7 +134,8 @@ class AlarmView(EventListener,Logger):
         self.lock = Lock()
         self.verbose = verbose
         Logger.__init__(self,name)
-        self.setLogLevel('INFO')
+        self.setLogLevel(self.verbose>3 and 'DEBUG' or 
+                (self.verbose>1 and 'INFO' or 'WARNING'))
         
         if isString(filters): filters = {'tag':filters}
         self.filters = FilterStack(filters)
@@ -145,7 +154,7 @@ class AlarmView(EventListener,Logger):
         [self.defaults.update(**f) for f in self.filters.values()]
         self.filters.insert(0,'default',self.defaults.dict())
         
-        self.info('AlarmView(%s)'%self.filters)
+        self.info('AlarmView(%s)'%str((filters,domain,refresh,asynch)))
                 
         self.ordered=[] #Alarms list ordered
         self.last_sort = 0
@@ -154,8 +163,7 @@ class AlarmView(EventListener,Logger):
         
         self.timeSortingEnabled=None
         self.changed = True
-        #self.changes = CaselessDefaultDict(int)
-        self.info('parent init done, +%s'%(now()-self.t_init))
+        #self.info('parent init done, +%s'%(now()-self.t_init))
         self.api = api or panic.AlarmAPI(filters=domain)
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
@@ -163,17 +171,6 @@ class AlarmView(EventListener,Logger):
         self.info('view api init done, +%s'%(now()-self.t_init))
         self.info('sources : %s'%fd.log.pformat(self.alarms))
         
-        #self.default_regEx=options.get('filter',None) or filters or None
-        #self.regEx = self.default_regEx
-        #if self.regEx and str(self.regEx)!=os.getenv('PANIC_DEFAULT'): 
-            #print 'Setting RegExp filter: %s'%self.regEx
-            #self._ui.regExLine.setText(str(self.regEx))
-        #self.severities=['alarm', 'error', 'warning', 'debug', '']
-        #self.snapi = None
-        #self.ctx_names = []
-
-            
-        #AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
         N = len(self.alarms)
         
         ## How often should the ordered list be renewed?
@@ -190,7 +187,8 @@ class AlarmView(EventListener,Logger):
         #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
         
         EventListener.__init__(self,name)
-        self.setLogLevel('INFO')
+        self.setLogLevel(self.verbose>3 and 'DEBUG' or 
+                (self.verbose>1 and 'INFO' or 'WARNING'))
         
         self.update_sources()
         self.info('event sources updated, +%s'%(now()-self.t_init))
@@ -199,6 +197,7 @@ class AlarmView(EventListener,Logger):
 
         #self.start()
         self.info('view init done, +%s'%(now()-self.t_init))
+        self.logPrint('info','\n\n')
         
     def __del__(self):
         print('AlarmView(%s).__del__()'%self.name)
@@ -233,10 +232,13 @@ class AlarmView(EventListener,Logger):
         if not self.filtered and not filters:
             r = self.filtered
         else:
-            #r = [a.tag for a in #self.api.filter_alarms(filters or self.filters)]
-            filters = FilterStack(filters) if filters else self.filters
+            if filters and not isinstance(filters,FilterStack):
+                filters = FilterStack(filters)
+            else:
+                filters = filters or self.filters
             r = [a.tag for a in filters.apply(self.api.values())]
-        self.info('get_alarms(%s): %d alarms found'%(filters,len(r)))
+
+        self.info('get_alarms(%s): %d alarms found'%(repr(filters),len(r)))
         return r
       
     def apply_filters(self,**filters):
@@ -257,7 +259,7 @@ class AlarmView(EventListener,Logger):
         try:
             #self.lock.acquire()
             filters = FilterStack(filters) if filters else self.filters
-            self.info('apply_filters(%s)'%filters)
+            self.info('apply_filters(%s)'%repr(filters))
             self.filtered = self.get_alarms(filters)
             self.filters = filters
             objs = [self.api[f] for f in self.filtered]
@@ -473,8 +475,8 @@ class AlarmView(EventListener,Logger):
         try:
             rvalue = getAttrValue(value,None)# convert empty arrays to []
             error = getattr(value,'err',False) or rvalue is None
-            self.debug('AlarmView(%s).event_hook(%s,%s,%s)'%(
-              self.name,src,type_, rvalue))
+            ## eventReceived already log that
+            #self.debug('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
             
             #self.lock.acquire()
             if src.simple_name in self.api.alarms:
@@ -485,46 +487,40 @@ class AlarmView(EventListener,Logger):
                 dev = self.api.get_device(src.device)
                 alarms = dev.alarms.keys()
                 
-            #print(sorted(a for a in dir(value) if 'value' in a))
-            #print((hasattr(value,'rvalue'),getattr(value,'rvalue',2)))
             if not getattr(value,'err',False):
-                self.debug('AlarmView(%s): rvalue = %s(%s)'%(
-                            src,type(rvalue),str(rvalue)))
-                
+                #self.debug('rvalue = %s(%s)'%(type(rvalue),str(rvalue)))
                 r = rvalue[0] if rvalue else ''
                 splitter = ';' if ';' in r else ':'
                 array = dict((l.split(splitter)[0],l) for l in rvalue)
-                self.debug('AlarmView(%s): rvalue = %s'
-                            %(self.source,fd.log.pprint(array)))
+                self.debug('rvalue = %s'%(fd.log.pformat(array)))
                 
             assert len(alarms), 'EventUnprocessed!'
                 
             for a in alarms:
-              
                 av = self.get_alarm(a)
+                #self.debug('event_hook[%s,%s] ...'%(a,av.tag))
                 av.updated = now()
 
                 if error:
-                    rvalue = None
+                    pass
                     
                 elif isSequence(rvalue):
                     try:
                         row = array.get(av.tag,None)
+                        self.debug('event_hook[%s]:\n\t"%s"'%(av.tag,row))
                         if not row: 
                             if clsearch('activealarms',src.full_name):
                                 row = '%s:'%av.tag #av.set_active(0)
                             else:
                                 self.warning('%s Not found in %s(%s)'%(
                                     av.tag,src.full_name,splitter))
-                        else:
+
+                        av.set_state(row or None)
+                        if av.active:
                             self.info('%s active since %s'
                               %(av.tag,fd.time2str(av.active or 0)))
-                        av.set_state(row or None)
-                        rvalue = av.active
-                        
                     except:
                         self.warning(traceback.format_exc())
-                        rvalue = None
                 else:
                     # Not parsing an array value
                     av.set_active((rvalue and av.active) or rvalue)
@@ -534,14 +530,14 @@ class AlarmView(EventListener,Logger):
                     self.values[av.get_model()] = None
                   
                 prev = self.values[av.get_model()]
-                last = rvalue
+                last = av.active if not error else None
 
                 if last != prev:
                     (self.info if self.verbose else self.debug)(
                       'event_hook(%s,%s): %s => %s'%(
                       av.tag,av.get_state(),prev,last))
                         
-                self.values[av.get_model()] = rvalue
+                self.values[av.get_model()] = last
                     
         except:
             self.error('AlarmView(%s).event_hook(%s,%s,%s)'%(
