@@ -1319,7 +1319,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #self.debug( "In "+self.get_name()+"::read_VersionNumber()")
 
         #    Add your own code here
-        attr_VersionNumber_read = __RELEASE__ #"%s.%s: srubio-2013/07/07"%(MAJOR_VERSION,MINOR_VERSION)
+        attr_VersionNumber_read = __RELEASE__ 
         attr.set_value(attr_VersionNumber_read)
         
 #------------------------------------------------------------------
@@ -1335,14 +1335,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
 #---- LastAlarm attribute State Machine -----------------
     def is_LastAlarm_allowed(self,req_type=None):
-            #if self.get_state() in [PyTango.DevState.INIT]:
-            if not self.LastAlarms:
-                    #       End of Generated Code
-                    #       Re-Start of Generated Code
-                    self.info('LastAlarms list is emptied once it is read, is used only for archiving purposes.')
-                    PyTango.Except.throw_exception('EmptyList','LastAlarms already read/archived','read_LastAlarm')
-                    return False
-            return True
+
+        if not self.LastAlarms:
+                self.info('LastAlarms list is emptied once it is read,'
+                  ' is used only for archiving purposes.')
+                PyTango.Except.throw_exception('EmptyList',
+                  'LastAlarms already read/archived','read_LastAlarm')
+                return False
+        return True
 
 #------------------------------------------------------------------
 #    Read AlarmConfiguration attribute
@@ -1352,7 +1352,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         #    Add your own code here
         attr_AlarmConfig_read = []
-        attr_AlarmConfig_read = ['%s:%s'%(property,getattr(self,property)) for property in PyAlarmClass.device_property_list.keys() if property not in panic.ALARM_TABLES]
+        attr_AlarmConfig_read = ['%s:%s'%(property,getattr(self,property)) 
+                  for property in PyAlarmClass.device_property_list.keys() 
+                  if property not in panic.ALARM_TABLES]
         attr.set_value(attr_AlarmConfig_read)
 
 #------------------------------------------------------------------
@@ -1362,7 +1364,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #self.debug( "In "+self.get_name()+"::read_ActiveAlarms()")
 
         #    Add your own code here
-        attr_ActiveAlarms_read = ['%s:%s:%s' % (tag_name,time.ctime(alarm.active),alarm.formula) 
+        attr_ActiveAlarms_read = ['%s:%s:%s' 
+            % (tag_name,time.ctime(alarm.active),alarm.formula) 
             for tag_name,alarm in self.Alarms.items() if alarm.active][-512:]
         attr.set_value(attr_ActiveAlarms_read, len(attr_ActiveAlarms_read))
 
@@ -1374,7 +1377,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         #    Add your own code here
         attr_AcknowledgedAlarms_read = sorted(self.AcknowledgedAlarms)[-512:]
-        attr.set_value(attr_AcknowledgedAlarms_read, len(attr_AcknowledgedAlarms_read))
+        attr.set_value(attr_AcknowledgedAlarms_read, 
+                       len(attr_AcknowledgedAlarms_read))
 
 #------------------------------------------------------------------
 #    Read DisabledAlarms attribute
@@ -1384,7 +1388,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         #    Add your own code here
         [self.CheckDisabled(t) for t in self.DisabledAlarms]
-        attr_DisabledAlarms_read = sorted('%s until %s'%(a,time.ctime(t)) for a,t in self.DisabledAlarms.items())[-512:]
+        attr_DisabledAlarms_read = sorted('%s until %s'%(a,time.ctime(t)) 
+                        for a,t in self.DisabledAlarms.items())[-512:]
         attr.set_value(attr_DisabledAlarms_read, len(attr_DisabledAlarms_read))
 
 #------------------------------------------------------------------
@@ -1410,9 +1415,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         dates.sort(reverse=True)
         for date in dates:
             for tag_name in self.PastAlarms[date]:
-                attr_PastAlarms_read.append('%s:%s:%s' % (tag_name,time.ctime(date),self.Alarms[tag_name].formula))
+                attr_PastAlarms_read.append('%s:%s:%s' 
+                  % (tag_name,time.ctime(date),self.Alarms[tag_name].formula))
                 if len(attr_PastAlarms_read) == 512: break
-        #if len(attr_PastAlarms_read)>512: attr_PastAlarms_read = attr_PastAlarms_read[-512:]
+        
         attr.set_value(attr_PastAlarms_read, len(attr_PastAlarms_read))
 
 
@@ -1441,7 +1447,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #self.debug( "In "+self.get_name()+"::read_AlarmReceivers()")
 
         #    Add your own code here
-        attr_AlarmReceivers_read = sorted('%s:%s'%(k,v.receivers) for k,v in self.Alarms.items())
+        attr_AlarmReceivers_read = sorted('%s:%s'%(k,v.receivers) 
+                        for k,v in self.Alarms.items())
         attr.set_value(attr_AlarmReceivers_read, len(attr_AlarmReceivers_read))
 
 
@@ -1452,8 +1459,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #self.debug( "In "+self.get_name()+"::read_PhoneBook()")
 
         #    Add your own code here
-        attr_PhoneBook_read = sorted('%s:%s'%(k,v) for k,v in self.AddressList.items() if v)
-        attr.set_value(attr_PhoneBook_read, len(attr_PhoneBook_read))        
+        attr_PhoneBook_read = sorted('%s:%s'%(k,v) 
+                    for k,v in self.AddressList.items() if v)
+        attr.set_value(attr_PhoneBook_read, len(attr_PhoneBook_read))
 
 
 #------------------------------------------------------------------
@@ -1517,7 +1525,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         This method can be called from both updateAlarms thread or external clients 
         """
         #    Add your own code here
-        t0,STATE,VALUE,variables = time.time(),False,None,{} if variables is None else variables
+        t0,STATE,VALUE = time.time(),False,None
+        variables = notNone(variables,{})
         try:
             if lock: self.lock.acquire()
             # Update Locals (Done here to minimize time in which WorkerProcess is IDLE)
@@ -2098,22 +2107,35 @@ class PyAlarmClass(PyTango.DeviceClass):
                 #'Display level':PyTango.DispLevel.EXPERT,
              } ],
         'EvaluateFormula':
-            [[PyTango.DevString, "alarm formula to test with the current environment"],
+            [[PyTango.DevString, 
+              "alarm formula to test with the current environment"],
             [PyTango.DevString,"result obtained"]],
         'ResetAlarm':
-            [[PyTango.DevVarStringArray, "This is used to inform which alarm should be reset. If it doesn't exst an error occurs, comment"],
-            [PyTango.DevVarStringArray, "If succeed, returns the list of ActiveAlarms"]],
+            [[PyTango.DevVarStringArray, 
+              "This is used to inform which alarm should be reset."
+              " If it doesn't exst an error occurs, comment"],
+            [PyTango.DevVarStringArray, 
+              "If succeed, returns the list of ActiveAlarms"]],
         'Acknowledge':
-            [[PyTango.DevVarStringArray, "This is used to inform which alarm should be acknowledged, no more reminders will be sent, comment"],
-            [PyTango.DevVarStringArray, "If succeed, returns the list of ActiveAlarms"]],
+            [[PyTango.DevVarStringArray, 
+              "This is used to inform which alarm should be acknowledged,"
+              " no more reminders will be sent, comment"],
+            [PyTango.DevVarStringArray, 
+              "If succeed, returns the list of ActiveAlarms"]],
         'Renounce':
-            [[PyTango.DevString, "This is used to inform which alarm should be renounced, all reminders will be send again."],
+            [[PyTango.DevString, 
+              "This is used to inform which alarm should be renounced,"
+              " all reminders will be send again."],
             [PyTango.DevString, "If succeed, returns DONE"]],
         'Enable':
-            [[PyTango.DevString, "(TAG,) This is used to inform which alarm should be enabled, alarm won't skip the updateAlarms loop"],
+            [[PyTango.DevString, 
+              "(TAG,) This is used to inform which alarm should be enabled,"
+              " alarm won't skip the updateAlarms loop"],
             [PyTango.DevString, "If succeed, returns DONE"]],
         'Disable':
-            [[PyTango.DevVarStringArray, "(TAG,comment,[timeout s/m/h/d]) Disable an alarm (skips update loop) until timeout"],
+            [[PyTango.DevVarStringArray, 
+              "(TAG,comment,[timeout s/m/h/d]) Disable an alarm, "
+              "skips update loop until timeout"],
             [PyTango.DevString, "If succeed, returns DONE"]],
         'ResetAll':
             [[PyTango.DevVarStringArray, "User message"],
@@ -2122,7 +2144,8 @@ class PyAlarmClass(PyTango.DeviceClass):
             [[PyTango.DevVoid, ""],
             [PyTango.DevString, ""]],
         'GenerateReport':
-            [[PyTango.DevVarStringArray, "tag,message,receivers,...,description"],
+            [[PyTango.DevVarStringArray, 
+              "tag,message,receivers,...,description"],
             [PyTango.DevVarStringArray,"result, subject, receivers"]],
         'CreateAlarmContext':
             [[PyTango.DevVarStringArray, "tag,attributes,..."],
@@ -2164,7 +2187,8 @@ class PyAlarmClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
                 'description':"Returns Alarm:AlarmDate for last alarms until "
-                              "each is read once, then it's cleared (used for archiving)",
+                              "each is read once, then it's cleared"
+                              " (used for archiving)",
             } ],
         'AlarmConfiguration':
             [[PyTango.DevString,
@@ -2189,16 +2213,16 @@ class PyAlarmClass(PyTango.DeviceClass):
             PyTango.SPECTRUM,
             PyTango.READ, 512],
             {
-                'description':"Returns AlarmDate:ACKDate:AlarmDescription for all "
-                              "OLD alarms already acknowledged",
+                'description':"Returns AlarmDate:ACKDate:AlarmDescription"
+                              " for all OLD alarms already acknowledged",
             } ],
         'AlarmList':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 512],
             {
-                'description':"Returns the current state and definition of alarms "
-                              "managed by this device",
+                'description':"Returns the current state and definition of"
+                              " alarms managed by this device",
             } ],
         'AlarmReceivers':
             [[PyTango.DevString,
@@ -2261,8 +2285,12 @@ class PyAlarmClass(PyTango.DeviceClass):
     def __init__(self, name):
         print ( "In PyAlarmClass  constructor")
         import panic
+        # Reload default property values
+        # @TODO This update seems not needed!
         for k in panic.PyAlarmDefaultProperties:
-            PyAlarmClass.device_property_list[k][-1] = panic.PyAlarmDefaultProperties[k][-1]
+            p = panic.PyAlarmDefaultProperties[k][-1]
+            PyAlarmClass.device_property_list[k][-1] = p
+        
         PyTango.DeviceClass.__init__(self, name)
         self.set_type(name);
 
