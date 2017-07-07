@@ -275,8 +275,10 @@ class Alarm(object):
         o = self._state
         if state is None:
             self.get_state(True)
+            
         elif state in AlarmStates:
             self._state = AlarmStates[state]
+            
         elif isString(state) and ';' in state:
             tag,state,severity,stamp,desc = state.split(';')
             self._state = AlarmStates[state]
@@ -303,6 +305,7 @@ class Alarm(object):
                 self.disabled = stamp
             if state in ('ERROR'):
                 self.active = None
+                
         elif isString(state) and ':' in state:
             tt = self.get_time(True) #array cache reading from ds
             if tt: 
@@ -311,14 +314,19 @@ class Alarm(object):
             else:
                 self.set_state('NORM')
                 self.set_active(0)
+                
         else:
             self._state = AlarmStates.get_key(state)
 
         if o != self._state:
+            fn.log.tracer('%s state changed!: %s -> %s -> %s'
+              %(self.tag,o,state,self._state))
             return self.set_time()
       
     def get_state(self,force=True):
+      
         if force or self._state is None:
+          
             if self.disabled:
                 if time.time() < self.disabled:
                     self._state = AlarmStates.SHLVD
@@ -359,24 +367,13 @@ class Alarm(object):
 
         ## Parsing ActiveAlarms attribute
         if attr_value in (None,True):
-            attr_value = self.get_ds().get_active_alarms()
+            actives = self.get_ds().get_active_alarms()
+        elif isSequence(attr_value):
+            actives = self.get_ds().get_active_alarms(attr_value)
+        else:
+            actives = {self.tag:[attr_value]}
             
-        elif not isSequence(attr_value):
-            attr_value = [attr_value]
-            
-        lines = [l for l in (attr_value or []) if l.startswith(self.tag+':')]
-        if lines: 
-            date = str((lines[0].replace(self.tag+':','').split('|')[0]
-                        ).rsplit(':',1)[0].strip())
-            try:
-                return time.mktime(time.strptime(date))
-            except:
-                try:
-                    return str2time(date)
-                except:
-                    self.trace('failed to parse date from %s'%(str(lines)))
-                    return END_OF_TIME
-        else: return 0
+        return actives.get(self.tag,0)
       
     time = property(get_time,set_time)
         
@@ -613,11 +610,31 @@ class AlarmDS(object):
             model = self.name+'/activealarms'
         return model.lower()
       
-    def get_active_alarms(self):
+    def get_active_alarms(self, value = None):
         """ Returns the list of currently active alarms """
         if self._actives is None:
-          self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',keeptime=3000.)
-        return self._actives.read().value
+            self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',
+                                               keeptime=3000.)
+        if value is None:
+            value = getAttrValue(self._actives.read())
+            
+        if not value: return {}
+      
+        #Parsing ActiveAlarms: TAG:DATE[:Formula]
+        r = {} 
+        for line in value:
+            splitter = ';' if ';' in line else ':'
+            tag,line = str(line).split(splitter,1)
+            date = ':'.join(line.split(':')[:3])
+            try:
+                r[tag] = time.mktime(time.strptime(date))
+            except:
+                try:
+                    r[tag] = str2time(date)
+                except:
+                    self.warning('failed to parse date from %s'%line)
+                    r[tag] = END_OF_TIME if line else 0
+        return r
 
     def state(self):
         """ Returns device state """
