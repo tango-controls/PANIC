@@ -310,18 +310,19 @@ class Alarm(object):
             tt = self.get_time(True) #array cache reading from ds
             if tt: 
                 self.set_state('ACTIVE')
+                o = self._state
                 self.set_active(tt)
             else:
                 self.set_state('NORM')
+                o = self._state
                 self.set_active(0)
-                
         else:
             self._state = AlarmStates.get_key(state)
 
-        if o != self._state:
+        if o != self._state or self._time is None:
             fn.log.tracer('%s state changed!: %s -> %s -> %s'
               %(self.tag,o,state,self._state))
-            return self.set_time()
+            return self.set_time(self.active)
       
     def get_state(self,force=True):
       
@@ -355,6 +356,7 @@ class Alarm(object):
       
     def set_time(self,t=None):
         self._time =  t or time.time()
+        #tracer('set_time(%s,%s)'%(self._time,self._state))
         return self._time
     
     def get_time(self,attr_value=None):
@@ -625,6 +627,11 @@ class AlarmDS(object):
         for line in value:
             splitter = ';' if ';' in line else ':'
             tag,line = str(line).split(splitter,1)
+
+            if not line:
+                r[tag] = 0
+                continue
+            
             date = ':'.join(line.split(':')[:3])
             try:
                 r[tag] = time.mktime(time.strptime(date))
@@ -633,7 +640,7 @@ class AlarmDS(object):
                     r[tag] = str2time(date)
                 except:
                     self.warning('failed to parse date from %s'%line)
-                    r[tag] = END_OF_TIME if line else 0
+                    r[tag] = END_OF_TIME
         return r
 
     def state(self):
@@ -794,10 +801,11 @@ class AlarmAPI(fandango.SingletonMap):
         if filters in all_devices:
             all_devices = matched = [filters]
             
-        elif filters!='*' and any(matchCl(filters,s) for s in all_servers):
+        elif (filters!='*' and '/' in filters 
+                and any(matchCl(filters,s) for s in all_servers)):
             self.servers.load_by_name(filters)
             matched = [d.lower() for d in self.servers.get_all_devices() 
-                       if d.lower() in all_devices]
+                    if d.lower() in all_devices]
             if filters in self.servers:
                 all_devices = matched
             
@@ -1012,7 +1020,7 @@ class AlarmAPI(fandango.SingletonMap):
         if key in self.alarms:
             return self.devices[self.alarms[key].device]
         if not full and ':' in key:
-            key = key.split(':',1)[-1].split('/',1)[1]        
+            key = key.split(':',1)[-1].split('/',1)[1]
         if key in self.devices:
             return self.devices[key]
         return None
