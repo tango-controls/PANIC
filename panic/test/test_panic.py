@@ -20,7 +20,7 @@ def test_AlarmDS(device=''):
   Fn.log.info('Testing AlarmDS(%s)'%device)
   if device:
     device = api.devices.get(device)
-    assert Fn.isSequence(device.get_active_alarms())
+    assert Fn.isMapping(device.get_active_alarms())
   return True
 
 @InOutLogged

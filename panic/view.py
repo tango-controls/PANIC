@@ -160,7 +160,8 @@ class AlarmView(EventListener,Logger):
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
         self.apply_filters()
-        self.info('api init done, +%s'%(now()-self.t_init))
+        self.info('view api init done, +%s'%(now()-self.t_init))
+        self.info('sources : %s'%fd.log.pformat(self.alarms))
         
         #self.default_regEx=options.get('filter',None) or filters or None
         #self.regEx = self.default_regEx
@@ -207,7 +208,8 @@ class AlarmView(EventListener,Logger):
     def __test__(*args):
         args = args or ['*value*']
         view = AlarmView('Test',api=AlarmAPI(args[0]),verbose=4)
-        fd.wait(15.)
+        print('\n'.join('#'*80 for i in range(4)))
+        fd.wait(20.)
         
     def get_alarm(self,alarm):
         #self.info('get_alarm(%s)'%alarm)
