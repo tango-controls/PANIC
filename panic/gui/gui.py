@@ -33,7 +33,7 @@ from alarmhistory import *
 OPEN_WINDOWS = []
 
 import widgets
-widgets.TRACE_LEVEL = 0
+widgets.TRACE_LEVEL = -1
 
     ###########################################################################
     
@@ -247,7 +247,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         try:
             items = self.getSelectedRows(extend=False)
             if len(items)==1:
-                a = items[0]
+                a = self.view.get_alarm_from_text(items[0])
                 tags = a.tag.split('_')
                 self.emit(Qt.SIGNAL('alarmSelected'),a.tag)
                 models = self.api.parse_attributes(a.alarm.formula)
@@ -653,7 +653,8 @@ class AlarmGUI(QFilterGUI):
                 self.scope or self.default_regEx or '',
                 fn.get_tango_host().split(':')[0]))
             
-            url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6.svg'
+            icon = '/gui/icon/panic-6-big.png' #'.svg'
+            url = os.path.dirname(panic.__file__)+icon
             px = Qt.QPixmap(url)
             self.mainwindow.setWindowIcon(Qt.QIcon(px))
             
@@ -822,7 +823,7 @@ def main_gui():
     import fandango.threads
     import fandango.callbacks
     [s.unsubscribeEvents() for s 
-        in fandango.callbacks.EventSource.thread().sources]
+        in fandango.callbacks.EventSource.get_thread().sources]
     fandango.threads.ThreadedObject.kill_all()
     sys.exit(n) 
     
