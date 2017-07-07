@@ -42,6 +42,8 @@ from fandango.dicts import SortedDict,CaselessDict, \
 
 
 import fandango.callbacks
+fandango.callbacks.EventSource.get_thread().set_period_ms(2.)
+fandango.callbacks.EventThread.SHOW_ALIVE = 5000
 fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
 ft.check_device_cached.expire = 60.
 
@@ -467,7 +469,7 @@ class AlarmView(EventListener,Logger):
         """
         array = {}
         try:
-            rvalue = getAttrValue(value,None)
+            rvalue = getAttrValue(value,None)# convert empty arrays to []
             error = getattr(value,'err',False) or rvalue is None
             self.debug('AlarmView(%s).event_hook(%s,%s,%s)'%(
               self.name,src,type_, rvalue))
@@ -485,12 +487,13 @@ class AlarmView(EventListener,Logger):
             #print((hasattr(value,'rvalue'),getattr(value,'rvalue',2)))
             if not getattr(value,'err',False):
                 self.debug('AlarmView(%s): rvalue = %s(%s)'%(
-                  src,type(rvalue),str(rvalue)))
+                            src,type(rvalue),str(rvalue)))
+                
                 r = rvalue[0] if rvalue else ''
                 splitter = ';' if ';' in r else ':'
                 array = dict((l.split(splitter)[0],l) for l in rvalue)
                 self.debug('AlarmView(%s): rvalue = %s'
-                  %(self.source,fd.log.pprint(array)))
+                            %(self.source,fd.log.pprint(array)))
                 
             assert len(alarms), 'EventUnprocessed!'
                 
@@ -501,22 +504,28 @@ class AlarmView(EventListener,Logger):
 
                 if error:
                     rvalue = None
-                else:
+                    
+                elif isSequence(rvalue):
                     try:
                         row = array.get(av.tag,None)
                         if not row: 
-                            if 'activealarms' in str(src).lower():
-                                av.set_active(0)
-                            self.warning('%s Not found in %s(%s)'%(
-                                av.tag,src.full_name,splitter))
+                            if clsearch('activealarms',src.full_name):
+                                row = '%s:'%av.tag #av.set_active(0)
+                            else:
+                                self.warning('%s Not found in %s(%s)'%(
+                                    av.tag,src.full_name,splitter))
                         else:
                             self.info('%s active since %s'
                               %(av.tag,fd.time2str(av.active or 0)))
-                        av.set_state(row)
+                        av.set_state(row or None)
                         rvalue = av.active
+                        
                     except:
                         self.warning(traceback.format_exc())
                         rvalue = None
+                else:
+                    # Not parsing an array value
+                    av.set_active((rvalue and av.active) or rvalue)
                 
                 if av.get_model() not in self.values:
                     self.info('%s has no cache'%(av.get_model()))
@@ -545,8 +554,8 @@ class AlarmView(EventListener,Logger):
     ###########################################################################
     
     
-#class QAlarmView(AlarmView):
-            
+class QOldAlarmView(AlarmView):
+    pass
 
     #def getCurrents(self):
         #return self._ordered
