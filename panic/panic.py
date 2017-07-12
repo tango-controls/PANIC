@@ -53,6 +53,7 @@ from fandango import first,searchCl,matchCl,isString,isSequence,now
 from fandango import isFalse,xor,str2time,time2str,END_OF_TIME
 from fandango.tango import CachedAttributeProxy, AttrDataFormat
 from fandango.tango import PyTango,get_tango_host
+from fandango.log import tracer
 
 from .properties import *
 
@@ -320,7 +321,7 @@ class Alarm(object):
             self._state = AlarmStates.get_key(state)
 
         if o != self._state or self._time is None:
-            fn.log.tracer('%s state changed!: %s -> %s -> %s'
+            tracer('%s state changed!: %s -> %s -> %s'
               %(self.tag,o,state,self._state))
             return self.set_time(self.active)
       
@@ -356,7 +357,7 @@ class Alarm(object):
       
     def set_time(self,t=None):
         self._time =  t or time.time()
-        #tracer('set_time(%s,%s)'%(self._time,self._state))
+        tracer('%s.set_time(%s,%s)'%(self.tag,time2str(self._time),self._state))
         return self._time
     
     def get_time(self,attr_value=None):
@@ -365,6 +366,8 @@ class Alarm(object):
         It returns 0 if the alarm is not active.
         """
         if attr_value is None and self._time is not None:
+            tracer('%s.get_time(%s): %s'%(self.tag,
+                                          attr_value,time2str(self._time)))
             return self._time
 
         ## Parsing ActiveAlarms attribute
@@ -380,9 +383,12 @@ class Alarm(object):
     time = property(get_time,set_time)
         
     def get_quality(self):
-        """ it just translates severity to the equivalent Tango quality, but does NOT get actual attribute quality (which may be INVALID) """
-        qualities = {'DEBUG':'VALID','INFO':'VALID','WARNING':'WARNING','ALARM':'ALARM','ERROR':'ALARM'}
-        quality = PyTango.AttrQuality.names['ATTR_%s'%qualities.get(self.severity,'WARNING')]
+        """ it just translates severity to the equivalent Tango quality, 
+        but does NOT get actual attribute quality (which may be INVALID) """
+        qualities = {'DEBUG':'VALID','INFO':'VALID','WARNING':'WARNING',
+                     'ALARM':'ALARM','ERROR':'ALARM'}
+        quality = PyTango.AttrQuality.names['ATTR_%s'
+                            %qualities.get(self.severity,'WARNING')]
         return quality
 
     def parse_config(self):
@@ -393,11 +399,14 @@ class Alarm(object):
         elif config:
             config = str(config)
             try:
-                if '=' in config and ':' not in config: config = config.replace('=',':')
-                if ';' not in config and config.count(':')>1: config = config.replace(',',';')
+                if '=' in config and ':' not in config: 
+                    config = config.replace('=',':')
+                if ';' not in config and config.count(':')>1: 
+                    config = config.replace(',',';')
                 config = dict(s.split(':') for s in config.split(';'))
             except: 
-                print 'Alarm(%s): Unable to parse config(%s):\n%s'%(tag,config,traceback.format_exc())
+                print('Alarm(%s): Unable to parse config(%s):\n%s'
+                      %(tag,config,traceback.format_exc()))
                 config = {}
         else:
             config = {}
@@ -422,8 +431,8 @@ class Alarm(object):
         
     def get_acknowledged(self):
         try: 
-                self.acknowledged = not self.get_ds().get().CheckDisabled(self.tag)
-                return self.acknowledged
+            self.acknowledged = not self.get_ds().get().CheckDisabled(self.tag)
+            return self.acknowledged
         except: return None        
     
     def reset(self, comment):
@@ -435,7 +444,8 @@ class Alarm(object):
     def write(self,device='',exclude='',update=True):
         """
         Updates the Alarm config for the given device in the database
-        :param: update controls whether the device.init() will be called or not, if not the alarm will not be applied yet
+        :param: update controls whether the device.init() will be called or not,
+        if not the alarm will not be applied yet
         """
         self.device = device or self.device
         if not self.device: 
@@ -443,17 +453,21 @@ class Alarm(object):
         props = self.get_ds().get_alarm_properties()
 
         def update_lines(lines,new_line,exclude):
-            new_lines,added = [],False #A copy of the array is needed due to a bug in PyTango!
+            new_lines,added = [],False 
+            #A copy of the array is needed due to a bug in PyTango!
             tag = new_line.split(':',1)[0]
             for l in lines:
                 if l.startswith(tag+':') and l!=new_line:
-                    print 'In Alarm(%s).write(): line updated: %s' % (tag,new_line)
+                    print('In Alarm(%s).write(): line updated: %s' 
+                          % (tag,new_line))
                     new_lines.append(new_line)
                     added = True
-                elif not (exclude and re.match(exclude, l)) and l not in new_lines:
+                elif (not (exclude and re.match(exclude, l)) 
+                      and l not in new_lines):
                     new_lines.append(l)
+                    
             if not added and new_line not in new_lines: 
-                print 'In Alarm(%s).write(): line added: %s' % (tag,new_line)
+                print('In Alarm(%s).write(): line added: %s'%(tag,new_line))
                 new_lines.append(new_line)
             return new_lines
 
@@ -489,12 +503,14 @@ class Alarm(object):
         
     def add_receiver(self,receiver,write=True):
         """ Adds a new receiver """
-        self.receivers = ','.join([r for r in self.receivers.split(',') if r.strip()!=receiver]+[receiver])
+        self.receivers = ','.join([r for r in self.receivers.split(',') 
+                                   if r.strip()!=receiver]+[receiver])
         if write: self.write()
 
     def remove_receiver(self,receiver,write=True):
         """ Removes a receiver """
-        self.receivers = ','.join([r for r in self.receivers.split(',') if r.strip()!=receiver])
+        self.receivers = ','.join([r for r in self.receivers.split(',') 
+                                   if r.strip()!=receiver])
         if write: self.write()
 
     def replace_receiver(self,old,new,write=True):
@@ -569,36 +585,44 @@ class AlarmDS(object):
         return self.api.put_db_property(self.name,prop,value)
                     
     def enable(self,tag=None):
-        """ If Tag is None, this method will enable the whole device, but individual disables will be kept """
+        """ If Tag is None, this method will enable the whole device,
+        but individual disables will be kept 
+        """
         if tag is None:
-                self.api.put_db_property(self.name,'Enabled',True)
-                self.init()
-                print('%s: Enabled!' %self.name)
+            self.api.put_db_property(self.name,'Enabled',True)
+            self.init()
+            print('%s: Enabled!' %self.name)
         else:
-                tags = [a for a in self.alarms if matchCl(tag,a)]
-                print('%s: Enabling %d alarms: %s' % (self.name,len(tags),tags))
-                [self.get().Enable([str(a)]) for t in tags]
+            tags = [a for a in self.alarms if matchCl(tag,a)]
+            print('%s: Enabling %d alarms: %s' % (self.name,len(tags),tags))
+            [self.get().Enable([str(a)]) for t in tags]
                     
     def disable(self,tag=None,comment=None,timeout=None):
-        """ If Tag is None this method disables the whole device """
+        """ If Tag is None this method disables the whole device 
+        """
         if tag is None:
-                self.api.put_db_property(self.name,'Enabled',False)
-                self.init()
-                print('%s: Disabled!' %self.name)
+            self.api.put_db_property(self.name,'Enabled',False)
+            self.init()
+            print('%s: Disabled!' %self.name)
         else:
-                tags = [a for a in self.alarms if matchCl(tag,a)]
-                print('%s: Disabling %d alarms: %s' % (self.name,len(tags),tags))
-                [self.get().Disable([str(a) for a in (t,comment,timeout) if a is not None]) for t in tags]
+            tags = [a for a in self.alarms if matchCl(tag,a)]
+            print('%s: Disabling %d alarms: %s'%(self.name,len(tags),tags))
+            [self.get().Disable(
+              [str(a) for a in (t,comment,timeout) if a is not None]) 
+              for t in tags]
                     
     def get_alarm_properties(self):
         """ Method used in all panic classes """
         props = self.api.get_db_properties(self.name,ALARM_TABLES.keys())
         #Updating old property names
         if not props['AlarmList']:
-            props['AlarmList'] = self.api.get_db_property(self.name,'AlarmsList')
+            props['AlarmList'] = \
+                self.api.get_db_property(self.name,'AlarmsList')
             if props['AlarmList']:
-                print('%s: AlarmsList property renamed to AlarmList'%self.name)
-                self.api.put_db_properties(self.name,{'AlarmList':props['AlarmList'],'AlarmsList':[]})
+                print('%s:AlarmsList property renamed to AlarmList'%self.name)
+                self.api.put_db_properties(self.name,
+                    {'AlarmList':props['AlarmList'],'AlarmsList':[]})
+                
         return props
     
     def get_model(self):
@@ -669,21 +693,33 @@ class AlarmDS(object):
                 tag,formula = line.split(':',1)
                 self.alarms[tag] = {'formula':formula}
                 try: 
-                  local_receivers = [r for r in props['AlarmReceivers'] if r.startswith(tag+':')]
-                  local_receivers = first(local_receivers or ['']).split(':',1)[-1]
-                  #global_receivers = self.api.get_global_receivers(tag)
-                  #self.alarms[tag]['receivers'] = ','.join((local_receivers,global_receivers))
-                  self.alarms[tag]['receivers'] = local_receivers
+                    local_receivers = [r for r in props['AlarmReceivers'] 
+                                      if r.startswith(tag+':')]
+                    local_receivers = first(local_receivers or [''])
+                    local_receirvers = local_receivers.split(':',1)[-1]
+                    #global_receivers = self.api.get_global_receivers(tag)
+                    #self.alarms[tag]['receivers'] = \
+                    #  ','.join((local_receivers,global_receivers))
+                    self.alarms[tag]['receivers'] = local_receivers
                 except: 
-                  traceback.print_exc()
-                  self.alarms[tag]['receivers'] = ''
-                try: self.alarms[tag]['description'] = first(r for r in props['AlarmDescriptions'] if r.startswith(tag+':')).split(':',1)[-1]
-                except: self.alarms[tag]['description'] = ''
-                try: self.alarms[tag]['severity'] = first(r for r in props['AlarmSeverities'] if r.startswith(tag+':')).split(':',1)[-1]
-                except: self.alarms[tag]['severity'] = ''
+                    traceback.print_exc()
+                    self.alarms[tag]['receivers'] = ''
+                try: 
+                    self.alarms[tag]['description'] = first(r for r in 
+                        props['AlarmDescriptions'] 
+                        if r.startswith(tag+':')).split(':',1)[-1]
+                except: 
+                    self.alarms[tag]['description'] = ''
+                try: 
+                    self.alarms[tag]['severity'] = first(r for r in 
+                        props['AlarmSeverities'] 
+                        if r.startswith(tag+':')).split(':',1)[-1]
+                except: 
+                    self.alarms[tag]['severity'] = ''
             except:
                 print('Unparsable Alarm!: %s' % line)
-        #print '%s device manages %d alarms: %s'%(self.name,len(self.alarms),self.alarms.keys())
+        #print('%s device manages %d alarms: %s'
+        #   %(self.name,len(self.alarms),self.alarms.keys()))
         return self.alarms
 
     def init(self):
