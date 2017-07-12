@@ -476,7 +476,7 @@ class AlarmView(EventListener,Logger):
             rvalue = getAttrValue(value,None)# convert empty arrays to []
             error = getattr(value,'err',False) or rvalue is None
             ## eventReceived already log that
-            #self.debug('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
+            self.info('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
             
             #self.lock.acquire()
             if src.simple_name in self.api.alarms:
@@ -502,6 +502,9 @@ class AlarmView(EventListener,Logger):
                 av.updated = now()
 
                 if error:
+                    self.warning('event_hook(%s).Error: %s'%(src,rvalue))
+                    if 'CantConnectToDevice' in str(rvalue):
+                        av.set_state('ERROR')
                     pass
                     
                 elif isSequence(rvalue):

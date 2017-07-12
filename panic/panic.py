@@ -244,19 +244,26 @@ class Alarm(object):
         the count value has been reached
         """
         self.updated = now()
-        #print('%s.set_active(%s,%s)'%(self.tag,value,self.counter))
+        tracer('%s.set_active(%s,%s)'%(self.tag,value,self.counter))
         if value:
-            if not self.active: 
+            if self.active == 0:
                 self.counter+=1
         elif self.counter>0:
             self.counter-=1
         
-        if value and self.counter>=count and not self.active:
+        if value and value>0 and self.counter>=count and not self.active:
+            #ACTIVE
             self.last_sent = self.updated
             self.active = value
             self.set_time(value if value>1 else 0)
+            
+        if value and value<0:
+            #ERROR
+            if self.active>=0: self.set_time()
+            self.active = -1
 
         if not value and not self.counter:
+            #NORM
             self.active = 0
             self.set_time()
             if not self.recovered:
@@ -305,15 +312,19 @@ class Alarm(object):
                 self.active = 0
                 self.disabled = stamp
             if state in ('ERROR'):
-                self.active = None
+                self.active = -1
                 
         elif isString(state) and ':' in state:
             tt = self.get_time(True) #array cache reading from ds
-            if tt: 
+            if tt and tt>0 and not self.get_state() in ('ACTIVE',):
                 self.set_state('ACTIVE')
                 o = self._state
                 self.set_active(tt)
-            else:
+            elif tt and tt<0 and self.get_state not in ('ERROR',):
+                self.set_state('ERROR')
+                o = self._state
+                self.set_active(-1)
+            elif self.get_state() in ('NORM',):
                 self.set_state('NORM')
                 o = self._state
                 self.set_active(0)
@@ -326,7 +337,9 @@ class Alarm(object):
             return self.set_time(self.active)
       
     def get_state(self,force=True):
-      
+        tracer('%s.get_state(f=%s,d=%s,a=%s,r=%s,s=%s'%(self.tag,force,
+                self.disabled,self.active,self.recovered,self._state))
+        
         if force or self._state is None:
           
             if self.disabled:
@@ -345,7 +358,7 @@ class Alarm(object):
                 else:
                     self._state = AlarmStates.ACTIVE
                     
-            elif self.active is None:
+            elif self.active in (None,-1):
                 self._state = AlarmStates.ERROR
                 
             else:
@@ -377,6 +390,8 @@ class Alarm(object):
             actives = self.get_ds().get_active_alarms(attr_value)
         else:
             actives = {self.tag:[attr_value]}
+            
+        if isinstance(actives,(type(None),Exception)): return -1
             
         return actives.get(self.tag,0)
       
@@ -642,7 +657,10 @@ class AlarmDS(object):
             self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',
                                                keeptime=3000.)
         if value is None:
-            value = getAttrValue(self._actives.read())
+            try:
+                value = getAttrValue(self._actives.read())
+            except Exception,e:
+                return e
             
         if not value: return {}
       
