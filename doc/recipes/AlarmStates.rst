@@ -1,4 +1,20 @@
-IEC 62682: AlarmStates
+AlarmStates
+===========
+
+.. contents::
+
+State transitions
+-----------------
+
+events will be received from the device or from the poll->read->read_hw chain
+
+
+* ActiveAlarms doesn't cotain tag, alarm.active will be 0, state = NORM
+* Activealarms contains tag, alarm.active = activealarms timestamp, state = ACTIVE
+* ActiveAlarms is None or Exception, alarm.active will be set to -1. state = ERROR
+
+IEC 62682: AlarmStates Definition and related  Actions
+------------------------------------------------------
 
 Different annunciators can be setup for each State change
 
