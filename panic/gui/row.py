@@ -788,7 +788,7 @@ class AlarmRow(QtGui.QListWidgetItem,TaurusBaseComponent):
                 if not getattr(self,'ack_attr',None):
                     self.ack_attr = taurus.Attribute(self.device+'/AcknowledgedAlarms')
                     self.ack_attr.changePollingPeriod(REFRESH_TIME)
-                ack_val = getAttrValue(self.ack_attr.read())
+                ack_val = getAttrValue(self.ack_attr.read(),None)
                 val = any([a==self.alarm.tag for a in (ack_val or [])])
             else: 
                 val = taurus.Device(self.alarm.device).command_inout('CheckAcknowledged',self.alarm.tag)

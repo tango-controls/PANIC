@@ -465,7 +465,7 @@ class AlarmView(EventListener,Logger):
     def value_hook(self,src,type_,value):
         pass
         
-    def event_hook(self, src, type_, value):
+    def event_hook(self, src, type_, value, locked=False):
         """ 
         EventListener.eventReceived will jump to this method
         Method to implement the event notification
@@ -473,12 +473,15 @@ class AlarmView(EventListener,Logger):
         """
         array = {}
         try:
-            rvalue = getAttrValue(value,None)# convert empty arrays to []
-            error = getattr(value,'err',False) or rvalue is None
-            ## eventReceived already log that
-            self.info('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
+            # convert empty arrays to [] , pass exceptions
+            rvalue = getAttrValue(value,Exception)
+            error =  (getattr(value,'err',False) 
+                or isinstance(rvalue,(type(None),Exception,PyTango.DevError)))
             
-            #self.lock.acquire()
+            #self.info('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
+            ## eventReceived already log that
+            
+            #if locked is True: self.lock.acquire()
             if src.simple_name in self.api.alarms:
                 av = self.get_alarm(src.full_name)
                 alarms = [av.tag]
@@ -487,41 +490,45 @@ class AlarmView(EventListener,Logger):
                 dev = self.api.get_device(src.device)
                 alarms = dev.alarms.keys()
                 
-            if not getattr(value,'err',False):
+            if not error:
                 #self.debug('rvalue = %s(%s)'%(type(rvalue),str(rvalue)))
                 r = rvalue[0] if rvalue else ''
                 splitter = ';' if ';' in r else ':'
                 array = dict((l.split(splitter)[0],l) for l in rvalue)
-                self.debug('rvalue = %s'%(fd.log.pformat(array)))
+                self.debug('%s.rvalue = %s'%(src,fd.log.pformat(array)))
                 
             assert len(alarms), 'EventUnprocessed!'
                 
             for a in alarms:
                 av = self.get_alarm(a)
-                #self.debug('event_hook[%s,%s] ...'%(a,av.tag))
+                self.debug('event_hook() %s was %s since %s(%s)'
+                            %(a,av._state,av._time,
+                              time2str(av._time,us=True)))
                 av.updated = now()
 
                 if error:
-                    self.warning('event_hook(%s).Error: %s'%(src,rvalue))
-                    if 'CantConnectToDevice' in str(rvalue):
-                        av.set_state('ERROR')
-                    pass
-                    
+                    l = (self.warning if av.state not in ('ERROR','OOSRV') 
+                         else self.info)
+                    l('event_hook(%s).Error: %s'%(src,rvalue))
+                    s = ('ERROR','OOSRV')['CantConnectToDevice' in str(rvalue)]
+                    av.set_state(s)
+
                 elif isSequence(rvalue):
                     try:
-                        row = array.get(av.tag,None)
-                        self.debug('event_hook[%s]:\n\t"%s"'%(av.tag,row))
+                        EMPTY = ''
+                        row = array.get(av.tag,EMPTY)
+                        self.debug('[%s]:\t"%s"'%(av.tag,row or EMPTY))
                         if not row: 
                             if clsearch('activealarms',src.full_name):
-                                row = '%s:'%av.tag #av.set_active(0)
+                                row = 'NORM'
                             else:
                                 self.warning('%s Not found in %s(%s)'%(
                                     av.tag,src.full_name,splitter))
 
-                        av.set_state(row or None)
-                        if av.active:
-                            self.info('%s active since %s'
-                              %(av.tag,fd.time2str(av.active or 0)))
+                        av.set_state(row)
+                        #if av.active:
+                            #self.info('%s active since %s'
+                              #%(av.tag,fd.time2str(av.active or 0)))
                     except:
                         self.warning(traceback.format_exc())
                 else:
@@ -529,18 +536,19 @@ class AlarmView(EventListener,Logger):
                     av.set_active((rvalue and av.active) or rvalue)
                 
                 if av.get_model() not in self.values:
-                    self.info('%s has no cache'%(av.get_model()))
                     self.values[av.get_model()] = None
+                    self.info('%s cache initialized'%(av.get_model()))
                   
                 prev = self.values[av.get_model()]
-                last = av.active if not error else None
+                curr = av.active if not error else -1
 
-                if last != prev:
+                if curr != prev:
                     (self.info if self.verbose else self.debug)(
                       'event_hook(%s,%s): %s => %s'%(
-                      av.tag,av.get_state(),prev,last))
+                      av.tag,av.get_state(),prev,curr))
                         
-                self.values[av.get_model()] = last
+                self.values[av.get_model()] = curr
+                self.debug('event_hook() done ... \n')
                     
         except:
             self.error('AlarmView(%s).event_hook(%s,%s,%s)'%(
@@ -548,9 +556,8 @@ class AlarmView(EventListener,Logger):
             self.error(traceback.format_exc())
             self.error(array)
         finally:
-            #self.lock.release()
+            #if locked is True: self.lock.release()
             pass
-      
     
     ###########################################################################
     

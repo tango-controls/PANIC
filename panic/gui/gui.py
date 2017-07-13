@@ -101,7 +101,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         trace('AlarmGUI(%s): api done'%self.scope)
         #self._ordered=[] #Alarms list ordered
         self.view = panic.view.AlarmView(api=self.api,domain=self.scope,
-                                         verbose=4) 
+                                         verbose=2) 
         trace('AlarmGUI(): view done')
         
         self.snapi = None
