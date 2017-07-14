@@ -1434,8 +1434,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         setup = 'tag','state','severity','time','description'
         
         attr_AlarmList_read = sorted(
-          sep.join((str if s!='time' else time2str)(getattr(alarm,s))
-                   for s in setup)
+            sep.join('%s=%s'
+            %(s,(str if s!='time' else time2str)(getattr(alarm,s)))
+            for s in setup)
           for alarm in self.Alarms.values())
         
         attr.set_value(attr_AlarmList_read, len(self.Alarms))
