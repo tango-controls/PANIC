@@ -409,6 +409,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             except:
                 traceback.print_exc()
         
+        # data is now a sorted list of text rows
+        # self.view.ordered will contain alarm objects (reversed)
         for i,alarm in enumerate(data): #self._ordered:
             #obj = self.AlarmRows[alarm.tag]
             #if not ActiveCheck or (obj.alarm and not obj.alarmAcknowledged 
@@ -424,6 +426,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             text = str(item.text())
             if text!=alarm:
                 item.setText(alarm)
+                obj = self.view.ordered[-(i+1)]
                 self.setFontsAndColors(alarm,item)
                 font = Qt.QFont(Qt.QString("Courier"))
                 self._ui.listWidget.item(i).setFont(font)

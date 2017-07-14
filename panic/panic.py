@@ -464,7 +464,7 @@ class Alarm(object):
             
         return actives.get(self.tag,0)
       
-    #time = property(get_time,set_time)
+    time = property(get_time,set_time)
         
     def get_quality(self):
         """ it just translates severity to the equivalent Tango quality, 
