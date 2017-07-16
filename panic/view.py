@@ -293,6 +293,8 @@ class AlarmView(EventListener,Logger):
     
     def sort(self,sortkey = None):
         """
+        Returns a sorted list of alarm models
+        
         valid keys are:
         * name
         * device

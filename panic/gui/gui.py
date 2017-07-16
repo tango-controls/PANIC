@@ -421,7 +421,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                               lengths=self.ALARM_LENGTHS))
             except:
                 traceback.print_exc()
-        
+
+        # data is now a sorted list of alarm,text rows
         for i,t in enumerate(data): #self._ordered:
             #obj = self.AlarmRows[alarm.tag]
             #if not ActiveCheck or (obj.alarm and not obj.alarmAcknowledged 
@@ -441,7 +442,6 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 #self._ui.listWidget.item(i).setFont(font)
                 item.setText(text)
                 self.setFontsAndColors(item,alarm)
-                
                 
             #font = self._ui.listWidget.item(i).font()
             #font.setFixedPitch(True)
