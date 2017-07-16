@@ -72,6 +72,7 @@ The _proxies object allows to retrieve either DeviceProxy or DeviceServer object
 """
 
 SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4,'CONTROL':-1}
+DEFAULT_SEVERITY = 'WARNING'
 
 AlarmStates = fn.Struct({
   'NORM':0, #Normal state

@@ -595,7 +595,7 @@ class AlarmPreview(Qt.QDialog):
         
     @staticmethod
     def showEmptyAlarmPreview(gui=None):
-        print 'In AlarmPreview.showEmptyAlarmPreview(%s)'%gui
+        print('In AlarmPreview.showEmptyAlarmPreview(%s)'%type(gui))
         form = getattr(gui,'_AlarmFormulaPreview',None) or AlarmPreview()
         form.setModal(False)
         if not gui:

@@ -8,6 +8,7 @@ import fandango.qt
 from fandango.functional import *
 from fandango.qt import Qt
 from fandango.excepts import Catched
+from fandango.log import tracer
 
 import panic
 import panic.view
@@ -293,56 +294,66 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self._ui.listWidget.verticalScrollBar.valueChanged.connect(hook)
         
     @staticmethod
-    def setFontsAndColors(alarm,item):
+    def setFontsAndColors(item,alarm):
       
-        #if isinstance(alarm.active,(Exception,type(None))):
-            #icon = None
-            #bold = False
-            #color = QtGui.QColor("grey").light()
-            #background = QtGui.QColor("white")
-            
-        #if self.alarm.active and not self.alarmDisabled:
-          
-            #if self.quality==PyTango.AttrQuality.ATTR_ALARM:
-                #trace('alarm')
-                #if self.alarmAcknowledged:
-                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
-                #else:
-                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"software-update-urgent",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
-            #elif self.quality==PyTango.AttrQuality.ATTR_WARNING:
-                #trace('warning')
-                #if self.alarmAcknowledged:
-                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
-                #else:
-                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-important",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
-            #elif self.quality==PyTango.AttrQuality.ATTR_VALID:
-                #trace('debug')
-                #if self.alarmAcknowledged:
-                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
-                #else:
-                    #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"applications-development",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter()
-                                        
-            #if self.alarm.counter<2:
-                #self.font.setBold(True)
-            
-        #elif alarm.active in (False,0) and not alarm.disabled:
-            #if alarm.acknowledged:
-                #"media-playback-pause",False,QtGui.QColor("green").lighter(),QtGui.QColor("white")
-            #else:
-                #"emblem-system",False,QtGui.QColor("green").lighter(),QtGui.QColor("white")
-            #if not alarm.recovered and alarm.counter>1:
-                #bold = True
-                
-        #else: #AlarmDisabled or value = None
-            #"dialog-error",False,QtGui.QColor("black"),QtGui.QColor("grey").lighter()
+        state,severity = alarm.get_state(),alarm.severity
+        severity = severity or panic.DEFAULT_SEVERITY
+        color = Qt.QColor("black")
+        background = Qt.QColor("white")
+        bold = False
+        icon = ""
         
-        #alarmicon=getThemeIcon(icon) if icon else none
-        #item.setIcon(alarmicon or Qt.QIcon())
-        #item.font.setBold(bold)
-        #item.setTextColor(color)
-        #item.setBackgroundColor(background)
+        if state in ('ERROR','OOSRV'):
+            icon = "emblem-noread"
+            color = Qt.QColor("grey").light()
+            background = Qt.QColor("white")
+            
+        elif state in ('ACKED','ACTIVE','RTNUN'):
 
-        return
+            #bold = (state == "ACTIVE")
+            if severity in ('ALARM','ERROR'):
+                background = Qt.QColor("red").lighter()
+                icon = "software-update-urgent"
+                
+            elif severity == 'WARNING':
+                background = Qt.QColor("orange").lighter()
+                icon = "emblem-important"
+                
+            elif severity in ('INFO','DEBUG'):
+                background = Qt.QColor("yellow").lighter()
+                
+            if state == 'ACKED':
+                icon = "media-playback-pause"
+                icon = "applications-development"
+            
+        elif state in ('DSUPR','SHLVD'):
+            icon = "dialog-error"
+            color = Qt.QColor("grey").light()
+            background = Qt.QColor("white")
+            
+        elif state == 'NORM':
+            icon = "media-playback-pause" if alarm.acknowledged \
+                            else "emblem-system"
+            color = Qt.QColor("green").lighter()
+            background = Qt.QColor("white")
+            
+        else:
+            raise Exception('UnknownState:%s'%state)
+            
+        if (fandango.now() - alarm.get_time()) < 60:
+            bold = True
+
+        alarmicon=getThemeIcon(icon) if icon else None
+        tracer('setFontsAndColors(%s,%s,%s,%s,%s)'
+          %(alarm.tag,state,icon,background,bold))
+        item.setIcon(alarmicon or Qt.QIcon())
+        item.setTextColor(color)
+        item.setBackgroundColor(background)
+        f = item.font()
+        f.setBold(bold)
+        item.setFont(f)
+
+        return item
 
     @Catched
     def buildList(self,changed=False,block=False):
@@ -404,29 +415,32 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         for i in range(len(data)): #self.getVisibleRows():
             t = data[i]
             try:
-                data[i] = (self.view.get_alarm_as_text(t,
-                        cols=self.ALARM_ROW,lengths=self.ALARM_LENGTHS))
+                data[i] = (self.view.get_alarm(t),
+                           self.view.get_alarm_as_text(t,
+                              cols=self.ALARM_ROW,
+                              lengths=self.ALARM_LENGTHS))
             except:
                 traceback.print_exc()
         
-        for i,alarm in enumerate(data): #self._ordered:
+        for i,t in enumerate(data): #self._ordered:
             #obj = self.AlarmRows[alarm.tag]
             #if not ActiveCheck or (obj.alarm and not obj.alarmAcknowledged 
                                    #and (obj.alarm.active 
                                   #or (not self.timeSortingEnabled 
-                                      #and str(obj.quality) == 'ATTR_INVALID'))):
+                                  #and str(obj.quality) == 'ATTR_INVALID'))):
+            alarm,text = t
             if i>=self._ui.listWidget.count():
-                self._ui.listWidget.addItem(alarm)
+                self._ui.listWidget.addItem(text)
                 font = Qt.QFont(Qt.QString("Courier"))
                 self._ui.listWidget.item(i).setFont(font)
             
             item = self._ui.listWidget.item(i)
-            text = str(item.text())
-            if text!=alarm:
-                item.setText(alarm)
-                self.setFontsAndColors(alarm,item)
-                font = Qt.QFont(Qt.QString("Courier"))
-                self._ui.listWidget.item(i).setFont(font)
+            row = str(item.text())
+            if text!=row:
+                #font = Qt.QFont(Qt.QString("Courier"))
+                #self._ui.listWidget.item(i).setFont(font)
+                item.setText(text)
+                self.setFontsAndColors(item,alarm)
                 
                 
             #font = self._ui.listWidget.item(i).font()
