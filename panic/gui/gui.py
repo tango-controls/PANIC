@@ -19,13 +19,14 @@ from taurus.qt.qtgui import container
 from taurus.qt.qtgui.panel import TaurusForm
 
 try:
-  from taurus.core.tango.tangovalidator import TangoAttributeNameValidator as AttributeNameValidator
+  from taurus.core.tango.tangovalidator import \
+      TangoAttributeNameValidator as AttributeNameValidator
 except:
   #Taurus3
   from taurus.core import AttributeNameValidator
 
 from row import AlarmRow, QAlarm, QAlarmManager
-from widgets import * #< getThemeIcon imported here
+from widgets import * #< getThemeIcon, getIconForAlarm imported here
 from widgets import WindowManager
 from editor import FormulaEditor,AlarmForm
 from core import Ui_AlarmList
@@ -303,42 +304,37 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         bold = False
         icon = ""
         
-        if state in ('ERROR','OOSRV'):
-            icon = "emblem-noread"
+        if state in ('OOSRV',):
             color = Qt.QColor("grey").light()
+            background = Qt.QColor("white")
+            
+        if state in ('ERROR',):
+            color = Qt.QColor("red")
             background = Qt.QColor("white")
             
         elif state in ('ACKED','ACTIVE','RTNUN'):
 
-            #bold = (state == "ACTIVE")
-            if severity in ('ALARM','ERROR'):
+            if severity in ('ALARM',):
                 background = Qt.QColor("red").lighter()
-                icon = "software-update-urgent"
                 
             elif severity == 'WARNING':
                 background = Qt.QColor("orange").lighter()
-                icon = "emblem-important"
                 
             elif severity in ('INFO','DEBUG'):
                 background = Qt.QColor("yellow").lighter()
                 
-            if state == 'ACKED':
-                icon = "media-playback-pause"
-                icon = "applications-development"
-            
         elif state in ('DSUPR','SHLVD'):
-            icon = "dialog-error"
             color = Qt.QColor("grey").light()
             background = Qt.QColor("white")
             
         elif state == 'NORM':
-            icon = "media-playback-pause" if alarm.acknowledged \
-                            else "emblem-system"
             color = Qt.QColor("green").lighter()
             background = Qt.QColor("white")
             
         else:
             raise Exception('UnknownState:%s'%state)
+          
+        icon = getIconForAlarm(alarm)
             
         if (fandango.now() - alarm.get_time()) < 60:
             bold = True
