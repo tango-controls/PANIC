@@ -2,6 +2,11 @@
 PANIC Test Devices
 ==================
 
+.. contents::
+
+Launching the tests
+-------------------
+
 To load the .csv file (using fandango)::
 
    csv2tango panic/test/testdevs.csv
@@ -25,6 +30,9 @@ Show attributes and alarms for the tests::
 Show the Panic UI::
 
   (t3) python panic/gui/gui.py &
+  
+Expected results
+----------------
 
 For each of the implemented alarms the behaviour is:
 
@@ -47,11 +55,24 @@ For each of the implemented alarms the behaviour is:
 ** COMM: Will reset WATTR when reseted/triggered again.
 ** SYSTEM: will save current date at /tmp/date
 
-----
+-----
+
+6.0.7 RESULTS
+-------------
+
+@PENDING TESTS: Compatibility of T9 device against T7 GUI; and T7 device against T9 GUI
+
+@PENDING TESTS: Receivers refactored: Test SMS, Mail, ACTION, flag, html
+
+@BUG: On Tango9 Class Properties are not being loaded (FromAddress/SMSConfig do not override empty device properties!!)
+
+6.0 RESULTS
+-----------
 
 !!*: tests passed for 6.0; but with some bugs in GUI:
 
 * EXCEPT is green, should be grey
 * EXCEPTS_OK is shown in Orange (should be Yellow)
 * GROUP_ALL is hard to predict due to chained delay in evaluation
+
 
