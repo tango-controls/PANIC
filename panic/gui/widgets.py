@@ -9,7 +9,7 @@ from taurus.core.util  import Logger
 
 import panic
 from panic import getAttrValue
-from panic.widgets import AlarmValueLabel, getThemeIcon
+from panic.widgets import AlarmValueLabel,getThemeIcon,getIconForAlarm
 import getpass
 
 dummies = []
