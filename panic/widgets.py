@@ -44,6 +44,33 @@ def getThemeIcon(icon):
         else:
             icon = Qt.QIcon.fromTheme(icon)
     return icon
+  
+def getIconForAlarm(alarm):
+    state,severity = alarm.get_state(),alarm.severity
+    
+    if state == 'ERROR':
+        return "dialog-error" #icon = "emblem-noread"
+      
+    elif state == 'OOSRV':
+        return "media_stop"
+    elif state == 'DSUPR':
+        return "media_stop"
+    elif state == 'SHLVD':
+        return "media_pause" #"media_playback_stop"
+      
+    elif state == 'ACKED': 
+        return "applications-development" #"media_playback_pause"
+    elif state == 'RTNUN':
+        return "stock_down"
+      
+    elif state == 'ACTIVE':
+        if severity in ('ALARM','ERROR'):
+            return "software-update-urgent"
+        elif severity == 'WARNING':
+            return "emblem-important"
+          
+    return "emblem-system"
+        
 
 ###############################################################################
 
