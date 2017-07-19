@@ -9,6 +9,21 @@ Alarm Receivers
 
 Allowed receivers are email, sms, action and shell commands.
 
+SMS / Mail Config
+-----------------
+
+These CLASS properties will control how SMS and Mail is configured:
+
+  SMSConfig
+  
+  SMSMaxLength
+  
+  SMSMaxPerDay
+  
+  FromAddress
+  
+  MailMethod
+
 Global Receivers
 ----------------
 
