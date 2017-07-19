@@ -29,6 +29,7 @@ PyAlarm Device Default Properties
 =================================
 """
 
+import fandango as fd
 from fandango.functional import join,djoin
 from fandango.tango import PyTango,get_tango_host
 
@@ -41,7 +42,7 @@ except:
 SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4,'CONTROL':-1}
 DEFAULT_SEVERITY = 'WARNING'
 
-AlarmStates = fn.Struct({
+AlarmStates = fd.Struct({
   'NORM':0, #Normal state
   'ACTIVE':1, #Active and unacknowledged
   'ACKED':2, #Acknowledged by operator
@@ -81,7 +82,7 @@ PANIC_PROPERTIES = {
     'FromAddress':
         [PyTango.DevString,
         "Address that will appear as Sender in mail and SMS",
-        [ "oncall" ] ],
+        [ tango_host ] ],
     'AllowedActions':
         [PyTango.DevVarStringArray,
         "List of OS commands that alarms are able to execute.",
@@ -109,10 +110,6 @@ PANIC_PROPERTIES = {
         Declared as FILTER:receiver,ACTION(MESSAGE:...) like\n\
         \t*VC*:vacuum@cells.es,ACTION(RESET:command,t/t/t/stop)",
         [ 0 ] ],
-    'FromAddress':
-        [PyTango.DevString,
-        "Address that will appear as Sender in mail and SMS",
-        [ tango_host ] ],
     }
 
 __doc__+="""
@@ -255,6 +252,10 @@ ALARM_LOGS = {
         [PyTango.DevString,
         "Address that will appear as Sender in mail and SMS",
         [ ] ],
+    'SMSConfig':
+        [PyTango.DevString,
+        "Arguments for sendSMS command (user:word)",
+        [ ] ],
     }
     
 __doc__+="""
@@ -269,10 +270,6 @@ DEVICE_CONFIG = {
         [PyTango.DevString,
         "stdout log filter",
         [ "INFO" ] ],
-    'SMSConfig':
-        [PyTango.DevString,
-        "Arguments for sendSMS command",
-        [ ":" ] ],
     'StartupDelay':
         [PyTango.DevLong,
         "Number of seconds that PyAlarm will wait before starting.",

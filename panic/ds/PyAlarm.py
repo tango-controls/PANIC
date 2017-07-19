@@ -787,8 +787,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
               return _rcatched
               
             if alarm and self.Alarms[tag_name].severity=='DEBUG':
-                self.warning('%s Alarm with severity==DEBUG do not trigger "
-                    "actions, messages or snapshot'%tag_name)
+                self.warning('%s Alarm with severity==DEBUG do not trigger '
+                    'actions, messages or snapshot'%tag_name)
 
             #NOTIFICATION OF ALARMS
             else:
@@ -2104,6 +2104,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         :param tag_name:    Alarm or Test message to be sent
         :param receivers:   SMS numbers to receive the alarm
         """
+        self.warning = self.info = fandango.printf
         if not receivers and hasattr(tag,'__iter__'):
             tag,receivers = tag[0],tag[1:]
         alarm = (self.Alarms.get(tag) or [None])[0]
@@ -2115,6 +2116,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         report = ''
         username,password=self.SMSConfig.split(':',1)
         source = self.FromAddress 
+        self.warning('SendSMS from %s as  %s'%(source,username))
 
         now = time.time()
         try:
@@ -2137,8 +2139,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if smslist:
                 try:
                     self.lock.acquire()
-                    self.info( 'SMS Sending: the phone numbers to be reported"
-                                " for %s are: %s' % (tag,','.join(smslist)) )
+                    self.info( 'SMS Sending: the phone numbers to be reported'
+                                ' for %s are: %s' % (tag,','.join(smslist)) )
                     
                     if message in ('ALARM',) and tag in self.Alarms:
                       formula,text = (self.Alarms[tag].formula, ';%s'
