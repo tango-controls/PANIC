@@ -66,6 +66,8 @@ For each of the implemented alarms the behaviour is:
 
 @BUG: On Tango9 Class Properties are not being loaded (FromAddress/SMSConfig do not override empty device properties!!)
 
+@BUG: PyAlarm logging not working !! (setLogLevel is useless, only printf works)
+
 6.0 RESULTS
 -----------
 
