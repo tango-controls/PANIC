@@ -68,6 +68,8 @@ For each of the implemented alarms the behaviour is:
 
 @BUG: PyAlarm logging not working !! (setLogLevel is useless, only printf works)
 
+@PENDING DOC: States and Severities moved to panic.properties module ; document them properly to each of the cases (OOSRV = device off, DSUPR=Enabled is False , SHLVD=alarm in DisabledAlarms list, ERROR= device alive but alarm not evaluating (thread dead or exception).
+
 6.0 RESULTS
 -----------
 
