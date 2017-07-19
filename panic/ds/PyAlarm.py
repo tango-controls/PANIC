@@ -774,59 +774,110 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
               
             if alarm and self.Alarms[tag_name].severity=='DEBUG':
               self.warning('%s Alarm with severity==DEBUG do not trigger actions, messages or snapshot'%tag_name)
-              
-            #NOTIFICATION OF ALARMS
-            else:
-              ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
-              if action_receivers:
-                self.info('-'*80)
-                for ac in action_receivers:
-                  try:
-                    self.trigger_action(tag_name,ac,message=message)
-                  except:
-                    msg = 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc()
+
+            def rcatched(method):
+              def _rcatched(*args,**kwargs):
+                self.info('-'*40+' %s(%s,%s)'%(method,args,kwargs))
+                try: 
+                    r = method(*args,**kwargs)
+                except:
+                    msg = getattr(method,'__name__',str(method))
+                    msg = '%s crashed! \n%s'%(msg,traceback.format_exc())
                     self.warning(msg)
                     report[0] += '\n'+'-'*80+'\n'+msg
+                return r
+              return _rcatched
 
-              #Disabling sms message for those messages not related to new alarms
-              if sms_receivers and message in ('ALARM',) or 'sms' in str(self.AlertOnRecovery).lower(): 
-                try:
+            #NOTIFICATION OF ALARMS
+            else:
+              
+              ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
+              if action_receivers:
                   self.info('-'*80)
-                  self.SendSMS(tag_name,sms_receivers,message=message,values=values)
-                except:
-                  msg = 'Exception sending sms!: %s' % traceback.format_exc()
-                  self.warning(msg)
-                  report[0] += '\n'+'-'*80+'\n'+msg
+                  for ac in action_receivers:
+                      rcatched(self.trigger_action)(
+                          tag_name,ac,message=message)
 
+              #Disabling sms message for messages not related to new alarms
+              if sms_receivers and message in ('ALARM',) \
+                    or 'sms' in str(self.AlertOnRecovery).lower(): 
+                  rcatched(self.SendSMS)(
+                    tag_name,sms_receivers,message=message,values=values)
+                  
               # SNAP ARCHIVING
               if (self.snap and SNAP_ALLOWED
-                  and (message in ('ALARM','ACKNOWLEDGED','RESET') or self.AlertOnRecovery and message=='RECOVERED')
-                  and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers,message=message))):
-                try:
-                  self.info('-'*80),self.info('triggering snapshot for alarm:'+tag_name)
-                  if (self.Alarms[tag_name].severity!='DEBUG'): self.trigger_snapshot(tag_name,message)
-                except Exception, e:
-                  msg = 'PyAlarm.trigger_snapshot crashed with exception:\n%s' % traceback.format_exc()
-                  self.warning(msg)
-                  report[0] += '\n'+'-'*80+'\n'+msg
+                  and (message in ('ALARM','ACKNOWLEDGED','RESET') 
+                       or self.AlertOnRecovery and message=='RECOVERED')
+                  and (self.UseSnap 
+                       or self.parse_receivers(tag_name,'SNAP',
+                                               receivers,message=message))):
+                  if (self.Alarms[tag_name].severity!='DEBUG'): 
+                      rcatched(self.trigger_snapshot)(tag_name,message)
+                  
+              ### ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
+              #if action_receivers:
+                #self.info('-'*80)
+                #for ac in action_receivers:
+                  #try:
+                    #self.trigger_action(tag_name,ac,message=message)
+                  #except:
+                    #msg = 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc()
+                    #self.warning(msg)
+                    #report[0] += '\n'+'-'*80+'\n'+msg
+
+              ##Disabling sms message for messages not related to new alarms
+              #if sms_receivers and message in ('ALARM',) \
+                    #or 'sms' in str(self.AlertOnRecovery).lower(): 
+                #try:
+                  #self.info('-'*80)
+                  #self.SendSMS(tag_name,sms_receivers,
+                               #message=message,values=values)
+                #except:
+                  #msg = 'Exception sending sms!: %s' % traceback.format_exc()
+                  #self.warning(msg)
+                  #report[0] += '\n'+'-'*80+'\n'+msg
+
+              ## SNAP ARCHIVING
+              #if (self.snap and SNAP_ALLOWED
+                  #and (message in ('ALARM','ACKNOWLEDGED','RESET') or self.AlertOnRecovery and message=='RECOVERED')
+                  #and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers,message=message))):
+                #try:
+                  #self.info('-'*80),self.info('triggering snapshot for alarm:'+tag_name)
+                  #if (self.Alarms[tag_name].severity!='DEBUG'): self.trigger_snapshot(tag_name,message)
+                #except Exception, e:
+                  #msg = 'PyAlarm.trigger_snapshot crashed with exception:\n%s' % traceback.format_exc()
+                  #self.warning(msg)
+                  #report[0] += '\n'+'-'*80+'\n'+msg
+                  
+            #LOGGING (by file or email)
             
             # html logs
             if self.parse_receivers(tag_name,'HTML',receivers,message=message):
-              try:
-                self.info('-'*80),self.info('saving html report for alarm:'+tag_name)
-                self.SaveHtml(self.GenerateReport(tag_name,message=message,values=values, html=True))
-              except Exception, e:
-                msg = 'PyAlarm.saveHtml crashed with exception:\n%s' % traceback.format_exc()
-                self.warning(msg)
-                report[0] += '\n'+'-'*80+'\n'+msg
-              
-            # emails
+                r = rcatched(self.GenerateReport)(tag_name,message=message,
+                                      values=values,html=True)
+                rcatched(self.SaveHtml)(r)
+                
+            ## emails
             if mail_receivers: 
-              self.info('-'*80)
-              try:
-                self.SendMail(report)
-              except:
-                self.warning('Exception sending email!: %s' % traceback.format_exc())
+                r = rcatched(self.SendMail)(report)
+            
+            ## html logs
+            #if self.parse_receivers(tag_name,'HTML',receivers,message=message):
+              #try:
+                #self.info('-'*80),self.info('saving html report for alarm:'+tag_name)
+                #self.SaveHtml(self.GenerateReport(tag_name,message=message,values=values, html=True))
+              #except Exception, e:
+                #msg = 'PyAlarm.saveHtml crashed with exception:\n%s' % traceback.format_exc()
+                #self.warning(msg)
+                #report[0] += '\n'+'-'*80+'\n'+msg
+              
+            ## emails
+            #if mail_receivers: 
+              #self.info('-'*80)
+              #try:
+                #self.SendMail(report)
+              #except:
+                #self.warning('Exception sending email!: %s' % traceback.format_exc())
                 
             self.info('-'*80),self.update_flag_file()
 
@@ -834,7 +885,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.info('=============> ALARM SENDING DISABLED!!')
 
           try:
-            self.update_log_file(tag=tag_name,report=report,message=message or '')
+            self.update_log_file(tag=tag_name,report=report,
+                                 message=message or '')
           except:
             self.warning(traceback.format_exc())
             
@@ -845,41 +897,62 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
           return report
               
         except Exception,e:
-            self.warning('PyAlarm.send_alarm crashed with exception:\n%s' % traceback.format_exc())
+            self.warning('PyAlarm.send_alarm crashed with exception:\n%s' 
+              % traceback.format_exc())
         self.info('-'*80)
         return ''
 
     def update_flag_file(self):
-        ''' If there's Active Alarms writes a 1 to the file specified by FlagFile property, else writes 0 '''
+        ''' If there's Active Alarms writes a 1 to the file specified 
+        by FlagFile property, else writes 0 '''
         try:
             self.lock.acquire()
             AlarmsToNotify = self.get_active_alarms()
             f=open(self.FlagFile,'w')
             f.writelines(['1\n' if AlarmsToNotify else '0\n'])
             f.close()
-            self.info( 'update_flag_file(%s,%s)' % ('1' if AlarmsToNotify else '0' ,self.FlagFile))
+            self.info( 'update_flag_file(%s,%s)' 
+              % ('1' if AlarmsToNotify else '0' ,self.FlagFile))
+
         except Exception,e:
             self.warning( 'Exception in PyAlarm.update_flag_file: %s' % str(e))
+            return False
+          
         finally:
             self.lock.release()
+        return True
 
     def update_log_file(self,argin='',tag='',report='',message=''):
+        """
+        """
         self.debug('update_log_file(%s,%s,%s,%s)'%(argin,tag,report,message))
         logfile = (argin.strip() or self.LogFile or '').strip()
-        if not logfile or logfile == '/dev/null': return
+        if not logfile or logfile == '/dev/null': 
+            return
         try:
             self.lock.acquire()
             logfile = self.parse_defines(logfile,tag=tag,message=message)
             
             if not report:
                 report = []
-                report.append('%s PyAlarm Device Server at %s\n\n' % (self.get_name(),time.ctime()))
+                report.append('%s PyAlarm Device Server at %s\n\n' 
+                  % (self.get_name(),time.ctime()))
+                
                 if self.get_active_alarms():
                     report.append('Active Alarms are:\n')
-                    [report.append('\t%s:%s:%s\n'%(k,time.ctime(self.Alarms[k].active),self.Alarms[k].formula)) for k in self.get_active_alarms()]
-                else: report.append( "There's No Active Alarms\n")
+                    [report.append('\t%s:%s:%s\n'
+                      %(k,time.ctime(self.Alarms[k].active),
+                                    self.Alarms[k].formula)) 
+                      for k in self.get_active_alarms()]
+                      
+                else: 
+                    report.append( "There's No Active Alarms\n")
+                    
                 if self.PastAlarms: 
-                    report.append( '\n\n' + 'Past Alarms were:' + '\n\t'.join([''] + ['%s:%s'%(','.join(k),time.ctime(d)) for d,k in self.PastAlarms.items()]) +'\n')
+                    report.append( '\n\n' + 'Past Alarms were:' 
+                      + '\n\t'.join([''] 
+                      + ['%s:%s'%(','.join(k),time.ctime(d)) 
+                              for d,k in self.PastAlarms.items()]) +'\n')
 
             if fun.isSequence(report):
                 report = '\n'.join(report)
@@ -887,7 +960,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if fun.clmatch('(folderds|tango)[:].*',logfile):                 
                 self.info('Sending alarm log to %s'%logfile)
                 try:
-                    fandango.device.FolderAPI().save(logfile,logfile,report,asynch=True)
+                    fandango.device.FolderAPI().save(
+                            logfile,logfile,report,asynch=True)
                 except:
                     self.warning(traceback.format_exc())
             else:
@@ -895,8 +969,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 f=open(logfile,'a')
                 f.write(report)
                 f.close()
+                
         except Exception,e:
-            self.warning( 'Exception in PyAlarm.update_log_file: %s' % traceback.format_exc())
+            self.warning( 'Exception in PyAlarm.update_log_file: %s' 
+                          % traceback.format_exc())
         finally:
             self.lock.release()
 
