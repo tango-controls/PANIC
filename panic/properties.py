@@ -30,7 +30,12 @@ PyAlarm Device Default Properties
 """
 
 from fandango.functional import join,djoin
-from fandango.tango import PyTango
+from fandango.tango import PyTango,get_tango_host
+
+try:
+    tango_host = get_tango_host().split(':')[0]
+except:
+    tango_host = 'PyAlarm'
 
 __doc__+="""
 PANIC_PROPERTIES: This properties will be shared by the whole TANGO_HOST
@@ -55,7 +60,8 @@ PANIC_PROPERTIES = {
         [] ],
     'StartupDelay':
         [PyTango.DevLong,
-        "Number of seconds that PyAlarm will wait before starting to evaluate alarms.",
+        "Number of seconds that PyAlarm will "
+        "wait before starting to evaluate alarms.",
         [ 0 ] ],
     'PanicAdminUsers':
         [PyTango.DevVarStringArray,
@@ -75,34 +81,52 @@ PANIC_PROPERTIES = {
         Declared as FILTER:receiver,ACTION(MESSAGE:...) like\n\
         \t*VC*:vacuum@cells.es,ACTION(RESET:command,t/t/t/stop)",
         [ 0 ] ],
+    'FromAddress':
+        [PyTango.DevString,
+        "Address that will appear as Sender in mail and SMS",
+        [ tango_host ] ],
     }
 
 __doc__+="""
 ALARM_TABLES: Properties used to store Alarms declaration in Panic<=6
 
-  This properties will be managed by API; DON'T ACCESS THEM WITH self.$Property from the device
+  This properties will be managed by API; 
+  
+  DON'T ACCESS THEM WITH self.$Property from the device
   
 """
 ALARM_TABLES = {
     'AlarmList':
         [PyTango.DevVarStringArray,
-        "List of alarms to be monitorized. The format is:\n<br>domain/family/member #It simply checks that dev is alive\n<br>domain/family/member/attribute > VALUE\n<br>domain/family/member/State == UNKNOWN\n<br>domain/family/*/Temperature > VALUE\n<br>\n<br>When using wildcards all slash / must be included",
+        "List of alarms to be monitorized. The format is:\n<br>"
+        "domain/family/member #It simply checks that dev is alive\n<br>"
+        "domain/family/member/attribute > VALUE\n<br>"
+        "domain/family/member/State == UNKNOWN\n<br>"
+        "domain/family/*/Temperature > VALUE\n<br>\n<br>"
+        "When using wildcards all slash / must be included",
         [] ],
     'AlarmReceivers':
         [PyTango.DevVarStringArray,
-        "Users that will be notified for each alarm. The format is:\n<br>[TYPE]:[ADDRESS]:[attributes];...\n<br>\n<br>[TYPE]: MAIL / SMS\n<br>[ADDRESS] : operator@accelerator.es / +34666555444\n<br>[attributes]: domain/family/member/attribute;domain/family/*",
+        "Users that will be notified for each alarm. The format is:\n<br>"
+        "[TYPE]:[ADDRESS]:[attributes];...\n<br>\n<br>"
+        "[TYPE]: MAIL / SMS\n<br>"
+        "[ADDRESS] : operator@accelerator.es / +34666555444\n<br>"
+        "[attributes]: domain/family/member/attribute;domain/family/*",
         [] ],
     'AlarmDescriptions':
         [PyTango.DevVarStringArray,
-        "Description to be included in emails for each alarm. The format is:\n<br>TAG:AlarmDescription...",
+        "Description to be included in emails for each alarm.\n<br>"
+        "The format is:TAG:AlarmDescription...",
         [] ],
     'AlarmConfigurations':
         [PyTango.DevVarStringArray,
-        "Configuration customization appliable to each alarm. The format is:\n<br>TAG:PAR1=Value1;PAR2=Value2;...",
+        "Configuration customization appliable to each alarm.\n<br>"
+        "The format is: TAG:PAR1=Value1;PAR2=Value2;...",
         [] ],
     'AlarmSeverities':
         [PyTango.DevVarStringArray,
-        "ALARM:DEBUG/INFO/WARNING/ERROR #DEBUG alarms will not trigger messages",
+        "ALARM:DEBUG/INFO/WARNING/ALARM/ERROR\n<br>"
+        "#DEBUG alarms will not trigger messages",
         [] ],
     }
 
@@ -112,7 +136,9 @@ ALARM_CYCLE: Properties to manage the timing of Alarm stages
 ALARM_CYCLE = {
     'Enabled':
         [PyTango.DevString,
-        "If False forces the device to Disabled state and avoids messaging; if INT then it will last only for N seconds after Startup; if a python formula is written it will be used to enable/disable the device",
+        "If False forces the device to Disabled state and avoids messaging;"
+        " if INT then it will last only for N seconds after Startup; "
+        "if a python formula is written it will enable/disable the device",
         [ '120' ] ],#Overriden by panic.DefaultPyAlarmProperties
     'AlarmThreshold':
         [PyTango.DevLong,
@@ -120,20 +146,25 @@ ALARM_CYCLE = {
         [ 3 ] ],
     'AlertOnRecovery':
         [PyTango.DevString,
-        "It can contain 'email' and/or 'sms' keywords to specify if an automatic message must be sent in case of alarm returning to safe level.",
+        "It can contain 'email' and/or 'sms' keywords to specify "
+        "if an automatic message must be sent in case of alarm "
+        "returning to safe level.",
         [ "false" ] ],
     'PollingPeriod':
         [PyTango.DevFloat,
-        "Period in SECONDS in which all attributes not event-driven will be polled.\n \
-        @TODO for convenience any value above 300 will be divided by 1000, @DEPRECATE",
+        "Period in SECONDS to poll all not event-driven attributes."
+        "@TODO for convenience any value above 300 will be divided by 1000, "
+        "@DEPRECATE",
         [ 15. ] ],
     'Reminder':
         [PyTango.DevLong,
-        "If a number of seconds is set, a reminder mail will be sent while the alarm is still active, if 0 no Reminder will be sent.",
+        "If a number of seconds is set, a reminder mail will be sent "
+        "while the alarm is still active, if 0 no Reminder will be sent.",
         [ 0 ] ],
     'AutoReset':
         [PyTango.DevFloat,
-        "If a number of seconds is set, the alarm will reset if the conditions are no longer active after the given interval.",
+        "If a number of seconds is set, the alarm will reset if "
+        "the conditions are no longer active after the given interval.",
         [ 3600. ] ],
     'RethrowState':
         [PyTango.DevBoolean,
@@ -145,7 +176,8 @@ ALARM_CYCLE = {
         [ False ] ],
     'IgnoreExceptions':
         [PyTango.DevString,
-        "Value can be False/True/NaN to return Exception, None or NotANumber in case of read_attribute exception.",
+        "Value can be False/True/NaN to return Exception, None or NotANumber"
+        " in case of read_attribute exception.",
         [ 'True' ] ],#Overriden by panic.DefaultPyAlarmProperties
     }
         
@@ -155,11 +187,13 @@ ALARM_ARCHIVE: Properties to manage the saving of Alarms
 ALARM_ARCHIVE = {
     'UseSnap':
         [PyTango.DevBoolean,
-        "If false no snapshots will be trigered (unless specifically added to receivers)",
+        "If false no snapshots will be trigered "
+        "(unless specifically added to receivers)",
         [ True ] ],
     'CreateNewContexts':
         [PyTango.DevBoolean,
-        "It enables PyAlarm to create new contexts for alarms if no matching context exists in the database.",
+        "It enables PyAlarm to create new contexts for alarms "
+        "if no matching context exists in the database.",
         [ False ] ],
     }
 
@@ -171,7 +205,7 @@ ALARM_LOGS = {
         [PyTango.DevString,
         """File where alarms are logged, like /tmp/alarm_$NAME.log\n
         Keywords are $DEVICE,$ALARM,$NAME,$DATE\n
-        From version 6.0 a FolderDS-like device can be used for remote logging:\n
+        If version>6.0 a FolderDS-like device can be used for remote logging:\n
         \ttango://test/folder/01/$ALARM_$DATE.log""",
         [ "" ] ], 
     'HtmlFolder':
@@ -180,16 +214,19 @@ ALARM_LOGS = {
         [ "htmlreports" ] ],
     'FlagFile':
         [PyTango.DevString,
-        "File where a 1 or 0 value will be written depending if theres active alarms or not.\n<br>This file can be used by other notification systems.",
+        "File where a 1 or 0 value will be written depending if theres "
+        "active alarms or not.\n<br>This file can be used by other "
+        "notification systems.",
         [ "/tmp/alarm_ds.nagios" ] ],
     'MaxMessagesPerAlarm':
         [PyTango.DevLong,
-        "Max Number of messages to be sent each time that an Alarm is activated/recovered/reset.",
+        "Max Number of messages to be sent each time that an Alarm "
+        "is activated/recovered/reset.",
         [ 0 ] ],
     'FromAddress':
         [PyTango.DevString,
         "Address that will appear as Sender in mail and SMS",
-        [ "oncall" ] ],
+        [ ] ],
     }
     
 __doc__+="""
