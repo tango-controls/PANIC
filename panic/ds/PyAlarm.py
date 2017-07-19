@@ -769,12 +769,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             report = [message, tag_name+'-'+message,','.join(mail_receivers)]
 
           if self.get_enabled():
-              
-            if alarm and self.Alarms[tag_name].severity=='DEBUG':
-              self.warning('%s Alarm with severity==DEBUG do not trigger actions, messages or snapshot'%tag_name)
-
+            
             def rcatched(method):
+              
               def _rcatched(*args,**kwargs):
+                
                 self.info('-'*40+' %s(%s,%s)'%(method,args,kwargs))
                 try: 
                     r = method(*args,**kwargs)
@@ -784,7 +783,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.warning(msg)
                     report[0] += '\n'+'-'*80+'\n'+msg
                 return r
+              
               return _rcatched
+              
+            if alarm and self.Alarms[tag_name].severity=='DEBUG':
+                self.warning('%s Alarm with severity==DEBUG do not trigger "
+                    "actions, messages or snapshot'%tag_name)
 
             #NOTIFICATION OF ALARMS
             else:

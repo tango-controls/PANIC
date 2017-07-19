@@ -36,6 +36,22 @@ try:
     tango_host = get_tango_host().split(':')[0]
 except:
     tango_host = 'PyAlarm'
+    
+    
+SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4,'CONTROL':-1}
+DEFAULT_SEVERITY = 'WARNING'
+
+AlarmStates = fn.Struct({
+  'NORM':0, #Normal state
+  'ACTIVE':1, #Active and unacknowledged
+  'ACKED':2, #Acknowledged by operator
+  'RTNUN':3, #Active but returned to normal
+  'ERROR':4, #PyAlarm not working properly, exception on formula 
+  'SHLVD':-1, #Silenced, hidden, ignored, (DEBUG), temporary state
+  'DSUPR':-2, #Disabled by a process condition (Enabled), failed not throwed
+  'OOSRV':-3, #Unconditionally disabled, Enable = False, Device is OFF
+  })
+
 
 __doc__+="""
 PANIC_PROPERTIES: This properties will be shared by the whole TANGO_HOST
@@ -288,8 +304,6 @@ DEVICE_PROPERTIES = dict(join(v.items() for v in
                               (PyAlarmDefaultProperties,ALARM_TABLES)))
 ALARM_CONFIG = (ALARM_CYCLE.keys()+ALARM_ARCHIVE.keys()
                                 +ALARM_LOGS.keys()+DEVICE_CONFIG.keys())
-
-ALARM_SEVERITIES = ['ERROR','ALARM','WARNING','DEBUG']
 
 try:
     from fandango.doc import get_fn_autodoc

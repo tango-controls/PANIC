@@ -63,27 +63,13 @@ _proxies = fandango.ProxiesDict()
 GetProxy = _proxies.get
 SetProxy = _proxies.__setitem__
 """
-The _proxies object allows to retrieve either DeviceProxy or DeviceServer objects.
+The _proxies object allows to retrieve DeviceProxy or DeviceServer objects.
 
  * GetProxy(a/dev/name) will return a DeviceProxy by default.
  * SetProxy('a/dev/name',object) allows to set a different object 
    to be returned (e.g. a device running in the same process)
 
 """
-
-SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4,'CONTROL':-1}
-DEFAULT_SEVERITY = 'WARNING'
-
-AlarmStates = fn.Struct({
-  'NORM':0, #Normal state
-  'ACTIVE':1, #Active and unacknowledged
-  'ACKED':2, #Acknowledged by operator
-  'RTNUN':3, #Active but returned to normal
-  'ERROR':4, #PyAlarm not working properly, exception on formula 
-  'SHLVD':-1, #Silenced, hidden, ignored, (DEBUG), temporary state
-  'DSUPR':-2, #Disabled by a process condition (Enabled), failed not throwed
-  'OOSRV':-3, #Unconditionally disabled, Enable = False, Device is OFF
-  })
 
 def intversion(version):
     try:
@@ -173,27 +159,34 @@ class Alarm(object):
       
     """
   
-    def __init__(self,tag,device='',formula='',description='',receivers='',config='', severity='',api=None):
+    def __init__(self,tag,device='',formula='',description='',receivers='',
+                 config='', severity='',api=None):
         #Info from the database
         self.api = api
-        self.setup(tag,device,formula,description,receivers,config,severity,write=False)
+        self.setup(tag,device,formula,description,
+                   receivers,config,severity,write=False)
         self.clear()
         
-    def setup(self,tag=None,device=None,formula=None,description=None,receivers=None,config=None, severity=None,write=False):
+    def setup(self,tag=None,device=None,formula=None,description=None,
+              receivers=None,config=None, severity=None,write=False):
         """ Assigns values to Alarm struct """
         notNone = lambda v,default:  default
-        setVar = lambda k,v: setattr(self,k,v if v is not None else getattr(self,k,''))
+        setVar = lambda k,v: setattr(self,k,v if v is not None 
+                                     else getattr(self,k,''))
+        
         [setVar(k,v) for k,v in (('tag',tag),('device',device),
               ('formula',formula),('description',description),
               ('receivers',receivers),('config',config),
-              ('severity',severity))]
+              ('severity',severity or DEFAULT_SEVERITY))]
+        
         if write: self.write()
         
     def trace(self,msg):
         print('%s: Alarm(%s): %s'%(fn.time2str(),self.tag,msg))
 
     def clear(self):
-        """ This method just initializes Flags updated from PyAlarm devices, it doesn't reset alarm in devices """
+        """ This method just initializes Flags updated from PyAlarm devices, 
+        it doesn't reset alarm in devices """
         self._state = None
         self._time = None
         self.counter = 0 #N cycles being active
@@ -216,11 +209,13 @@ class Alarm(object):
 
     def parse_severity(self):
         """ Replaces $TAG and $SEVERITY in Alarm severities """
-        return self.severity.replace('$TAG',self.tag).replace('$SEVERITY',self.device)
+        return self.severity.replace('$TAG',self.tag).replace(
+                                      '$SEVERITY',self.device)
 
     def parse_description(self):
         """ Replaces $TAG and $NAME in Alarm descriptions """
-        return self.description.replace('$TAG',self.tag).replace('$NAME',self.device)
+        return self.description.replace('$TAG',self.tag).replace(
+                                        '$NAME',self.device)
 
     def get_attribute(self,full=False):
         """ Gets the boolean attribute associated to this alarm """
@@ -438,12 +433,14 @@ class Alarm(object):
       
     def set_time(self,t=None):
         self._time =  t if t and t>0 else time.time()
-        tracer('%s.set_time(%s,%s)'%(self.tag,time2str(self._time),self._state))
+        tracer('%s.set_time(%s,%s)'
+                %(self.tag,time2str(self._time),self._state))
         return self._time
     
     def get_time(self,attr_value=None):
         """
-        This method extracts alarm activation timestamp from the ActiveAlarms array.
+        This method extracts alarm activation timestamp 
+        from the ActiveAlarms array.
         It returns 0 if the alarm is not active.
         """
         if attr_value is None and self._time is not None:
@@ -470,8 +467,13 @@ class Alarm(object):
     def get_quality(self):
         """ it just translates severity to the equivalent Tango quality, 
         but does NOT get actual attribute quality (which may be INVALID) """
-        qualities = {'DEBUG':'VALID','INFO':'VALID','WARNING':'WARNING',
-                     'ALARM':'ALARM','ERROR':'ALARM'}
+        qualities = {'DEBUG':'VALID',
+                     'INFO':'VALID',
+                     'WARNING':
+                     'WARNING',
+                     'ALARM':'ALARM',
+                     'ERROR':'ALARM'
+                     }
         quality = PyTango.AttrQuality.names['ATTR_%s'
                             %qualities.get(self.severity,'WARNING')]
         return quality
@@ -572,7 +574,8 @@ class Alarm(object):
 
     def set_severity(self,new_severity):
         """ Sets the severity of Alarm and writes in DB """
-        allowed=['DEBUG', 'WARNING', 'ALARM', 'ERROR']
+        allowed = panic.properties.SEVERITIES
+        new_severity = new_severity or DEFAULT_SEVERITY
         if new_severity not in allowed:
             raise Exception('Severity not allowed!')
         else:
@@ -803,7 +806,7 @@ class AlarmDS(object):
                         props['AlarmSeverities'] 
                         if r.startswith(tag+':')).split(':',1)[-1]
                 except: 
-                    self.alarms[tag]['severity'] = ''
+                    self.alarms[tag]['severity'] = DEFAULT_SEVERITY
             except:
                 print('Unparsable Alarm!: %s' % line)
         #print('%s device manages %d alarms: %s'
@@ -1303,7 +1306,8 @@ class AlarmAPI(fandango.SingletonMap):
                   for a in dd.alarms 
                   if matchCl(dev,d) and matchCl(attr,a))
           else:
-              attrs.extend(self[a].get_attribute(full=True) for a in self if matchCl(e,a))
+              attrs.extend(self[a].get_attribute(full=True) 
+                           for a in self if matchCl(e,a))
               
         if not cond: 
           attrs = [m+'.delta' for m in attrs]
@@ -1345,7 +1349,7 @@ class AlarmAPI(fandango.SingletonMap):
         Searches for alarm tags used in the formula
         """
         alnum = '(?:^|[^/a-zA-Z0-9-_])([a-zA-Z0-9-_]+)'#(?:$|[^/a-zA-Z0-9-_])' 
-        #It's redundant to check for the terminal character, re already does this
+        #It's redundant to check for the terminal character, re already does it
         var = re.findall(alnum,formula)
         #print '\tparse_alarms(%s): %s'%(formula,var)
         return [a for a in self.keys() if a in var]
@@ -1516,7 +1520,7 @@ class AlarmAPI(fandango.SingletonMap):
                   
                 elif f == 'severity':
                     r,s = r.upper().strip(),a.severity.upper().strip()
-                    s = s or 'WARNING'
+                    s = s or DEFAULT_SEVERITY
                     if SEVERITIES[s]>=SEVERITIES[r]: ok = True
                     
                 elif f == 'receivers':
@@ -1558,7 +1562,6 @@ class AlarmAPI(fandango.SingletonMap):
             try:
                 dp = d.get()
                 if dp.ping():
-                    #return dict((a,self.alarms[a].get_active()) for a in self.devices[device].alarms)
                     als = sorted(self.devices[device].alarms.keys())
                     ats = [self.alarms[a].get_attribute() for a in als]
                     vals = [v.value for v in dp.read_attributes(ats)]
@@ -1602,7 +1605,8 @@ class AlarmAPI(fandango.SingletonMap):
                     if '@' in r]
         return users
 
-    def add(self,tag,device,formula='',description='',receivers='', severity='WARNING', load=True, config=None,overwrite=False):
+    def add(self,tag,device,formula='',description='',receivers='', 
+            severity=DEFAULT_SEVERITY, load=True, config=None,overwrite=False):
         """ Adds a new Alarm to the database """
         device,match = device.lower(),self.has_tag(tag)
         if match:
@@ -1627,7 +1631,8 @@ class AlarmAPI(fandango.SingletonMap):
         if load: self.load()
         return tag
         
-    def modify(self,tag,device,formula='',description='',receivers='', severity='WARNING', config=None, load=True):
+    def modify(self,tag,device,formula='',description='',receivers='', 
+               severity=DEFAULT_SEVERITY, config=None, load=True):
         """ Modfies an Alarm in the database """
         device = device.lower()
         tag = self.has_tag(tag,raise_=True)
@@ -1693,7 +1698,8 @@ class AlarmAPI(fandango.SingletonMap):
         return val
 
     def rename(self,tag,new_tag='',new_device='',load=True):
-        """ Renames an existing tag, it also allows to move to a new device. """
+        """ Renames an existing tag, it also allows to move to a new device. 
+        """
         new_device = new_device.lower()
         if new_device and new_device not in self.devices: 
             raise Exception('DeviceDoesntExist:%s'%new_device)

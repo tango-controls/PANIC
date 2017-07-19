@@ -85,7 +85,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.AlarmRows = {}
         self.timeSortingEnabled=None
         self.changed = True
-        self.severities=['alarm', 'error', 'warning', 'debug', '']
+        self.severities = panic.properties.SEVERITIES
         
         self.expert = False
         self.tools = {} #Widgets dictionary
@@ -524,7 +524,7 @@ class QFilterGUI(QAlarmList):
             return
         for tag in tags:
             severity = str(severity).upper().strip()
-            if severity not in panic.ALARM_SEVERITIES: raise Exception(severity)
+            if severity not in panic.SEVERITIES: raise Exception(severity)
             self.AlarmRows[tag].get_alarm_object().setup(severity=severity.upper(),write=True)
         [f.setAlarmData() for f in WindowManager.WINDOWS if isinstance(f,AlarmForm)]
         
