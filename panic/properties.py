@@ -50,6 +50,18 @@ PANIC_PROPERTIES = {
         [PyTango.DevString,
         "Arguments for sendSMS command",
         [ ":" ] ],
+    'SMSMaxLength':
+        [PyTango.DevLong,
+         "Maximum length of SMS messages",
+         [ 160 ] ],
+    'SMSMaxPerDay':
+        [PyTango.DevLong,
+         "Maximum SMS messages per day",
+         [ 50 ] ],
+    'MailMethod':
+        [PyTango.DevString,
+         "mail or smtp",
+         [ "mail" ] ],
     'FromAddress':
         [PyTango.DevString,
         "Address that will appear as Sender in mail and SMS",

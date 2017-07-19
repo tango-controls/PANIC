@@ -135,8 +135,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
     Panic = None
 
-    MAX_SMS_DAY = 20
-
     MESSAGE_TYPES = ['ALARM','ACKNOWLEDGED','RECOVERED','REMINDER','AUTORESET','RESET','DISABLED']
     
     #--------------------------------------------------------------------------
@@ -2038,23 +2036,28 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         self.info('SendMail(%s)'%str(argin))
         def format4sendmail(report):
-            MAX_MAIL_LENGTH = 512
-            out = report.replace('\r','\n').replace('\n\n','\n').replace('\n','\\n').replace('"',"'") #.replace("'",'')
-            #if len(out)>MAX_MAIL_LENGTH: out = out[:(MAX_MAIL_LENGTH-5)]+'\\n...'
+            out = report.replace('\r','\n').replace('\n\n','\n')
+            out = out.replace('\n','\\n').replace('"',"'") #.replace("'",'')
             return out
         try:
-            #command = 'echo -e "'+format4sendmail(report)+'" | mail -s "%s" -r %s '%(subject,self.FromAddress) +','.join(maillist)
-            command = 'echo -e "'+format4sendmail(argin[0])+'" '
-            command += '| mail -s "%s" ' % argin[1]
-            command += '-S from=%s ' % self.FromAddress #'-r %s ' % (self.FromAddress)
-            command += (argin[2] if fun.isString(argin[2]) else ','.join(argin[2]))
-            self.info( 'Launching mail command: '+shortstr(command,512))
-            os.system(command)
-            for m in argin[2].split(','):
-                self.SentEmails[m.lower()]+=1
-            return 'DONE'
+            if self.MailMethod == 'mail':
+                command = 'echo -e "'+format4sendmail(argin[0])+'" '
+                command += '| mail -s "%s" ' % argin[1]
+                command += '-S from=%s ' % self.FromAddress 
+                #'-r %s ' % (self.FromAddress)
+                command += (argin[2] if fun.isString(argin[2]) 
+                                      else ','.join(argin[2]))
+                self.info( 'Launching mail command: '
+                            +shortstr(command,512))
+                os.system(command)
+                
+                for m in argin[2].split(','):
+                    self.SentEmails[m.lower()]+=1
+                    
+                return 'DONE'
         except Exception,e:
-            self.info( 'Exception in PyAlarm.SendMail(): \n%s'%traceback.format_exc())
+            self.info( 'Exception in PyAlarm.SendMail(): \n%s'
+              %traceback.format_exc())
         return 'FAILED'
 
 #------------------------------------------------------------------
@@ -2108,7 +2111,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         report = ''
         username,password=self.SMSConfig.split(':',1)
         source = self.FromAddress 
-        MAX_SMS_LENGTH=160
+
         now = time.time()
         try:
             self.lock.acquire()
@@ -2116,8 +2119,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             sends = len(self.SMS_Sent)
         finally:
             self.lock.release()
-        if sends>=self.MAX_SMS_DAY:
-            self.warning( 'The limit of Daily SMS messages (%d) has been exceeded!' % self.MAX_SMS_DAY)
+        if sends>=self.SMSMaxPerDay:
+            self.warning( 'Max Daily SMS messages (%d) has been exceeded!' 
+                % self.SMSMaxPerDay)
             return
         elif receivers:
             sms = '((SMS:)?([\+]?[0-9]{9,13}))'
@@ -2129,14 +2133,23 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             if smslist:
                 try:
                     self.lock.acquire()
-                    self.info( 'SMS Sending: the phone numbers to be reported for %s are: %s' % (tag,','.join(smslist)) )
+                    self.info( 'SMS Sending: the phone numbers to be reported"
+                                " for %s are: %s' % (tag,','.join(smslist)) )
+                    
                     if message in ('ALARM',) and tag in self.Alarms:
-                      formula,text = self.Alarms[tag].formula, ';%s'%self.Alarms[tag].parse_description()
+                      formula,text = (self.Alarms[tag].formula, ';%s'
+                              %self.Alarms[tag].parse_description())
                     else:
                         formula,text = '',';%s'%message
+                        
                     report = 'Alarm '+tag+': '+text
-                    if values: report += ';Values=' + str(values).replace('{','').replace('}','')[:MAX_SMS_LENGTH-len(report)-1]
-                    #for sms in smslist: #For unknown reasons it fails when passing a list of numbers
+                    if values: 
+                        svalues = str(values).replace('{','').replace('}','')
+                        report += ';Values=' + svalues
+                        
+                    if len(report) > self.SMSMaxLength:
+                        report = report[:self.SMSMaxLength-5]+'...'
+                        
                     self.info( 'SMS Sending: message is: %s' % (report))
                 except:
                     self.warning( 'Exception generating SMS report: %s' % traceback.format_exc())
@@ -2155,7 +2168,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     thr.setDaemon(True)
                     thr.start()
                     self.SMS_Sent.append(now)
-                    self.info( '%d SMS messages sent in the last 24 hours.' % len(self.SMS_Sent))
+                    
+                    self.info( '%d SMS messages sent in the last 24 hours.' 
+                                % len(self.SMS_Sent))
                     for s in smslist:
                         self.SentSMS[s.lower()]+=1
                 return 'DONE'
