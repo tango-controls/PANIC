@@ -41,3 +41,16 @@ OOSRV is permanent (device disabled).
 All of them are controlled by the Enable/Disable states/commands of PyAlarm.
 
 In addition, PANIC adds ERROR State to raise problems with Tango devices.
+
+Disabled States in PANIC
+------------------------
+
+Alarm States and Severities are defined in panic.properties module.
+
+Their meanings are:
+
+* OOSRV = Device server is Off, no process running
+* DSUPR = Enabled property is False
+* SHLVD = Alarm is listed in DisabledAlarms attribute (temporary disabled)
+* ERROR = Device is alive but the alarm is not being evaluated (thread dead or exception).
+
