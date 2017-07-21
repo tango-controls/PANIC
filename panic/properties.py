@@ -66,7 +66,7 @@ PANIC_PROPERTIES = {
     'SMSConfig':
         [PyTango.DevString,
         "Arguments for sendSMS command",
-        [ ":" ] ],
+        [ ] ],#user:word
     'SMSMaxLength':
         [PyTango.DevLong,
          "Maximum length of SMS messages",

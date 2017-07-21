@@ -1226,25 +1226,42 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def init_device(self,update_properties=True,allow=True):
         """
         This method will be called first for creating the device.
-        It will be called afterwards to force a reloading of Alarms or Properties
+        It will be called afterwards to force a reloading 
+        of Alarms or Properties
         """
         self.info( "In "+self.get_name()+
-            "::init_device(update_properties=%s,allow=%s)"%(update_properties,allow))
+            "::init_device(update_properties=%s,allow=%s)"
+            %(update_properties,allow))
+        
         if not allow: 
-            raise Exception('init_device() is not allowed, please restart the server')
+            raise Exception('init_device() is not allowed,'
+              ' please restart the server')
         try:
             if update_properties or not self._initialized: 
+
+                self.get_device_properties(self.get_device_class())
+                
+                self.info("Current Alarm server configuration is:\n\t"
+                    +"\n\t".join(
+                    sorted("%s: %s"%(k,getattr(self,k,None)) for k in 
+                    panic.PyAlarmDefaultProperties)))
+                
                 try:
                     #Reloading the alarm properties
                     self.lock.acquire()
                     if self.Alarms is None:
-                        self.Alarms = panic.AlarmAPI(self.get_name()) #Everything that was active/inactive is erased here?
-                    #This second part is not called for the first init(); only for the next ones
-                    #It's just for checking if alarms has been added/removed from the API
+                        #Everything that was active/inactive is erased here?
+                        self.Alarms = panic.AlarmAPI(self.get_name()) 
+                        
+                    #This second part is not called for the first init(); 
+                    # only for the next ones
+                    #It's just for checking if alarms has been added/removed 
+                    # from the API
                     else:
                         self.Alarms.load(self.get_name())
                         self.Alarms.get_global_receivers(renew=True)
-                        alarm_attrs = dict((a,v.get_attribute()) for a,v in self.Alarms.items())
+                        alarm_attrs = dict((a,v.get_attribute()) 
+                                           for a,v in self.Alarms.items())
                         for a in self.DynamicAttributes[:]:
                             if a not in alarm_attrs.values():
                                 try:
@@ -1260,18 +1277,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                                 self.create_alarm_attribute(a)
                 except Exception,e:
                     raise e
-                finally: self.lock.release()
-                self.get_device_properties(self.get_device_class())
-                self.info("Current Alarm server configuration is:\n\t"+"\n\t".join(
-                    sorted("%s: %s"%(k,getattr(self,k,None)) for k in 
-                    panic.PyAlarmDefaultProperties)))
+                finally: self.lock.release()                
                 
-                #@TODO: Period should be in SECONDS!: this patch must be DEPRECATED
+                
+                #@TODO: Period should be in SECONDS!: 
+                #this patch must be DEPRECATED
                 if self.PollingPeriod>3600: 
-                  self.warning('PERIODS IN MILLISECONDS ARE DEPRECATED!!!!!!!: '+
-                      '%s ms >> %s s'%(self.PollingPeriod,self.PollingPeriod*1e-3))
-                  self.PollingPeriod = self.PollingPeriod*1e-3 #Converting from ms to s
-                if str(self.AlertOnRecovery).strip().lower() in ('false','no','none'): self.AlertOnRecovery=''
+                    self.warning('PERIODS IN MILLISECONDS ARE DEPRECATED!: '
+                        '%s ms >> %s s'
+                        %(self.PollingPeriod,self.PollingPeriod*1e-3))
+                    #Converting from ms to s
+                    self.PollingPeriod = self.PollingPeriod*1e-3
+                  
+                if (str(self.AlertOnRecovery).strip().lower()
+                       in ('false','no','none')): 
+                    self.AlertOnRecovery=''
+                       
                 if str(self.Reminder).strip().lower()=='false': self.Reminder=0
                 
                 if not self.UseTaurus:
@@ -1279,42 +1300,68 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 else:
                     self.info('UseTaurus = %s'%self.UseTaurus)
                 if self.Eval is None:
-                    self.Eval = self.Panic._eval = (SingletonTangoEval if self.UseProcess and PROCESS else fandango.tango.TangoEval)(
-                        timeout=self.EvalTimeout,keeptime=self.PollingPeriod/2.,
-                        trace=False, #self.LogLevel.upper()=='DEBUG',
-                        cache=1+self.AlarmThreshold, #Note, a cache too large will filter oscillations in alarms using .delta
-                        use_tau=False
-                        )
+                    evalClass = (SingletonTangoEval 
+                                 if self.UseProcess and PROCESS 
+                                 else fandango.tango.TangoEval)
+                    
+                    #Note, a cache too large will filter 
+                    # oscillations in alarms using .delta
+                    self.Eval = self.Panic._eval = (evalClass)(
+                      timeout=self.EvalTimeout,keeptime=self.PollingPeriod/2.,
+                      trace=False, #self.LogLevel.upper()=='DEBUG',
+                      cache=1+self.AlarmThreshold, 
+                      use_tau=False)
+                    
                     [self.Eval.add_macro(*m) for m in self.Panic.macros]
                     self.update_locals(check=True,update=True)
                     self.Eval.set_timeout(self.EvalTimeout)
+                    
                 if hasattr(self.Eval,'clear'): self.Eval.clear()
                 
                 if self.UseProcess and PROCESS and not self.worker:
-                    #Do not reduce worker timeout or you may have problems if main thread idles (e.g. Tango database is down)
+                  
+                    #Do not reduce worker timeout or you may have problems 
+                    #if main thread idles (e.g. Tango database is down)
                     self.info('Configuring WorkerProcess ...')
-                    self.worker = WorkerProcess(self.Eval,start=True,timeout=self.PollingPeriod*max((self.AlarmThreshold,3)))
-                    self.worker.send('set_timeout','set_timeout',self.EvalTimeout)
+                    self.worker = WorkerProcess(self.Eval,start=True,
+                      timeout=self.PollingPeriod*max((self.AlarmThreshold,3)))
+                    self.worker.send('set_timeout','set_timeout',
+                                     self.EvalTimeout)
                     self.worker.command('import threading')
+                    
                     #,timewait=0.05*self.PollingPeriod/len(self.Alarms))
-                    self.worker.add('previous',target='dict([(k,str(v)) for k,v in executor.previous.items()])',args='',period=self.PollingPeriod/2.,expire=self.AlarmThreshold*self.PollingPeriod)
+                    self.worker.add('previous',target='dict([(k,str(v)) '
+                        'for k,v in executor.previous.items()])',
+                        args='',period=self.PollingPeriod/2.,
+                        expire=self.AlarmThreshold*self.PollingPeriod)
+                    
                     if self.UseTaurus:
                         try: 
                             self.worker.command('import taurus')
-                            self.worker.add('update_polling','[taurus.Attribute(a).changePollingPeriod(%d) for a in taurus.Factory().tango_attrs.keys()]'%max((500,1e3*self.PollingPeriod/2.)),period=self.PollingPeriod)
+                            self.worker.add('update_polling',
+                              '[taurus.Attribute(a).changePollingPeriod(%d) '
+                              'for a in taurus.Factory().tango_attrs.keys()]'
+                              %max((500,1e3*self.PollingPeriod/2.)),
+                              period=self.PollingPeriod)
+                            
                         except: print traceback.format_exc()
-                    #raise Exception,'The StartupDelay should be asynchronous!!! It cannot be called before any "command" call or will block!'
+                        
+                    #raise Exception,'The StartupDelay should be asynchronous!
+                    #It cannot be called before any "command" call
                     self.worker.pause(self.StartupDelay)
-                    self.info('Configured WorkerProcess, waiting %s seconds in background ...'%self.StartupDelay)
+                    self.info('Configured WorkerProcess, waiting %s seconds'
+                      ' in background ...'%self.StartupDelay)
 
                 self.PhoneBook = self.Alarms.phonebook
 
             self.AddressList = dict(self.PhoneBook)
 
             for tag,alarm in self.Alarms.items():
-                self.info('\n\t%s: %s\n\t\tFormula: %s\n\t\tSeverity: %s\n\t\tReceivers: %s'%(tag,alarm.description,alarm.formula,alarm.severity,alarm.receivers))
+                self.info('\n\t%s: %s\n\t\tFormula: %s\n\t\tSeverity: %s\n'
+                  '\t\tReceivers: %s'%(tag,alarm.description,alarm.formula,
+                                       alarm.severity,alarm.receivers))
 
-            #Create Alarm Attributes (not called in first init(), only afterwards
+            #Create Alarm Attributes (not called in first init(), only after
             if self._initialized: self.dyn_attr()
 
             #Get SnapConfig
@@ -1333,10 +1380,13 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 
             self.info( 'Ready to accept request ...'+'<'*40)
             self.setLogLevel(self.LogLevel)
+
         except Exception,e:
-            self.info( 'Exception in PyAlarm.init_device(): \n%s'%traceback.format_exc())
+            self.info( 'Exception in PyAlarm.init_device(): \n%s'
+                      %traceback.format_exc())
             self.set_state(PyTango.DevState.FAULT)
             raise e
+          
         finally:
             self.pause.clear()
             self.kill.clear()
@@ -1430,9 +1480,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         #    Add your own code here
         attr_AlarmConfig_read = []
-        attr_AlarmConfig_read = ['%s:%s'%(property,getattr(self,property)) 
-                  for property in PyAlarmClass.device_property_list.keys() 
-                  if property not in panic.ALARM_TABLES]
+        attr_AlarmConfig_read = ['%s:%s'%(prop,getattr(self,prop)) 
+                  for prop in PyAlarmClass.device_property_list.keys() 
+                  if prop not in panic.ALARM_TABLES]
         attr.set_value(attr_AlarmConfig_read)
 
 #------------------------------------------------------------------
