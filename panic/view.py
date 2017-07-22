@@ -221,11 +221,15 @@ class AlarmView(EventListener,Logger):
         
         print('AlarmView(Test,\t'
             '\tscope=%s,\n\ttlimit=%s,\n\t**%s)\n'%(scope,tlimit,opts))
+        th = TangoAttribute.get_thread()
+        th.set_period_ms(500)
+        th.setLogLevel('DEBUG')        
+        
         view = AlarmView('Test',scope=scope,verbose=4,**opts)
         print('\n'.join('>'*80 for i in range(4)))     
         fd.wait(tlimit)
         
-        print('<'*80)
+        print('\n'+'<'*80)
         l = view.sort()
         print('\n'.join(map(view.get_alarm_as_text,l)))
         print('AlarmView.__test__(%s) finished after %d seconds'
@@ -474,7 +478,8 @@ class AlarmView(EventListener,Logger):
             ta.setLogLevel(self.verbose>3 and 'DEBUG' or 
                 (self.verbose>1 and 'INFO' or 'WARNING'))
             self.sources[ta.full_name] = ta
-            self.sources[ta.full_name].addListener(self,use_events=events)
+            self.sources[ta.full_name].addListener(self,
+                use_events=events, use_polling=not events)
             return ta
             
     def disconnect(self,alarm=None):

@@ -894,21 +894,17 @@ class AlarmAPI(fandango.SingletonMap):
           self.log = self.debug
 
     ## Dictionary-like methods
+    def __get_tag(self,k):
+        if '/' in k: 
+            self.warning('AlarmAPI[%s] does not support multi-host!'%k)
+            k = k.split('/')[-1]
+        return k
     def __getitem__(self,k): #*a,**k): 
-        if '/' in k: 
-            self.warning('AlarmAPI does not support multi-host!')
-            k = k.split('/')[-1]
-        return self.alarms.__getitem__(k) #*a,**k)
+        return self.alarms.__getitem__(self.__get_tag(k)) #*a,**k)
     def __setitem__(self,k,v):
-        if '/' in k: 
-            self.warning('AlarmAPI does not support multi-host!')
-            k = k.split('/')[-1]
-        return self.alarms.__setitem__(k,v)
-    def __contains__(self,k): 
-        if '/' in k: 
-            self.warning('AlarmAPI does not support multi-host!')
-            k = k.split('/')[-1]        
-        return self.has_tag(k,False)
+        return self.alarms.__setitem__(self.__get_tag(k),v)
+    def __contains__(self,k):        
+        return self.has_tag(self.__get_tag(k),False)
 
     def __len__(self): return self.alarms.__len__()
     def __iter__(self): return self.alarms.__iter__()
