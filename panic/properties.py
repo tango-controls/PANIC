@@ -265,7 +265,7 @@ DEVICE_CONFIG = {
     'VersionNumber':
         [PyTango.DevString,
          "API version used (device-managed)",
-         [ "?.?" ] ],
+         [ "6.1.1" ] ],
     'LogLevel':
         [PyTango.DevString,
         "stdout log filter",

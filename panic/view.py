@@ -31,7 +31,7 @@ import fandango.tango as ft
 import panic
 from panic import *
 from fandango.functional import *
-from fandango.tango import parse_tango_model
+from fandango.tango import parse_tango_model, check_device_cached
 from fandango.threads import ThreadedObject,Lock,RLock
 from fandango.callbacks import EventSource, EventListener, TangoAttribute
 from fandango.excepts import Catched
@@ -127,8 +127,8 @@ class AlarmView(EventListener,Logger):
         #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
         }
   
-    def __init__(self,name='AlarmView',filters={},domain='*',api=None,
-                 refresh=3.,asynch=False,verbose=False):
+    def __init__(self,name='AlarmView',filters={},scope='*',api=None,
+                 refresh=3.,events=True,asynch=False,verbose=False):
 
         self.t_init = now()
         self.lock = Lock()
@@ -154,7 +154,7 @@ class AlarmView(EventListener,Logger):
         [self.defaults.update(**f) for f in self.filters.values()]
         self.filters.insert(0,'default',self.defaults.dict())
         
-        self.info('AlarmView(%s)'%str((filters,domain,refresh,asynch)))
+        self.info('AlarmView(%s)'%str((filters,scope,refresh,asynch)))
                 
         self.ordered=[] #Alarms list ordered
         self.last_sort = 0
@@ -164,7 +164,7 @@ class AlarmView(EventListener,Logger):
         self.timeSortingEnabled=None
         self.changed = True
         #self.info('parent init done, +%s'%(now()-self.t_init))
-        self.api = api or panic.AlarmAPI(filters=domain)
+        self.api = api or panic.AlarmAPI(filters=scope)
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
         self.apply_filters()
@@ -180,7 +180,9 @@ class AlarmView(EventListener,Logger):
                 len(self.alarms),refresh))
         
         self.__asynch = asynch #Unmodifiable once started
+        self.__events = events or False #Unmodifiable once started
         self.__refresh = refresh #Unmodifiable once started?
+        self.__dead = 0 #deadtime caused by event hooks
         self.get_period = lambda s=self: refresh
         #ThreadedObject.__init__(self,target=self.sort,
                                 #period=refresh,start=False)
@@ -205,13 +207,33 @@ class AlarmView(EventListener,Logger):
         
     @staticmethod
     def __test__(*args):
-        args = args or ['*value*']
-        view = AlarmView('Test',api=AlarmAPI(args[0]),verbose=4)
-        print('\n'.join('#'*80 for i in range(4)))
-        fd.wait(20.)
+        t0 = fd.now()
+        args = args or ['*value*','20']
+        opts = dict.fromkeys(a.strip('-') for a in args if a.startswith('-'))
+        args = [a for a in args if a not in opts]
+        scope = args[0]
+        tlimit = int((args[1:] or ['20'])[0])
+        
+        if opts:
+            opts = dict(o.split('=') if '=' in o else (o,True) 
+                        for o in opts)
+            opts.update((o,fd.str2type(v)) for o,v in opts.items())
+        
+        print('AlarmView(Test,\t'
+            '\tscope=%s,\n\ttlimit=%s,\n\t**%s)\n'%(scope,tlimit,opts))
+        view = AlarmView('Test',scope=scope,verbose=4,**opts)
+        print('\n'.join('>'*80 for i in range(4)))     
+        fd.wait(tlimit)
+        
+        print('<'*80)
+        l = view.sort()
+        print('\n'.join(map(view.get_alarm_as_text,l)))
+        print('AlarmView.__test__(%s) finished after %d seconds'
+              %(args[0],fd.now()-t0))
         
     def get_alarm(self,alarm):
         #self.info('get_alarm(%s)'%alarm)
+        alarm = getattr(alarm,'tag',alarm)
         alarm = alarm.split('tango://')[-1]
         if alarm in self.api:
             return self.api[alarm]
@@ -265,6 +287,7 @@ class AlarmView(EventListener,Logger):
             objs = [self.api[f] for f in self.filtered]
             models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
             self.alarms = self.models = CaselessDict(models)
+            self.debug('apply_filters: \n%s\n'%'\n'.join(self.filtered))
             return self.filtered
         except:
             self.error(traceback.format_exc())
@@ -342,7 +365,7 @@ class AlarmView(EventListener,Logger):
     def get_alarm_as_text(self,alarm=None,cols=None,
                           formatters=None,lengths=[],sep=' - '):
         alarm = self.get_alarm(alarm)
-        cols = cols or ['tag','active','description']
+        cols = cols or ['tag','get_state','active','get_time','severity']
         formatters = formatters or self.ALARM_FORMATTERS
         s = '  '
         try:
@@ -439,18 +462,19 @@ class AlarmView(EventListener,Logger):
             return None
         else:
             alarm = self.get_model(alarm)
-            self.debug('add_source(%s)'%alarm)
+            events = self.__events and ['CHANGE_EVENT']
+            self.debug('add_source(%s,events=%s)'%(alarm,events))
             ta = TangoAttribute(alarm,
                   log_level = 'INFO',
                   #asynchronous attr reading is faster than event subscribing
-                  use_events=['CHANGE_EVENT'],
+                  use_events=events,
                   tango_asynch = self.__asynch,
                   enable_polling = 1e3*self.__refresh,
                   )
             ta.setLogLevel(self.verbose>3 and 'DEBUG' or 
                 (self.verbose>1 and 'INFO' or 'WARNING'))
             self.sources[ta.full_name] = ta
-            self.sources[ta.full_name].addListener(self)
+            self.sources[ta.full_name].addListener(self,use_events=events)
             return ta
             
     def disconnect(self,alarm=None):
@@ -473,6 +497,7 @@ class AlarmView(EventListener,Logger):
         Method to implement the event notification
         Source will be an object, type a PyTango EventType, evt_value an AttrValue
         """
+        tt0 = now()
         array = {}
         try:
             # convert empty arrays to [] , pass exceptions
@@ -490,13 +515,15 @@ class AlarmView(EventListener,Logger):
             else:
                 #if anyendswith(src.simple_name,dev.get_model()):
                 dev = self.api.get_device(src.device)
+                assert dev,'UnknownDevice:%s'%src.device
                 alarms = dev.alarms.keys()
                 
             if not error:
                 #self.debug('rvalue = %s(%s)'%(type(rvalue),str(rvalue)))
                 r = rvalue[0] if rvalue else ''
                 splitter = ';' if ';' in r else ':'
-                array = dict((l.split(splitter)[0],l) for l in rvalue)
+                array = dict((l.split(splitter)[0].split('=')[-1],l) 
+                             for l in rvalue)
                 self.debug('%s.rvalue = %s'%(src,fd.log.pformat(array)))
                 
             assert len(alarms), 'EventUnprocessed!'
@@ -509,10 +536,12 @@ class AlarmView(EventListener,Logger):
                 av.updated = now()
 
                 if error:
+                    devup = check_device_cached(src.device)
                     l = (self.warning if av.state not in ('ERROR','OOSRV') 
                          else self.info)
-                    l('event_hook(%s).Error: %s'%(src,rvalue))
-                    s = ('ERROR','OOSRV')['CantConnectToDevice' in str(rvalue)]
+                    s = ('OOSRV','ERROR')[devup]
+                    l('event_hook(%s).Error(s=%s,%s): %s'%(src,s,devup,rvalue))
+                    #['CantConnectToDevice' in str(rvalue)]
                     av.set_state(s)
 
                 elif isSequence(rvalue):
@@ -552,13 +581,14 @@ class AlarmView(EventListener,Logger):
                 self.values[av.get_model()] = curr
                 self.debug('event_hook() done ... \n')
                     
-        except:
+        except Exception,e:
             self.error('AlarmView(%s).event_hook(%s,%s,%s)'%(
               self.name,src,type_, shortstr(value)))
             self.error(traceback.format_exc())
             self.error(array)
         finally:
             #if locked is True: self.lock.release()
+            self.__dead += now() - tt0
             pass
     
     ###########################################################################
