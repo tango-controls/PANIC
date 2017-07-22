@@ -35,7 +35,7 @@ from alarmhistory import *
 OPEN_WINDOWS = []
 
 import widgets
-widgets.TRACE_LEVEL = -1
+widgets.TRACE_LEVEL = 1 #-1
 
     ###########################################################################
     
@@ -102,7 +102,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.api = panic.AlarmAPI(self.scope)
         trace('AlarmGUI(%s): api done'%self.scope)
         #self._ordered=[] #Alarms list ordered
-        self.view = panic.view.AlarmView(api=self.api,domain=self.scope,
+        self.view = panic.view.AlarmView(api=self.api,scope=self.scope,
                                          verbose=2) 
         trace('AlarmGUI(): view done')
         
@@ -308,7 +308,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             color = Qt.QColor("grey").light()
             background = Qt.QColor("white")
             
-        if state in ('ERROR',):
+        elif state in ('ERROR',):
             color = Qt.QColor("red")
             background = Qt.QColor("white")
             
@@ -427,7 +427,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                                   #and str(obj.quality) == 'ATTR_INVALID'))):
             alarm,text = t
             if i>=self._ui.listWidget.count():
-                self._ui.listWidget.addItem(text)
+                self._ui.listWidget.addItem("...")
                 font = Qt.QFont(Qt.QString("Courier"))
                 self._ui.listWidget.item(i).setFont(font)
             
