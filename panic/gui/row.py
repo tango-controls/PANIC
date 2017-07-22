@@ -54,199 +54,199 @@ class QAlarm(panic.Alarm):
             print traceback.format_exc()
             return str(null)
           
-    def eventReceived(self,evt_src,evt_type,evt_value):
-        try:
-            debug = 'debug' in str(evt_src).lower() or TRACE_LEVEL>0
-            now = fandango.time2str()
-            evtype = str(TaurusEventType.reverseLookup[evt_type])
-            # Direct getattr(o,n,v) fails on some taurus classes
-            is_empty = (hasattr(evt_value,'is_empty') and getattr(evt_value,'is_empty')) or False
-            evvalue = getAttrValue(evt_value) if not is_empty else []
+    #def eventReceived(self,evt_src,evt_type,evt_value):
+        #try:
+            #debug = 'debug' in str(evt_src).lower() or TRACE_LEVEL>0
+            #now = fandango.time2str()
+            #evtype = str(TaurusEventType.reverseLookup[evt_type])
+            ## Direct getattr(o,n,v) fails on some taurus classes
+            #is_empty = (hasattr(evt_value,'is_empty') and getattr(evt_value,'is_empty')) or False
+            #evvalue = getAttrValue(evt_value) if not is_empty else []
             
-            if debug: 
-                print '\n'
-                trace('%s: In AlarmRow(%s).eventReceived(%s,%s,%s)'%(fandango.time2str(),self.alarm.tag,evt_src,evtype,evvalue),clean=True)
-            disabled,acknowledged,quality,value = self.alarmDisabled,self.alarmAcknowledged,self.quality,bool(evvalue) #bool(self.alarm.active)
-            if self.qtparent and getattr(self.qtparent,'api',None): self.alarm = self.qtparent.api[self.tag] #Using common api object
+            #if debug: 
+                #print '\n'
+                #trace('%s: In AlarmRow(%s).eventReceived(%s,%s,%s)'%(fandango.time2str(),self.alarm.tag,evt_src,evtype,evvalue),clean=True)
+            #disabled,acknowledged,quality,value = self.alarmDisabled,self.alarmAcknowledged,self.quality,bool(evvalue) #bool(self.alarm.active)
+            #if self.qtparent and getattr(self.qtparent,'api',None): self.alarm = self.qtparent.api[self.tag] #Using common api object
             
-            #Ignoring Config Events
-            if evt_type==TaurusEventType.Config:
-                if debug: trace('%s: AlarmRow(%s).eventReceived(CONFIG): %s' % (now,self.alarm.tag,str(evt_value)[:20]),clean=True)
-                return
+            ##Ignoring Config Events
+            #if evt_type==TaurusEventType.Config:
+                #if debug: trace('%s: AlarmRow(%s).eventReceived(CONFIG): %s' % (now,self.alarm.tag,str(evt_value)[:20]),clean=True)
+                #return
 
-            #Filtering Error Events
-            elif evt_type==TaurusEventType.Error or evvalue is None:
-                error = True
-                self.errors+=1
-                if self.errors>=self.MAX_ERRORS: 
-                    #After MAX_ERRORS the alarm is simply ignored
-                    self.alarm.active,self.quality = None,PyTango.AttrQuality.ATTR_INVALID
-                if not self.errors%self.MAX_ERRORS:
-                    if 'EventConsumer' not in str(evt_value): 
-                        trace('%s: AlarmRow(%s).eventReceived(ERROR): %s' %(now,self.alarm.tag,'ERRORS=%s!:\n\t%s'%(self.errors,fandango.except2str(evt_value,80))),clean=True)
-                    #if self.value is None: taurus.Attribute(self.model).changePollingPeriod(5*REFRESH_TIME)
-                    if not self.changed and self.errors==self.MAX_ERRORS or 'Exception' not in self.status: 
-                        print '%s : %s.emitValueChanged(ERROR!)'%(now,self.alarm.tag)
-                        print 'ERROR: %s(%s)' % (type(evt_value),clean_str(evt_value))
-                        self.qtparent.emitValueChanged()
-                        self.changed = True #This flag is set here, and set to False after updating row style
-                        self.updateStyle(event=True,error=fandango.except2str(evt_value)) #It seems necessary to update the row text, color and icon
-                else: 
-                    if debug: trace('In AlarmRow(%s).eventReceived(%s,%s,%d/%d)' % (self.alarm.tag,evt_src,evtype,self.errors,self.MAX_ERRORS),clean=True)
-                    pass
+            ##Filtering Error Events
+            #elif evt_type==TaurusEventType.Error or evvalue is None:
+                #error = True
+                #self.errors+=1
+                #if self.errors>=self.MAX_ERRORS: 
+                    ##After MAX_ERRORS the alarm is simply ignored
+                    #self.alarm.active,self.quality = None,PyTango.AttrQuality.ATTR_INVALID
+                #if not self.errors%self.MAX_ERRORS:
+                    #if 'EventConsumer' not in str(evt_value): 
+                        #trace('%s: AlarmRow(%s).eventReceived(ERROR): %s' %(now,self.alarm.tag,'ERRORS=%s!:\n\t%s'%(self.errors,fandango.except2str(evt_value,80))),clean=True)
+                    ##if self.value is None: taurus.Attribute(self.model).changePollingPeriod(5*REFRESH_TIME)
+                    #if not self.changed and self.errors==self.MAX_ERRORS or 'Exception' not in self.status: 
+                        #print '%s : %s.emitValueChanged(ERROR!)'%(now,self.alarm.tag)
+                        #print 'ERROR: %s(%s)' % (type(evt_value),clean_str(evt_value))
+                        #self.qtparent.emitValueChanged()
+                        #self.changed = True #This flag is set here, and set to False after updating row style
+                        #self.updateStyle(event=True,error=fandango.except2str(evt_value)) #It seems necessary to update the row text, color and icon
+                #else: 
+                    #if debug: trace('In AlarmRow(%s).eventReceived(%s,%s,%d/%d)' % (self.alarm.tag,evt_src,evtype,self.errors,self.MAX_ERRORS),clean=True)
+                    #pass
 
-            #Change Events
-            elif evt_type==TaurusEventType.Change or evt_type==TaurusEventType.Periodic:
-                self.errors = 0
+            ##Change Events
+            #elif evt_type==TaurusEventType.Change or evt_type==TaurusEventType.Periodic:
+                #self.errors = 0
                 
-                # Refresh period not changed as these lines slows down a lot!!
-                #ta = taurus.Attribute(self.model)
-                #if self.value is None: ta.changePollingPeriod(5*REFRESH_TIME)
-                #elif ta.getPollingPeriod()!=REFRESH_TIME: ta.changePollingPeriod(REFRESH_TIME)
+                ## Refresh period not changed as these lines slows down a lot!!
+                ##ta = taurus.Attribute(self.model)
+                ##if self.value is None: ta.changePollingPeriod(5*REFRESH_TIME)
+                ##elif ta.getPollingPeriod()!=REFRESH_TIME: ta.changePollingPeriod(REFRESH_TIME)
                 
-                disabled = self.get_disabled()
-                acknowledged = self.get_acknowledged()
-                if str(self.model).endswith('/ActiveAlarms'):
-                    value,quality = any(s.startswith(self.alarm.tag+':') for s in (evvalue or [])),self.alarm.get_quality()
-                else:
-                    value,quality = evvalue,evt_value.quality
+                #disabled = self.get_disabled()
+                #acknowledged = self.get_acknowledged()
+                #if str(self.model).endswith('/ActiveAlarms'):
+                    #value,quality = any(s.startswith(self.alarm.tag+':') for s in (evvalue or [])),self.alarm.get_quality()
+                #else:
+                    #value,quality = evvalue,evt_value.quality
                 
-                if debug: trace('In AlarmRow(%s).eventReceived(%s,%s,%s)' % (self.alarm.tag,evt_src,str(TaurusEventType.reverseLookup[evt_type]),evvalue),clean=True)
-                if debug: trace('\t%s (%s), dis:%s, ack:%s'%(value,quality,disabled,acknowledged))
+                #if debug: trace('In AlarmRow(%s).eventReceived(%s,%s,%s)' % (self.alarm.tag,evt_src,str(TaurusEventType.reverseLookup[evt_type]),evvalue),clean=True)
+                #if debug: trace('\t%s (%s), dis:%s, ack:%s'%(value,quality,disabled,acknowledged))
                 
-                if  value!=bool(self.alarm.active) or quality!=self.quality or disabled!=self.alarmDisabled or acknowledged!=self.alarmAcknowledged:
-                    if not self.changed: 
-                        #print '%s : %s.emitValueChanged(%s)'%(fandango.time2str(),self.alarm.tag,value)
-                        self.qtparent.emitValueChanged()
-                    self.changed = True #This flag is set here, and set to False after updating row style
+                #if  value!=bool(self.alarm.active) or quality!=self.quality or disabled!=self.alarmDisabled or acknowledged!=self.alarmAcknowledged:
+                    #if not self.changed: 
+                        ##print '%s : %s.emitValueChanged(%s)'%(fandango.time2str(),self.alarm.tag,value)
+                        #self.qtparent.emitValueChanged()
+                    #self.changed = True #This flag is set here, and set to False after updating row style
                 
-                self.alarmDisabled = disabled
-                self.alarmAcknowledged = acknowledged
-                self.quality = quality
-                self.alarm.active = getAlarmTimestamp(self.alarm) if value else 0 #It will get the date from ActiveAlarms array
+                #self.alarmDisabled = disabled
+                #self.alarmAcknowledged = acknowledged
+                #self.quality = quality
+                #self.alarm.active = getAlarmTimestamp(self.alarm) if value else 0 #It will get the date from ActiveAlarms array
                 
-                if debug: trace('\tactive since %s'%time2str(self.alarm.active))
+                #if debug: trace('\tactive since %s'%time2str(self.alarm.active))
                 
-                self.updateStyle(event=True,error=False)
-            else: 
-                print '\tUnknown event type?!? %s' % evt_type
-        except:
-            try: print 'Exception in eventReceived(%s,...): \n%s' %(evt_src,fandango.log.except2str())
-            except : print 'eventReceived(...)!'*80+'\n'+traceback.format_exc()
-        if debug: print '\n'
+                #self.updateStyle(event=True,error=False)
+            #else: 
+                #print '\tUnknown event type?!? %s' % evt_type
+        #except:
+            #try: print 'Exception in eventReceived(%s,...): \n%s' %(evt_src,fandango.log.except2str())
+            #except : print 'eventReceived(...)!'*80+'\n'+traceback.format_exc()
+        #if debug: print '\n'
             
-    def updateIfChanged(self):
-        if self.changed:
-            print 'AlarmRow(%s).updateIfChanged(changed=True)'%(self.alarm.tag)
-            self.updateStyle(event=True,error=self.errors>self.MAX_ERRORS)
-            self.changed = False
+    #def updateIfChanged(self):
+        #if self.changed:
+            #print 'AlarmRow(%s).updateIfChanged(changed=True)'%(self.alarm.tag)
+            #self.updateStyle(event=True,error=self.errors>self.MAX_ERRORS)
+            #self.changed = False
 
-    def updateStyle(self,event=False,error=False):
-        #trace('%s -> AlarmRow(%s).updateStyle(event=%s)'%(time.ctime(),self.alarm.tag,event),clean=True)
-        if getattr(self.qtparent,'_attributesSignalsBlocked',False):
-            #print '\tupdateStyle(): blocked!'
-            return
-        if event:
-            try:
-                self.font=QtGui.QFont(QtCore.QString("Courier"))
-                self.font.setPointSize(10)
-                if error:
-                    if self.errors>=self.MAX_ERRORS and not self.errors%self.MAX_ERRORS:
-                        self.was_ok = self.alarm.active or self.alarm.recovered
-                        self.alarm.active,self.alarm.recovered,self.alarm.counter = 0,0,0
-                        self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,None,False,QtGui.QColor("grey").light(),QtGui.QColor("white"))
-                        if self.was_ok:
-                            self.font.setBold(False)
-                        error_text = clean_str(error if isinstance(error,basestring) else 'disabled').split('=',1)[-1].strip()[:40]
-                        self.setText('   '+' - '.join((self.get_tag_text(),error_text)))
-                        self.status = 'Exception received, check device %s'%self.alarm.device
-                elif self.alarm.active is None:
-                    #trace('updateStyle(%s): value not received yet' %(self.alarm.tag),clean=True)
-                    pass
-                else:
-                    trace('AlarmRow.updateStyle: %s = %s (%s)' %(self.alarm.tag,self.alarm.active,self.quality),clean=True)
-                    if self.alarm.active and not self.alarmDisabled:
-                        if self.quality==PyTango.AttrQuality.ATTR_ALARM:
-                            trace('alarm')
-                            if self.alarmAcknowledged:
-                                self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
-                            else:
-                                self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"software-update-urgent",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
-                        elif self.quality==PyTango.AttrQuality.ATTR_WARNING:
-                            trace('warning')
-                            if self.alarmAcknowledged:
-                                self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
-                            else:
-                                self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-important",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
-                        elif self.quality==PyTango.AttrQuality.ATTR_VALID:
-                            trace('debug')
-                            if self.alarmAcknowledged:
-                                self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
-                            else:
-                                self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"applications-development",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
-                        else: 
-                            print '\tUnknown event quality?!? %s' % self.quality
+    #def updateStyle(self,event=False,error=False):
+        ##trace('%s -> AlarmRow(%s).updateStyle(event=%s)'%(time.ctime(),self.alarm.tag,event),clean=True)
+        #if getattr(self.qtparent,'_attributesSignalsBlocked',False):
+            ##print '\tupdateStyle(): blocked!'
+            #return
+        #if event:
+            #try:
+                #self.font=QtGui.QFont(QtCore.QString("Courier"))
+                #self.font.setPointSize(10)
+                #if error:
+                    #if self.errors>=self.MAX_ERRORS and not self.errors%self.MAX_ERRORS:
+                        #self.was_ok = self.alarm.active or self.alarm.recovered
+                        #self.alarm.active,self.alarm.recovered,self.alarm.counter = 0,0,0
+                        #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,None,False,QtGui.QColor("grey").light(),QtGui.QColor("white"))
+                        #if self.was_ok:
+                            #self.font.setBold(False)
+                        #error_text = clean_str(error if isinstance(error,basestring) else 'disabled').split('=',1)[-1].strip()[:40]
+                        #self.setText('   '+' - '.join((self.get_tag_text(),error_text)))
+                        #self.status = 'Exception received, check device %s'%self.alarm.device
+                #elif self.alarm.active is None:
+                    ##trace('updateStyle(%s): value not received yet' %(self.alarm.tag),clean=True)
+                    #pass
+                #else:
+                    #trace('AlarmRow.updateStyle: %s = %s (%s)' %(self.alarm.tag,self.alarm.active,self.quality),clean=True)
+                    #if self.alarm.active and not self.alarmDisabled:
+                        #if self.quality==PyTango.AttrQuality.ATTR_ALARM:
+                            #trace('alarm')
+                            #if self.alarmAcknowledged:
+                                #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
+                            #else:
+                                #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"software-update-urgent",False,QtGui.QColor("black"),QtGui.QColor("red").lighter())
+                        #elif self.quality==PyTango.AttrQuality.ATTR_WARNING:
+                            #trace('warning')
+                            #if self.alarmAcknowledged:
+                                #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
+                            #else:
+                                #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-important",False,QtGui.QColor("black"),QtGui.QColor("orange").lighter())
+                        #elif self.quality==PyTango.AttrQuality.ATTR_VALID:
+                            #trace('debug')
+                            #if self.alarmAcknowledged:
+                                #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
+                            #else:
+                                #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"applications-development",False,QtGui.QColor("black"),QtGui.QColor("yellow").lighter())
+                        #else: 
+                            #print '\tUnknown event quality?!? %s' % self.quality
                             
-                        if self.alarm.counter<2:
-                            self.font.setBold(True)
-                        self.alarm.recovered,self.alarm.counter = 0,2
+                        #if self.alarm.counter<2:
+                            #self.font.setBold(True)
+                        #self.alarm.recovered,self.alarm.counter = 0,2
 
-                        #else: self.font.SetBold(False) #Good to keep it, to see what changed
-                        self.status = 'Alarm Acknowledged, no more messages will be sent' if self.alarmAcknowledged else 'Alarm is ACTIVE'
-                        self.setText(' | '.join((self.get_tag_text(),self.get_alarm_date(), self.alarm.description)))
-                        #self.setText('%45s | %30s'%(str(self.alarm.tag)[:45], self.get_alarm_date(), self.alarm.description))
+                        ##else: self.font.SetBold(False) #Good to keep it, to see what changed
+                        #self.status = 'Alarm Acknowledged, no more messages will be sent' if self.alarmAcknowledged else 'Alarm is ACTIVE'
+                        #self.setText(' | '.join((self.get_tag_text(),self.get_alarm_date(), self.alarm.description)))
+                        ##self.setText('%45s | %30s'%(str(self.alarm.tag)[:45], self.get_alarm_date(), self.alarm.description))
 
-                    elif self.alarm.active in (False,0) and not self.alarmDisabled:
-                        if self.alarmAcknowledged:
-                            self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("green").lighter(),QtGui.QColor("white"))
-                        else:
-                            self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-system",False,QtGui.QColor("green").lighter(),QtGui.QColor("white"))
-                        if not self.alarm.recovered:
-                            #trace('\teventReceived(%s): %s => %s' %(self.alarm.tag,self.alarm.active,self.value),clean=True)
-                            if self.alarm.counter>1: 
-                                self.font.setBold(True)
-                            self.alarm.active,self.alarm.recovered,self.alarm.counter = 0,time.time(),1
-                        #else: self.font.SetBold(False) #Good to keep it, to see what changed
-                        self.status = 'Alarm has NOT been triggered'
-                        self.setText(' - '.join((self.get_tag_text(),'Not triggered')))
+                    #elif self.alarm.active in (False,0) and not self.alarmDisabled:
+                        #if self.alarmAcknowledged:
+                            #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"media-playback-pause",False,QtGui.QColor("green").lighter(),QtGui.QColor("white"))
+                        #else:
+                            #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"emblem-system",False,QtGui.QColor("green").lighter(),QtGui.QColor("white"))
+                        #if not self.alarm.recovered:
+                            ##trace('\teventReceived(%s): %s => %s' %(self.alarm.tag,self.alarm.active,self.value),clean=True)
+                            #if self.alarm.counter>1: 
+                                #self.font.setBold(True)
+                            #self.alarm.active,self.alarm.recovered,self.alarm.counter = 0,time.time(),1
+                        ##else: self.font.SetBold(False) #Good to keep it, to see what changed
+                        #self.status = 'Alarm has NOT been triggered'
+                        #self.setText(' - '.join((self.get_tag_text(),'Not triggered')))
 
-                    else: #AlarmDisabled or value = None
-                        self.status = 'Alarm is Disabled, status will not be updated'
-                        self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"dialog-error",False,QtGui.QColor("black"),QtGui.QColor("grey").lighter())
+                    #else: #AlarmDisabled or value = None
+                        #self.status = 'Alarm is Disabled, status will not be updated'
+                        #self.qtparent.emit(QtCore.SIGNAL('setfontsandcolors'),self.tag,"dialog-error",False,QtGui.QColor("black"),QtGui.QColor("grey").lighter())
                         
-                    #if self.qtparent.USE_EVENT_REFRESH: 
-                self.setToolTip('\n'.join([
-                    self.status,'',
-                    'Severity: '+self.alarm.severity,
-                    'Formula: '+self.alarm.formula,
-                    'Description: %s'%self.alarm.description,
-                    'Alarm Device: %s'%self.alarm.device,
-                    'Archived: %s'%('Yes' if 'SNAP' in self.alarm.receivers else 'No'),
-                    ]))
-                self.setFont(self.font)
-            except:
-                print 'Exception in updateStyle(%s,...): \n%s' %(self.alarm.tag,traceback.format_exc())
-        else:
-            for klass in type(self).__bases__:
-                try: 
-                    if hasattr(klass,'updateStyle'): klass.updateStyle(self)
-                except: pass
+                    ##if self.qtparent.USE_EVENT_REFRESH: 
+                #self.setToolTip('\n'.join([
+                    #self.status,'',
+                    #'Severity: '+self.alarm.severity,
+                    #'Formula: '+self.alarm.formula,
+                    #'Description: %s'%self.alarm.description,
+                    #'Alarm Device: %s'%self.alarm.device,
+                    #'Archived: %s'%('Yes' if 'SNAP' in self.alarm.receivers else 'No'),
+                    #]))
+                #self.setFont(self.font)
+            #except:
+                #print 'Exception in updateStyle(%s,...): \n%s' %(self.alarm.tag,traceback.format_exc())
+        #else:
+            #for klass in type(self).__bases__:
+                #try: 
+                    #if hasattr(klass,'updateStyle'): klass.updateStyle(self)
+                #except: pass
 
-        pass
+        #pass
             
-    @classmethod
-    def setFontsAndColors(klass,tag,icon,bold,color,background):
-        #print 'setFontsAndColors(%s,%s,%s,%s,%s)'%(tag,icon,bold,color.name(),background.name())
-        tag = str(tag).lower()
-        if tag in klass.ALL_ROWS:
-            self = klass.ALL_ROWS[tag]
-            self.alarmIcon=getThemeIcon(icon) if icon else None
-            self.setIcon(self.alarmIcon or Qt.QIcon())
-            self.font.setBold(bold)
-            self.setTextColor(color)
-            self.setBackgroundColor(background)
-        else:
-            print 'Tag %s is not in the list of AlarmRows: %s' % (tag,klass.ALL_ROWS.keys())
+    #@classmethod
+    #def setFontsAndColors(klass,tag,icon,bold,color,background):
+        ##print 'setFontsAndColors(%s,%s,%s,%s,%s)'%(tag,icon,bold,color.name(),background.name())
+        #tag = str(tag).lower()
+        #if tag in klass.ALL_ROWS:
+            #self = klass.ALL_ROWS[tag]
+            #self.alarmIcon=getThemeIcon(icon) if icon else None
+            #self.setIcon(self.alarmIcon or Qt.QIcon())
+            #self.font.setBold(bold)
+            #self.setTextColor(color)
+            #self.setBackgroundColor(background)
+        #else:
+            #print 'Tag %s is not in the list of AlarmRows: %s' % (tag,klass.ALL_ROWS.keys())
         
     
         
