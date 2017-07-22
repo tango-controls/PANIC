@@ -135,7 +135,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
     Panic = None
 
-    MESSAGE_TYPES = ['ALARM','ACKNOWLEDGED','RECOVERED','REMINDER','AUTORESET','RESET','DISABLED']
+    MESSAGE_TYPES = ['ALARM','ACKNOWLEDGED','RECOVERED','REMINDER',
+                     'AUTORESET','RESET','DISABLED']
     
     #--------------------------------------------------------------------------
     ##Overriding Quality-based Tango state machine
@@ -1399,15 +1400,18 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #------------------------------------------------------------------
     def always_executed_hook(self):
         self.debug("In "+ self.get_name()+ "::always_excuted_hook()")
+        self.eval_status = ""
         try:
             actives = list(reversed([(v.active,k) for k,v in self.Alarms.items() if v.active]))
             if self.Alarms and 0<self.last_attribute_check<(time.time()-2*self.PollingPeriod):
                 self.set_state(PyTango.DevState.FAULT)
                 msg = 'Alarm Values not being updated!!!\n\n'
-                self.set_status(msg+self.get_status().replace(msg,''))
+                self.eval_status = msg+self.get_status().replace(msg,'')
+                self.set_status(self.eval_status)
             elif self.worker and not (self.worker._process.is_alive() and self.worker._receiver.is_alive()):
                 self.set_state(PyTango.DevState.FAULT)
-                self.set_status('Alarm Values not being processed!!!') 
+                self.eval_status = 'Alarm Values not being processed!!!'
+                self.set_status(self.eval_status)
             else:
                 if self.get_enabled():
                     self.set_state(PyTango.DevState.ALARM if actives else PyTango.DevState.ON)
@@ -1423,8 +1427,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                       self.set_state(PyTango.DevState.FAULT)
                 if self.Uncatched:
                     status+='\nUncatched exceptions:\n%s'%self.Uncatched
-                status += '\n\n' + 'EvalTimes are: \n %s\n'%(self.EvalTimes)
+                    
+                self.eval_status = 'EvalTimes are: \n %s\n'%(self.EvalTimes)
                 self.set_status(status)
+                
         except:
             self.warning( traceback.format_exc())
         self.debug("Out of "+ self.get_name()+ "::always_excuted_hook()")
