@@ -567,6 +567,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
         now = self.last_attribute_check = time.time()
         ##########################################################
+        alarm.get_state(force=True)
         WAS_OK = alarm.counter<self.AlarmThreshold
         self.info('Checking alarm tag %s'%tag_name)
         self.debug(alarm.formula)
@@ -578,12 +579,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
         self.debug('was_ok/counter/active/VALUE: %s,%s,%s,%s'%(WAS_OK,alarm.counter,alarm.active,VALUE))
         if WAS_OK:
-          self.info('\tupdateAlarms(%s) = %s' % (tag_name,type(VALUE) if isinstance(VALUE,Exception) else VALUE))
+            self.info('\tupdateAlarms(%s) = %s' % (tag_name,type(VALUE) if isinstance(VALUE,Exception) else VALUE))
                   
         # ALARM May be failed or removed during the thread iteration
         if (  tag_name not in self.Alarms or 
             (VALUE is None and tag_name in self.FailedAlarms) ):
-
+            alarm.get_state(force=True)
             return
 
         elif VALUE:
@@ -645,11 +646,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         if alarm.tag not in self.AcknowledgedAlarms: 
                           self.send_alarm(tag_name,message='AUTORESET',values=variables)
 
+        alarm.get_state(force=True)
         self.debug('Alarm %s counter is : %s' % (tag_name, alarm.counter))
 
         if tag_name in self.FailedAlarms: 
             self.FailedAlarms.pop(tag_name)
-              
+            
         return
 
     #@self_locked
