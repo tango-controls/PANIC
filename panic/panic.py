@@ -318,7 +318,12 @@ class Alarm(object):
             #Dictionary-like (Elettra)
             dct = dict(t.split('=',1) for t in state.split(';'))
             stamp = dct.pop('time',stamp)
-            locals().update(dct)
+            tracer('%s'%str(dct))
+            description = dct.get('description',self.description)
+            state = dct.get('state','NORM')
+            severity = dct.get('severity',self.severity)
+            tag = dct.get(tag,self.tag)
+            #locals().update(dct)
         elif ';' in state:
             #Default sorting order
             tag,state,severity,stamp,desc = state.split(';')
@@ -338,12 +343,16 @@ class Alarm(object):
             #array cache reading from ds
             stamp = self.get_time(True) #may return time.time()?
             
-        if stamp<=0:
+        if state not in AlarmStates and stamp<=0:
             tracer('%s: Setting state from timestamp: %s'%(self.tag,stamp))
-            if not self.disabled:
-                state = 'NORM' if not stamp else 'ERROR'
+            if self.disabled:
+                state = 'DSUPR'
+            elif stamp:
+                state = 'NORM'
+            elif check_device_cached(self.device):
+                state = 'ERROR'
             else:
-                state = 'DSUPR' if not stamp else 'OOSRV'
+                state = 'OOSRV'
         
         self._state = AlarmStates[state]
         #tracer('%s(%s).set_state(%s): %s,%s'
@@ -754,7 +763,8 @@ class AlarmDS(object):
                 try:
                     r[tag] = str2time(date)
                 except:
-                    self.warning('failed to parse date from %s'%line)
+                    print('AlarmDS.get_active_alarms():'
+                        'failed to parse date from %s'%line)
                     r[tag] = END_OF_TIME
         return r
 
@@ -884,12 +894,24 @@ class AlarmAPI(fandango.SingletonMap):
           self.log = self.debug
 
     ## Dictionary-like methods
-    def __getitem__(self,*a,**k): return self.alarms.__getitem__(*a,**k)
-    def __setitem__(self,k,v): return self.alarms.__setitem__(k,v)
+    def __getitem__(self,k): #*a,**k): 
+        if '/' in k: 
+            self.warning('AlarmAPI does not support multi-host!')
+            k = k.split('/')[-1]
+        return self.alarms.__getitem__(k) #*a,**k)
+    def __setitem__(self,k,v):
+        if '/' in k: 
+            self.warning('AlarmAPI does not support multi-host!')
+            k = k.split('/')[-1]
+        return self.alarms.__setitem__(k,v)
+    def __contains__(self,k): 
+        if '/' in k: 
+            self.warning('AlarmAPI does not support multi-host!')
+            k = k.split('/')[-1]        
+        return self.has_tag(k,False)
+
     def __len__(self): return self.alarms.__len__()
     def __iter__(self): return self.alarms.__iter__()
-    def __contains__(self,obj): 
-        return self.has_tag(obj,False) #return self.alarms.__contains__(obj)
     def keys(self): return self.alarms.keys()
     def values(self): return self.alarms.values()
     def items(self): return self.alarms.items()
@@ -1425,6 +1447,11 @@ class AlarmAPI(fandango.SingletonMap):
         """
         result=[]
         alarms = alarms or self.values()
+        m = fn.parse_tango_model(tag)
+        if m:
+            tag = m.attribute
+            device = m.device
+            
         if limit==1 and tag in self.alarms:
           found = [self[tag]]
         else:
@@ -1730,13 +1757,6 @@ class AlarmAPI(fandango.SingletonMap):
         host = host or self.tango_host
         self.servers.stop_servers(set(self.servers.get_device_server(a.device) 
                               for a in self.get_alarms(tag,device)))
-
-    #def __getitem__(self,key): return self.alarms.__getitem__(key)
-    #def __setitem__(self,key,value): return self.alarms.__setitem__(key,value)
-    #def __iter__(self): return self.alarms.__iter__()
-    #def keys(self): return self.alarms.keys()
-    #def values(self): return self.alarms.values()
-    #def items(self): return self.alarms.items()
 
     def __repr__(self): 
         #return '\n'.join(sorted('%s: %s' % (
