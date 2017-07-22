@@ -52,9 +52,9 @@ def getIconForAlarm(alarm):
         return "dialog-error" #icon = "emblem-noread"
       
     elif state == 'OOSRV':
-        return "media_stop"
+        return "stop" #"media_stop"
     elif state == 'DSUPR':
-        return "media_stop"
+        return "stop" #"media_stop"
     elif state == 'SHLVD':
         return "media_pause" #"media_playback_stop"
       
