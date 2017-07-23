@@ -275,7 +275,7 @@ class Alarm(object):
         """ This method connects to the Device to get the value and timestamp 
         of the alarm attribute """
         try:
-            self.active = self.get_time()
+            self.active = self.get_time(attr_value = True)
         except:
             self.active = None
         return self.active
@@ -318,7 +318,6 @@ class Alarm(object):
             #Dictionary-like (Elettra)
             dct = dict(t.split('=',1) for t in state.split(';'))
             stamp = dct.pop('time',stamp)
-            tracer('%s'%str(dct))
             description = dct.get('description',self.description)
             state = dct.get('state','NORM')
             severity = dct.get('severity',self.severity)
@@ -406,8 +405,8 @@ class Alarm(object):
         """
         if force or self._state is None:
 
-            tracer('%s.get_state(f=%s,d=%s,a=%s,r=%s,s=%s'%(self.tag,force,
-                self.disabled,self.active,self.recovered,self._state))
+            #tracer('%s.get_state(f=%s,d=%s,a=%s,r=%s,s=%s'%(self.tag,force,
+                #self.disabled,self.active,self.recovered,self._state))
             
             #if (not self.check_device_cached(self.device):
                 #self._state = AlarmStates.OOSRV
@@ -442,8 +441,8 @@ class Alarm(object):
       
     def set_time(self,t=None):
         self._time =  t if t and t>0 else time.time()
-        tracer('%s.set_time(%s,%s)'
-                %(self.tag,time2str(self._time),self._state))
+        #tracer('%s.set_time(%s,%s)'
+                #%(self.tag,time2str(self._time),self._state))
         return self._time
     
     def get_time(self,attr_value=None):
@@ -460,14 +459,16 @@ class Alarm(object):
         ## Parsing ActiveAlarms attribute
         #tracer('%s.get_time(%s): %s'
                 #%(self.tag,attr_value,time2str(self._time)))
-        if attr_value in (None,True):
+                
+        if attr_value in (None,True): #Force attribute cache reading
             actives = self.get_ds().get_active_alarms()
-        elif isSequence(attr_value):
+        elif isSequence(attr_value): #Pass the attribute value
             actives = self.get_ds().get_active_alarms(attr_value)
         else:
             actives = {self.tag:[attr_value]}
             
-        if isinstance(actives,(type(None),Exception)): return -1
+        if isinstance(actives,(type(None),Exception)): 
+            return -1
             
         return actives.get(self.tag,0)
       
@@ -788,33 +789,32 @@ class AlarmDS(object):
             #print('read:',line)
             line = line.split('#',1)[0].strip()
             if not line or not searchCl(filters,line): 
-              #print('read:pass')
-              continue
+                #print('read:pass')
+                continue
             try:
-                tag,formula = line.split(':',1)
+                tag,formula = map(str.strip,line.split(':',1))
                 self.alarms[tag] = {'formula':formula}
                 try: 
                     local_receivers = [r for r in props['AlarmReceivers'] 
                                       if r.startswith(tag+':')]
                     local_receivers = first(local_receivers or [''])
-                    local_receirvers = local_receivers.split(':',1)[-1]
-                    #global_receivers = self.api.get_global_receivers(tag)
-                    #self.alarms[tag]['receivers'] = \
-                    #  ','.join((local_receivers,global_receivers))
+                    local_receivers = local_receivers.split(':',1)[-1].strip()
+
                     self.alarms[tag]['receivers'] = local_receivers
                 except: 
                     traceback.print_exc()
                     self.alarms[tag]['receivers'] = ''
+
                 try: 
-                    self.alarms[tag]['description'] = first(r for r in 
-                        props['AlarmDescriptions'] 
-                        if r.startswith(tag+':')).split(':',1)[-1]
+                    d = first(r for r in props['AlarmDescriptions'] 
+                                if r.startswith(tag+':')).split(':',1)[-1]
+                    self.alarms[tag]['description'] = d.strip()
                 except: 
                     self.alarms[tag]['description'] = ''
                 try: 
-                    self.alarms[tag]['severity'] = first(r for r in 
-                        props['AlarmSeverities'] 
-                        if r.startswith(tag+':')).split(':',1)[-1]
+                    s = first(r for r in props['AlarmSeverities'] 
+                            if r.startswith(tag+':')).split(':',1)[-1]
+                    self.alarms[tag]['severity'] = s.upper().strip()
                 except: 
                     self.alarms[tag]['severity'] = DEFAULT_SEVERITY
             except:
@@ -933,14 +933,16 @@ class AlarmAPI(fandango.SingletonMap):
         
         t0 = tdevs = time.time()
         dbd = fandango.tango.get_database_device(db=self.db)
-        all_devices = map(str.lower,dbd.DbGetDeviceList(['*','PyAlarm']))
+        all_devices = []
+        all_servers = []
+        for cl in ('PyAlarm','PanicEngineDS','PanicViewDS'):
+            all_devices.extend(map(str.lower,dbd.DbGetDeviceList(['*',cl])))
+            all_servers.extend(map(str.lower,dbd.DbGetServerList(cl+'/*')))
 
         if exported:
             dev_exported = fandango.get_all_devices(
               exported=True,host=self.tango_host)
             all_devices = [d for d in all_devices if d in dev_exported]
-        
-        all_servers = map(str.lower,dbd.DbGetServerList('PyAlarm/*'))
         
         #If filter is the name of a pyalarm device, only this will be loaded
         if filters in all_devices:

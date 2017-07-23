@@ -104,7 +104,10 @@ class AlarmView(EventListener,Logger):
     
     sources = CaselessDict() #Dictionary for Alarm sources    
     
-    ALARM_FORMATTERS = {
+    PRIORITY = ('Active','Severity','Time')
+    
+    ALARM_FORMATTERS = fd.defaultdict(lambda :str)
+    ALARM_FORMATTERS.update({
         'tag' : lambda s,l=10: ('{0:<%d}'%(l or 4)).format(s),
         #'time' : lambda s,l=25: ('{:^%d}'%l).format(s),
         'device' : lambda s,l=25: ('{0:^%d}'%(l or 4)).format(s),
@@ -115,17 +118,17 @@ class AlarmView(EventListener,Logger):
         
         'get_state' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
         
-        'get_time' : lambda s,l=20: ('{0:^%d}'%(l or 4)).format(time2str(s)),
+        'get_time' : lambda s,l=20: ('{0:^%d}'%(l or 4)).format(time2str(s,bt=0)),
 
         'active' : lambda s,l=20: (('{0:^%d}'%(l or 4)).format(
           'FAILED!' if s is None else (
             'Not Active' if not s else (
               s if s in (1,True) else (
-                time2str(s)))))),
+                time2str(s,bt=0)))))),
               
         'formula' : lambda s,l=100: ('{0:^%d}'%(l or 4)).format(s),
         #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
-        }
+        })
   
     def __init__(self,name='AlarmView',filters={},scope='*',api=None,
                  refresh=3.,events=True,asynch=False,verbose=False):
@@ -221,17 +224,26 @@ class AlarmView(EventListener,Logger):
         
         print('AlarmView(Test,\t'
             '\tscope=%s,\n\ttlimit=%s,\n\t**%s)\n'%(scope,tlimit,opts))
-        th = TangoAttribute.get_thread()
-        th.set_period_ms(500)
-        th.setLogLevel('DEBUG')        
         
-        view = AlarmView('Test',scope=scope,verbose=4,**opts)
-        print('\n'.join('>'*80 for i in range(4)))     
-        fd.wait(tlimit)
+        if opts.get('d',False):
+            th = TangoAttribute.get_thread()
+            th.set_period_ms(500)
+            th.setLogLevel('DEBUG')     
+            
+        verbose = opts.get('v',2)
         
-        print('\n'+'<'*80)
-        l = view.sort()
-        print('\n'.join(map(view.get_alarm_as_text,l)))
+        view = AlarmView('Test',scope=scope,
+                         verbose=verbose,
+                         **opts)
+        print('\n'.join('>'*80 for i in range(4)))    
+        
+        cols = 'sortkey','tag','state','active','time','severity'
+        while fd.now()<(t0+tlimit):
+            fd.wait(3.)
+            print('\n'+'<'*80)
+            l = view.sort(as_text={'cols':cols})
+            print('\n'.join(l))
+            
         print('AlarmView.__test__(%s) finished after %d seconds'
               %(args[0],fd.now()-t0))
         
@@ -239,14 +251,17 @@ class AlarmView(EventListener,Logger):
         #self.info('get_alarm(%s)'%alarm)
         alarm = getattr(alarm,'tag',alarm)
         alarm = alarm.split('tango://')[-1]
-        if alarm in self.api:
-            return self.api[alarm]
         a = self.alarms.get(alarm,None)
-        if not a:
-            m = self.api.get(alarm.split('/')[-1])
-            assert len(m)<=1, '%s_MultipleAlarmMatches!'%m
-            assert m, '%s_AlarmNotFound!'%m
-            a = m[0]
+        if a is None:
+            alarm = alarm.split('/')[-1]
+            #@KEEP, do not remove this first check
+            if alarm in self.api:
+                return self.api[alarm]
+            else:
+                m = self.api.get(alarm)
+                assert len(m)<=1, '%s_MultipleAlarmMatches!'%m
+                assert m, '%s_AlarmNotFound!'%m
+                a = m[0]
         return a
         
     def get_alarms(self, filters = None):
@@ -300,25 +315,33 @@ class AlarmView(EventListener,Logger):
             pass
       
     @staticmethod
-    def sortkey(alarm,priority=('Active','Severity')):
-        result = []
+    def sortkey(alarm,priority=None):
+        """
+        Return alarms ordered from LEAST critical to MOST
+        """
+        r = []
+        priority = priority or AlarmView.PRIORITY
         for p in priority:
-            p = str(p).lower()
-            #if p=='active': 
-            if hasattr(alarm,p): result.append(getattr(alarm,p))
+            m,p = None,str(p).lower()
+            if p in ('time','state'):
+                m = getattr(alarm,'get_'+p,None)
+            v = m() if m else getattr(alarm,p,None)               
+            
             if p=='active':
-                ## TODO!!! DISABLED SHOULD BE APPLIED HERE AS -2
-                result[-1] = alarm.active #get_active()
+                v = alarm.disabled and -1 or \
+                        v > 0 and 1 or \
+                        v < 0 and -1 or 0
 
             if p=='severity':
-                if result[-1]=='ERROR': result[-1] = 0
-                if result[-1]=='ALARM': result[-1] = 1
-                if result[-1]=='WARNING': result[-1] = 2
-                if result[-1]=='DEBUG': result[-1] = 3
+                v = str(v).upper()
+                v = panic.SEVERITIES.get(v,'UNKNOWN')
                 
-        return result
+            r.append(v)
+        
+        setattr(alarm,'sortkey',str(r))
+        return r
     
-    def sort(self,sortkey = None):
+    def sort(self,sortkey = None, as_text=False):
         """
         Returns a sorted list of alarm models
         
@@ -345,8 +368,15 @@ class AlarmView(EventListener,Logger):
                 #self.last_keys = keys or self.last_keys
                 sortkey = sortkey or self.sortkey
                 self.ordered = sorted(self.alarms.values(),key=sortkey)
+                self.info('sort([%d])'%(len(self.ordered)))
                 
-            r = list(reversed([a.get_model() for a in self.ordered]))
+            if as_text:
+                kw = fd.isMapping(as_text) and as_text or {}
+                r = list(reversed([self.get_alarm_as_text(a,**kw) 
+                                   for a in self.ordered]))
+            else:
+                r = list(reversed([a.get_model() for a in self.ordered]))
+
             self.last_sort = now()
             return r
         except:
@@ -367,7 +397,7 @@ class AlarmView(EventListener,Logger):
                     for o in objs]
           
     def get_alarm_as_text(self,alarm=None,cols=None,
-                          formatters=None,lengths=[],sep=' - '):
+            formatters=None,lengths=[],sep=' - '):
         alarm = self.get_alarm(alarm)
         cols = cols or ['tag','get_state','active','get_time','severity']
         formatters = formatters or self.ALARM_FORMATTERS
@@ -483,7 +513,7 @@ class AlarmView(EventListener,Logger):
             return ta
             
     def disconnect(self,alarm=None):
-        sources = self.sources if alarm is None else [self.get_source(alarm)]
+        sources = self.sources.values() if alarm is None else [self.get_source(alarm)]
         for s in sources:
             s.removeListener(self)
             if not s.hasListeners():
@@ -544,7 +574,7 @@ class AlarmView(EventListener,Logger):
                     devup = check_device_cached(src.device)
                     l = (self.warning if av.state not in ('ERROR','OOSRV') 
                          else self.info)
-                    s = ('OOSRV','ERROR')[devup]
+                    s = ('OOSRV','ERROR')[bool(devup)]
                     l('event_hook(%s).Error(s=%s,%s): %s'%(src,s,devup,rvalue))
                     #['CantConnectToDevice' in str(rvalue)]
                     av.set_state(s)
@@ -573,7 +603,7 @@ class AlarmView(EventListener,Logger):
                 
                 if av.get_model() not in self.values:
                     self.values[av.get_model()] = None
-                    self.info('%s cache initialized'%(av.get_model()))
+                    self.debug('%s cache initialized'%(av.get_model()))
                   
                 prev = self.values[av.get_model()]
                 curr = av.active if not error else -1

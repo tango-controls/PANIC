@@ -1567,7 +1567,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #    Add your own code here
         sep = ';' #':'
         #setup = 'tag','description','formula'
-        setup = 'tag','state','severity','time','description'
+        setup = 'tag','state','severity','time','formula','description'
         
         attr_AlarmList_read = sorted(
             sep.join('%s=%s'

@@ -39,7 +39,13 @@ except:
     tango_host = 'PyAlarm'
     
     
-SEVERITIES = {'DEBUG':0,'INFO':1,'WARNING':2,'ALARM':3,'ERROR':4,'CONTROL':-1}
+SEVERITIES = {'DEBUG':0,
+              'INFO':1,
+              'WARNING':2,
+              'ALARM':3,
+              'ERROR':4,
+              'CONTROL':-1
+              }
 DEFAULT_SEVERITY = 'WARNING'
 
 AlarmStates = fd.Struct({

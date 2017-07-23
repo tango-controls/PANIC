@@ -46,7 +46,7 @@ import PyTango
 import sys
 # Add additional import
 #----- PROTECTED REGION ID(PanicViewDS.additionnal_import) ENABLED START -----#
-import traceback
+import traceback as tb
 import fandango as fd, fandango.tango as ft
 import panic, panic.view
 #----- PROTECTED REGION END -----#	//	PanicViewDS.additionnal_import
@@ -84,6 +84,7 @@ class PanicViewDS (PyTango.Device_4Impl):
         self.attr_LastUpdate_read = 0.0
         self.attr_AlarmList_read = [""]
         self.attr_Filters_read = [""]
+        self.attr_Summary_read = [""]
         #----- PROTECTED REGION ID(PanicViewDS.init_device) ENABLED START -----#
         self.view = panic.view.AlarmView(scope=self.Scope,
                                          filters=self.Filters,
@@ -142,6 +143,14 @@ class PanicViewDS (PyTango.Device_4Impl):
         
         #----- PROTECTED REGION END -----#	//	PanicViewDS.Filters_read
         
+    def read_Summary(self, attr):
+        self.debug_stream("In read_Summary()")
+        #----- PROTECTED REGION ID(PanicViewDS.Summary_read) ENABLED START -----#
+        self.attr_Summary_read = self.view.sort(as_text=True)
+        attr.set_value(self.attr_Summary_read)
+        
+        #----- PROTECTED REGION END -----#	//	PanicViewDS.Summary_read
+        
     
     
             
@@ -188,7 +197,7 @@ class PanicViewDSClass(PyTango.DeviceClass):
              '',
             [] ],
         'Refresh':
-            [PyTango.DevVarDoubleArray, 
+            [PyTango.DevDouble, 
              '',
             [3.0]],
         }
@@ -217,6 +226,10 @@ class PanicViewDSClass(PyTango.DeviceClass):
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 512]],
+        'Summary':
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ, 8192]],
         }
 
 
@@ -233,11 +246,9 @@ def main():
         U.server_run()
 
     except PyTango.DevFailed as e:
-        e = traceback.format_exc()
-        print ('-------> Received a DevFailed exception:'+ e)
+        print ('-------> Received a DevFailed exception:', e)
     except Exception as e:
-        e =  traceback.format_exc()
-        print ('-------> An unforeseen exception occured....'+ e)
+        print ('-------> An unforeseen exception occured....', e)
 
 if __name__ == '__main__':
     main()
