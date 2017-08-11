@@ -276,6 +276,10 @@ DEVICE_CONFIG = {
         [PyTango.DevString,
         "stdout log filter",
         [ "INFO" ] ],
+    'TGConfig':
+        [PyTango.DevString,
+        "Arguments for sendTelegram command",
+        [ "" ] ],
     'StartupDelay':
         [PyTango.DevLong,
         "Number of seconds that PyAlarm will wait before starting.",
