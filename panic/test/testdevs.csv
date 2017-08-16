@@ -5,13 +5,13 @@ SimulatorDS/panic-test	SimulatorDS	test/panic/sim-01	KeepTime	100
 			DynamicAttributes	T=S and (now()-S)%60					
 				T30=now()%30					
 				R=RW					
-				S=GET('Start'	default=0)				
-				RW=VAR('rwattr'	default=10.	WRITE=True)			
+				S=GET('Start',default=0)				
+				RW=VAR('rwattr',default=10.,WRITE=True)			
 				F=1/0.					
 				Tout=t<5 or time.sleep(VAR('hung',default=0))					
 									
-			DynamicCommands	Start=str(SET('Start'	now()))				
-				Stop=str(SET('Start'	0))				
+			DynamicCommands	Start=str(SET('Start',now()))				
+				Stop=str(SET('Start',0))				
 				Hung=VAR('hung',float(ARGS[0]))					
 									
 			DynamicStates	FAULT=ATTR('S') and ATTR('T')>45					
@@ -103,10 +103,10 @@ PyAlarm/Clock	PyAlarm	test/panic/ck02	AlarmList	CK02:False and not CK02
 									
 									
 PyAlarm/Group	PyAlarm	test/panic/group	AlarmList	GROUP_0: GROUP(test/panic/ck*/ck5|ck10)					
-				GROUP_1: GROUP(CK5	CK10)				
-				GROUP_OR: GROUP(CK5	CK10	x>=1)			
+				GROUP_1: GROUP(CK5,CK10)				
+				GROUP_OR: GROUP(CK5,CK10,x>=1)			
 				GROUP_AND: test/panic/ck2/ck2 and test/panic/ck5/ck5					
-				GROUP_ALL: GROUP( GROUP_0	GROUP_1	GROUP_2	GROUP_AND )		
+				GROUP_ALL: GROUP( GROUP_0,GROUP_1,GROUP_2,GROUP_AND )		
 									
 			AlarmSeverities	GROUP_1: ALARM					
 				GROUP_OR: ALARM					
@@ -118,12 +118,12 @@ PyAlarm/Group	PyAlarm	test/panic/group	AlarmList	GROUP_0: GROUP(test/panic/ck*/c
 									
 									
 PyAlarm/Actions	PyAlarm	test/panic/wattr	AlarmList	WATTR:True					
-			AlarmReceivers	WATTR:ACTION(alarm:attribute	test/panic/sim-01/rw	int(345))	ACTION(reset:attribute	test/panic/sim-01/rw	int(0))
+			AlarmReceivers	WATTR:ACTION(alarm:attribute,test/panic/sim-01/rw,int(345)),ACTION(reset:attribute,test/panic/sim-01/rw,int(0))
 			PollingPeriod	3					
 		test/panic/comm	AlarmList	COMM:(  NOW() - test/panic/sim-01/rw ) >5					
-			AlarmReceivers	COMM:ACTION(alarm:command	test/panic/wattr/ResetAlarm	WATTR	test)		
+			AlarmReceivers	COMM:ACTION(alarm:command,test/panic/wattr/ResetAlarm,WATTR,test)		
 		test/panic/system	AlarmList	SYSTEM:WATTR					
-			AlarmReceivers	SYSTEM:ACTION(alarm:system	date > /tmp/date)				
+			AlarmReceivers	SYSTEM:ACTION(alarm:system,date > /tmp/date)				
 		test/panic/property	AlarmList						
 			AlarmReceivers						
 									
