@@ -42,7 +42,7 @@ from fandango.dicts import SortedDict,CaselessDict, \
 
 
 import fandango.callbacks
-fandango.callbacks.EventSource.get_thread().set_period_ms(2.)
+fandango.callbacks.EventSource.get_thread().set_period_ms(200.)
 fandango.callbacks.EventThread.SHOW_ALIVE = 10000
 fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
 ft.check_device_cached.expire = 60.
@@ -99,7 +99,7 @@ class FilterStack(SortedDict):
         return fd.log.pformat(dct)
     
 
-class AlarmView(EventListener,Logger):
+class AlarmView(EventListener):
     #ThreadedObject,
     
     sources = CaselessDict() #Dictionary for Alarm sources    
@@ -136,7 +136,9 @@ class AlarmView(EventListener,Logger):
         self.t_init = now()
         self.lock = Lock()
         self.verbose = verbose
-        Logger.__init__(self,name)
+
+        EventListener.__init__(self,name)
+
         self.setLogLevel(self.verbose>3 and 'DEBUG' or 
                 (self.verbose>1 and 'INFO' or 'WARNING'))
         
@@ -170,13 +172,19 @@ class AlarmView(EventListener,Logger):
         
         if not isSequence(scope): scope = [scope]
         if api: 
-            self.apis = {scope:api}
+            self.apis = {scope[0]:api}
         else:
             self.apis = dict()
             for k in scope:
+                if not k.split('#')[0]: continue
                 k = k.split('@')
                 t = first(k[1:] or (None,))
-                self.apis[k[0]] = panic.AlarmAPI(filters=k[0],tango_host=t)
+                try:
+                    self.info('creating AlarmAPI(%s,%s)'%(k[0],t))
+                    self.apis[k[0]] = panic.AlarmAPI(filters=k[0],tango_host=t)
+                except:
+                    traceback.print_exc()
+                    self.apis[k[0]] = None
                 
         #@TODO: MULTIPLE APIS OBJECTS SHOULD BE MANAGED!!
         self.api = self.apis.values()[0]
@@ -206,7 +214,6 @@ class AlarmView(EventListener,Logger):
                                 #period=refresh,start=False)
         #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
         
-        EventListener.__init__(self,name)
         self.setLogLevel(self.verbose>3 and 'DEBUG' or 
                 (self.verbose>1 and 'INFO' or 'WARNING'))
         

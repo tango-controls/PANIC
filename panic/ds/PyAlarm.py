@@ -1422,7 +1422,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 for date,tag_name in actives:
                     status+='%s:%s:\n\t%s\n\tSeverity:%s\n\tSent to:%s\n' % (time.ctime(date),tag_name,self.Alarms[tag_name].description,self.Alarms[tag_name].severity,self.Alarms[tag_name].receivers)
                 if self.FailedAlarms:
-                    status+='\n%d alarms couldnt be evaluated:\n%s'%(len(self.FailedAlarms),','.join(str(t) for t in self.FailedAlarms.items()))
+                    status+='\n%d alarms couldnt be evaluated:\n%s'%(
+                        len(self.FailedAlarms),
+                        ','.join(str(t) for t in self.FailedAlarms.items()))
                     if float(len(self.FailedAlarms))/len(self.Alarms) > 0.1:
                       self.set_state(PyTango.DevState.FAULT)
                 if self.Uncatched:

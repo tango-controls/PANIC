@@ -26,6 +26,7 @@ except:
   from taurus.core import AttributeNameValidator
 
 from row import AlarmRow, QAlarm, QAlarmManager
+from views import ViewChooser
 from widgets import * #< getThemeIcon, getIconForAlarm imported here
 from widgets import WindowManager
 from editor import FormulaEditor,AlarmForm
@@ -719,27 +720,16 @@ class AlarmGUI(QFilterGUI):
 
 def main(args=[]):
     import widgets
-    from taurus.qt.qtgui.application import TaurusApplication
 
     t0 = time.time()
     opts = [a for a in args if a.startswith('-')]
     args = [a for a in args if not a.startswith('-')]
     URL = 'http://www.cells.es/Intranet/Divisions/Computing/'\
         'Controls/Help/Alarms/panic'
-    
-    #uniqueapp = Qt.QApplication([])
-    uniqueapp = TaurusApplication([]) #opts)
-    
+   
     print '='*80
     trace(' Launching Panic ...')
     print '='*80
-    
-    if '--calc' in opts:
-        args = args or ['']
-        form = AlarmPreview(*args)
-        form.show()
-        uniqueapp.exec_()
-        return
     
     tmw = CleanMainWindow()
     tmw.setWindowTitle('PANIC')
@@ -820,17 +810,38 @@ def main(args=[]):
         
     print('Toolbars created after %s seconds'%(time.time()-t0))
     tmw.show()
-    return uniqueapp #.exec_()
+    return #uniqueapp #.exec_()
   
     ###########################################################################
   
 def main_gui():
     import sys
-    app = main(sys.argv[1:] or ([os.getenv('PANIC_DEFAULT')] 
-        if os.getenv('PANIC_DEFAULT') else []))
+    
+    from taurus.qt.qtgui.application import TaurusApplication    
+    #uniqueapp = Qt.QApplication([])
+    uniqueapp = TaurusApplication([]) #opts)
+    
+    if '--calc' in sys.argv:
+        args = args or ['']
+        form = AlarmPreview(*args)
+        form.show()
+        uniqueapp.exec_()
+        return
+    
+    views = sys.argv[1:]
+    if not views:
+        vc = ViewChooser()
+        vc.exec_()
+        views = vc.view
+    if not views or not any(views):
+        sys.exit(-1)
+        
+    main(views)
+    # ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else []))
     print('app created')
-    n = app.exec_()
+    n = uniqueapp.exec_()
     print('exit')
+    
     import fandango.threads
     import fandango.callbacks
     [s.unsubscribeEvents() for s 
