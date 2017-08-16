@@ -78,34 +78,76 @@ class PanicViewDS (PyTango.Device_4Impl):
         #----- PROTECTED REGION END -----#	//	PanicViewDS.delete_device
 
     def init_device(self):
-        self.debug_stream("In init_device()")
+        self.info_stream("In init_device()")
         self.get_device_properties(self.get_device_class())
+        self.last_active_alarms_check = 0
         self.attr_Scope_read = [""]
         self.attr_LastUpdate_read = 0.0
         self.attr_AlarmList_read = [""]
+        self.attr_ActiveAlarms_read = [""]
         self.attr_Filters_read = [""]
         self.attr_Summary_read = [""]
         #----- PROTECTED REGION ID(PanicViewDS.init_device) ENABLED START -----#
-        self.view = panic.view.AlarmView(scope=self.Scope,
-                                         filters=self.Filters,
-                                         refresh=self.Refresh,
-                                         events=self.UseEvents,
-                                         )
+        self.view = panic.view.AlarmView(
+            name=self.get_name(),scope=self.Scope,filters=self.Filters,
+            refresh=self.Refresh,events=self.UseEvents,verbose=2,
+            )
+        print('>'*80)
         #----- PROTECTED REGION END -----#	//	PanicViewDS.init_device
 
     def always_executed_hook(self):
         self.debug_stream("In always_excuted_hook()")
         #----- PROTECTED REGION ID(PanicViewDS.always_executed_hook) ENABLED START -----#
         now = fd.now()
+        self.Update(force=False)
+        n = len(self.attr_AlarmList_read)
+        
         if not self.view.last_event_time:
             self.set_state(PyTango.DevState.INIT)
         elif now - self.view.last_event_time > 60.:
             self.set_state(PyTango.DevState.UNKNOWN)
+        elif len(self.attr_DisabledAlarms_read) == n:
+            self.set_state(PyTango.DevState.DISABLED)
+        elif len(self.attr_FailedAlarms_read) == n:
+            self.set_state(PyTango.DevState.FAULT)
+        elif any((self.attr_ActiveAlarms_read,self.attr_FailedAlarms_read)):
+            self.set_state(PyTango.DevState.ALARM)
         else:
-            self.set_state(PyTango.DevState.ON)  
-        self.set_status('AlarmView(%s) updated at %s'
-                        %(self.Scope,fd.time2str(self.view.last_event_time)))
+            self.set_state(PyTango.DevState.ON)
+            
+        status = 'AlarmView(%s): %s alarms'%(self.Scope,n)
+        status += '\nupdated at %s'%fd.time2str(self.view.last_event_time)        
+        status = '\nDescription: %s'%'\n'.join(self.Description)
+        status += '\n\nActive Alarms:\n%s'%(
+                    '\n'.join(self.attr_ActiveAlarms_read))
+        
+        self.set_status(status)
         #----- PROTECTED REGION END -----#	//	PanicViewDS.always_executed_hook
+        
+    def Update(self,force=True):
+        now = fd.now()
+        if not force and (now-self.last_active_alarms_check < self.Refresh):
+            return
+        try:
+            self.last_active_alarms_check = now
+            self.attr_ActiveAlarms_read = []
+            self.attr_DisabledAlarms_read = []
+            self.attr_FailedAlarms_read = []
+            self.attr_AlarmList_read = al = self.view.sort(as_text=True)
+
+            for i,a in enumerate(reversed(self.view.ordered)):
+                if a.disabled:
+                    self.attr_DisabledAlarms_read.insert(0,al[i])
+                elif a.get_state()=='ERROR':
+                    self.attr_FailedAlarms_read.insert(0,al[i])
+                elif a.active:
+                    self.attr_ActiveAlarms_read.insert(0,al[i])
+        except:
+            err = tb.format_exc()
+            self.error_stream(err)
+            self.attr_ActiveAlarms_read = err.split('\n')            
+            
+        
 
     # -------------------------------------------------------------------------
     #    PanicViewDS read/write attribute methods
@@ -119,6 +161,14 @@ class PanicViewDS (PyTango.Device_4Impl):
         
         #----- PROTECTED REGION END -----#	//	PanicViewDS.Scope_read
         
+    def read_Description(self, attr):
+        self.debug_stream("In read_Description()")
+        #----- PROTECTED REGION ID(PanicViewDS.Description_read) ENABLED START -----#
+        self.attr_Description_read = '\n'.join(self.Description[:])
+        attr.set_value(self.attr_Description_read)
+        
+        #----- PROTECTED REGION END -----#	//	PanicViewDS.Scope_read        
+        
     def read_LastUpdate(self, attr):
         self.debug_stream("In read_LastUpdate()")
         #----- PROTECTED REGION ID(PanicViewDS.LastUpdate_read) ENABLED START -----#
@@ -127,13 +177,41 @@ class PanicViewDS (PyTango.Device_4Impl):
         
         #----- PROTECTED REGION END -----#	//	PanicViewDS.LastUpdate_read
         
-    def read_AlarmList(self, attr):
+    def read_AlarmList(self, attr=None):
         self.debug_stream("In read_AlarmList()")
         #----- PROTECTED REGION ID(PanicViewDS.AlarmList_read) ENABLED START -----#
-        self.attr_AlarmList_read = self.view.sort(as_text=True)
-        attr.set_value(self.attr_AlarmList_read)
+        self.Update(force=False)
+        if attr is not None:
+            attr.set_value(self.attr_AlarmList_read)
         
         #----- PROTECTED REGION END -----#	//	PanicViewDS.AlarmList_read
+
+    def read_ActiveAlarms(self, attr=None):
+        self.debug_stream("In read_ActiveAlarms()")
+        #----- PROTECTED REGION ID(PanicViewDS.ActiveAlarms_read) ENABLED START -----#
+        self.Update(force=False)
+        if attr is not None:
+            attr.set_value(self.attr_ActiveAlarms_read)
+        
+        #----- PROTECTED REGION END -----#	//	PanicViewDS.ActiveAlarms_read
+        
+    def read_DisabledAlarms(self, attr=None):
+        self.debug_stream("In read_DisabledAlarms()")
+        #----- PROTECTED REGION ID(PanicViewDS.DisabledAlarms_read) ENABLED START -----#
+        self.Update(force=False)
+        if attr is not None:
+            attr.set_value(self.attr_DisabledAlarms_read)
+        
+        #----- PROTECTED REGION END -----#	//	PanicViewDS.DisabledAlarms_read
+        
+    def read_FailedAlarms(self, attr=None):
+        self.debug_stream("In read_FailedAlarms()")
+        #----- PROTECTED REGION ID(PanicViewDS.FailedAlarms_read) ENABLED START -----#
+        self.Update(force=False)
+        if attr is not None:
+            attr.set_value(self.attr_FailedAlarms_read)
+        
+        #----- PROTECTED REGION END -----#	//	PanicViewDS.FailedAlarms_read        
         
     def read_Filters(self, attr):
         self.debug_stream("In read_Filters()")
@@ -188,6 +266,10 @@ class PanicViewDSClass(PyTango.DeviceClass):
             [PyTango.DevVarStringArray,
             "Regexp filter to select PyAlarm/PanicDS devices",
             ["*"] ],
+        'Description':
+            [PyTango.DevVarStringArray,
+            "Name/Tooltip to be shown on GUI for this view",
+            ["Title?","Description?"] ],
         'Filters':
             [PyTango.DevVarStringArray, 
              '',
@@ -205,15 +287,22 @@ class PanicViewDSClass(PyTango.DeviceClass):
 
     #    Command definitions
     cmd_list = {
+        'Update':
+            [[PyTango.DevVoid, "Updates all attribute lists"],
+            [PyTango.DevVoid, ""]],        
         }
 
 
     #    Attribute definitions
     attr_list = {
         'Scope':
-            [[PyTango.DevVarStringArray,
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ, 512]],
+        'Description':
+            [[PyTango.DevString,
             PyTango.SCALAR,
-            PyTango.READ]],
+            PyTango.READ]],            
         'LastUpdate':
             [[PyTango.DevDouble,
             PyTango.SCALAR,
@@ -222,6 +311,18 @@ class PanicViewDSClass(PyTango.DeviceClass):
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 8192]],
+        'ActiveAlarms':
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ, 8192]],            
+        'DisabledAlarms':
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ, 8192]],  
+        'FailedAlarms':
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ, 8192]],              
         'Filters':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
