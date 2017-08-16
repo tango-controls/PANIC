@@ -944,7 +944,7 @@ class AlarmAPI(fandango.SingletonMap):
               exported=True,host=self.tango_host)
             all_devices = [d for d in all_devices if d in dev_exported]
         
-        #If filter is the name of a pyalarm device, only this will be loaded
+        #If filter is the exact name of a device, only this will be loaded
         if filters in all_devices:
             all_devices = matched = [filters]
             
@@ -953,10 +953,12 @@ class AlarmAPI(fandango.SingletonMap):
             self.servers.load_by_name(filters)
             matched = [d.lower() for d in self.servers.get_all_devices() 
                     if d.lower() in all_devices]
+            #If filter is the exact name of a server, only this will be loaded
             if filters in self.servers:
                 all_devices = matched
             
         else:
+            # If no server is matched, all devices are checked
             matched = []
             
         tdevs = time.time() - tdevs

@@ -43,7 +43,7 @@ from fandango.dicts import SortedDict,CaselessDict, \
 
 import fandango.callbacks
 fandango.callbacks.EventSource.get_thread().set_period_ms(2.)
-fandango.callbacks.EventThread.SHOW_ALIVE = 5000
+fandango.callbacks.EventThread.SHOW_ALIVE = 10000
 fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
 ft.check_device_cached.expire = 60.
 
@@ -167,9 +167,24 @@ class AlarmView(EventListener,Logger):
         self.timeSortingEnabled=None
         self.changed = True
         #self.info('parent init done, +%s'%(now()-self.t_init))
-        self.api = api or panic.AlarmAPI(filters=scope)
+        
+        if not isSequence(scope): scope = [scope]
+        if api: 
+            self.apis = {scope:api}
+        else:
+            self.apis = dict()
+            for k in scope:
+                k = k.split('@')
+                t = first(k[1:] or (None,))
+                self.apis[k[0]] = panic.AlarmAPI(filters=k[0],tango_host=t)
+                
+        #@TODO: MULTIPLE APIS OBJECTS SHOULD BE MANAGED!!
+        self.api = self.apis.values()[0]
+        
         if not self.api.keys():
             self.warning('NO ALARMS FOUND IN DATABASE!?!?')
+
+
         self.apply_filters()
         self.info('view api init done, +%s'%(now()-self.t_init))
         self.info('sources : %s'%fd.log.pformat(self.alarms))
@@ -471,7 +486,7 @@ class AlarmView(EventListener,Logger):
         self.info('update_sources(%d)'%len(self.alarms))
         olds = self.get_sources()
         news = [self.get_model(s) for s in self.alarms]
-        devs = set(parse_tango_model(s)['device'] for s in news)
+        devs = set(parse_tango_model(s)['devicename'] for s in news)
         news = [self.api.devices[d].get_model()
                 for d in devs] #discard single attributes
 
@@ -483,7 +498,7 @@ class AlarmView(EventListener,Logger):
             if s not in olds:
                 ta = self.add_source(s)
 
-            d = self.api.get_device(parse_tango_model(s)['device'])
+            d = self.api.get_device(parse_tango_model(s)['devicename'])
             if anyendswith(s,d.get_model()):
                 d._actives = self.get_source(s)
         

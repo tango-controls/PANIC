@@ -80,7 +80,7 @@ class PanicViewDS (PyTango.Device_4Impl):
     def init_device(self):
         self.debug_stream("In init_device()")
         self.get_device_properties(self.get_device_class())
-        self.attr_Scope_read = ""
+        self.attr_Scope_read = [""]
         self.attr_LastUpdate_read = 0.0
         self.attr_AlarmList_read = [""]
         self.attr_Filters_read = [""]
@@ -171,7 +171,7 @@ class PanicViewDS (PyTango.Device_4Impl):
     #----- PROTECTED REGION END -----#	//	PanicViewDS.programmer_methods
 
 class PanicViewDSClass(PyTango.DeviceClass):
-    # -------- Add you global class variables here --------------------------
+    # -------- Add you global klass variables here --------------------------
     #----- PROTECTED REGION ID(PanicViewDS.global_class_variables) ENABLED START -----#
     
     #----- PROTECTED REGION END -----#	//	PanicViewDS.global_class_variables
@@ -185,7 +185,7 @@ class PanicViewDSClass(PyTango.DeviceClass):
     #    Device Properties
     device_property_list = {
         'Scope':
-            [PyTango.DevString, 
+            [PyTango.DevVarStringArray,
             "Regexp filter to select PyAlarm/PanicDS devices",
             ["*"] ],
         'Filters':
@@ -211,7 +211,7 @@ class PanicViewDSClass(PyTango.DeviceClass):
     #    Attribute definitions
     attr_list = {
         'Scope':
-            [[PyTango.DevString,
+            [[PyTango.DevVarStringArray,
             PyTango.SCALAR,
             PyTango.READ]],
         'LastUpdate':
