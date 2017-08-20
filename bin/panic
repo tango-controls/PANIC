@@ -4,16 +4,8 @@ PANIC=$(python -c "import imp;print(imp.find_module('panic')[1])")
 
 CMD="python $PANIC/gui/gui.py"
 
-if [ "$( echo $1 | grep '\?\|\-h' )" ] ; then
-  echo "Usage:"
-  echo "    > panic [-?] [-v/--attach] [--filter=...]"
-  echo ""
-  echo "Without arguments, it will parse defaults from "
-  echo "PANIC.DefaultArgs property of Tango Database"
-  
-else
-  echo ${CMD} $*
-  $CMD $*
-fi
+echo ${CMD} $*
+$CMD $*
+
 
 

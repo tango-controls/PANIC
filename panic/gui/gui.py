@@ -34,6 +34,21 @@ from core import Ui_AlarmList
 from alarmhistory import *
 
 PANIC_URL = 'http://www.pythonhosted.org/panic'    
+
+HELP = """
+Usage:
+    > panic [-?] [-v/--attach] f0 f1 f2 [--scope=...] [--filter=...]
+
+Without arguments, it will parse defaults from 
+PANIC.DefaultArgs property of Tango Database
+
+Scope will constrain the devices accessed by the application, cannot
+be changed on runtime.
+
+Filters/args just initialize the regular expression search to a default value.
+
+"""
+
 OPEN_WINDOWS = []
 
 import widgets
@@ -74,9 +89,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     
     def __init__(self, parent=None, filters='', options=None, mainwindow=None):
               
-        trace('>>>> AlarmGUI()')
         options = options or {}
-        
         if not fn.isDictionary(options):
             options = dict((o.replace('-','').split('=')[0],o.split('=',1)[-1]) 
                 for o in options)
@@ -92,18 +105,19 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.expert = False
         self.tools = {} #Widgets dictionary
         
-        self.scope = options.get('scope','*')
+        self.scope = options.get('scope','*') #filters or '*'
         self.default_regEx = options.get('default',filters or '*')
-        self.regEx = ''
-        self.init_ui(parent,mainwindow)
+        self.regEx = self.default_regEx
+        self.init_ui(parent,mainwindow) #init_mw is called here
         
-        if self.regEx and str(self.regEx)!=os.getenv('PANIC_DEFAULT'): 
+        if self.regEx not in ('','*'): 
             print 'Setting RegExp filter: %s'%self.regEx
             self._ui.regExLine.setText(str(self.regEx))
         
         self.api = panic.AlarmAPI(self.scope)
         trace('AlarmGUI(%s): api done'%self.scope)
-        #self._ordered=[] #Alarms list ordered
+
+        # @TODO: api-based views are not multi-host
         self.view = panic.view.AlarmView(api=self.api,scope=self.scope,
                                          events=False,verbose=2) 
         trace('AlarmGUI(): view done')
@@ -742,13 +756,18 @@ class AlarmGUI(QFilterGUI):
     def main(args=[]):
         """Main launcher, load views and stops threads on exit"""
         
-        from taurus.qt.qtgui.application import TaurusApplication    
-        uniqueapp = TaurusApplication([]) #opts)
-        import widgets
         t0 = time.time()
         args = args or ft.get_free_property('PANIC','DefaultArgs')    
         opts = [a for a in args if a.startswith('-')]
-        args = [a for a in args if not a.startswith('-')]    
+        args = [a for a in args if not a.startswith('-')] 
+        
+        if any(o in opts for o in ('-h','--help','-?')):
+            print(HELP)
+            return
+
+        from taurus.qt.qtgui.application import TaurusApplication    
+        uniqueapp = TaurusApplication([]) #opts)
+        import widgets
         
         if '--calc' in opts:
             args = args or ['']
