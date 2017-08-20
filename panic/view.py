@@ -72,22 +72,37 @@ class FilterStack(SortedDict):
     def add(self,name,s):
         self[name] = str2dict(s) if not isMapping(s) else s
         
-    def match(self,value,strict=False,trace=False):
+    def match(self,value,strict=False,verbose=False):
         is_map = isMapping(value)
-        m = None
+        m,gm = None,None
         f = searchCl if not strict else matchCl
+        # Several keys at same level acts like OR
+        # Keys at different levet act like AND
+        # An !exclude clause always aborts
         for k,v in self.items():
-            if trace: print('apply((%s,%s),%s)'%(k,v,value))
+            if verbose: print('match((%s,%s),%s)'%(k,v,value))
+            hits = 0
+
             for p,r in v.items():
                 t = value.get(p,'') if is_map else getattr(value,p,'')
                 m = f(str(r),str(t),extend=True) if r else True
-                if not m: 
-                    if trace: print('%s doesnt match %s'%(t,r))
+                if m:
+                    hits,gm = hits+1,m
+                elif r.startswith('!'):
+                    if verbose: print('%s excluded by %s'%(t,r))
                     return m
-        return m
+
+            if not hits: 
+                print('%s not matched by %s'%(value,v))
+                return 0
+
+        return gm if hits else None
         
-    def apply(self,sequence,strict=False,trace=False):
-        return filter(partial(self.match,strict=strict,trace=trace),sequence)
+    def apply(self,sequence,strict=False,verbose=False):
+        r = filter(partial(self.match,strict=strict,verbose=verbose),sequence)
+        if verbose:
+            print('FilterStack.apply(%s,%s): \n\t%s'%(sequence,self.items(),r))        
+        return r
       
     def __repr__(self):
         dct = {}
@@ -299,7 +314,7 @@ class AlarmView(EventListener):
                 filters = FilterStack(filters)
             else:
                 filters = filters or self.filters
-            r = [a.tag for a in filters.apply(self.api.values())]
+            r = [a.tag for a in filters.apply(self.api.values(),verbose=0)]
 
         self.info('get_alarms(%s): %d alarms found'%(repr(filters),len(r)))
         return r
@@ -328,7 +343,7 @@ class AlarmView(EventListener):
             objs = [self.api[f] for f in self.filtered]
             models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
             self.alarms = self.models = CaselessDict(models)
-            self.debug('apply_filters: \n%s\n'%'\n'.join(self.filtered))
+            self.info('apply_filters: \n%s\n'%'\n'.join(self.filtered))
             return self.filtered
         except:
             self.error(traceback.format_exc())

@@ -113,6 +113,10 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         if self.regEx not in ('','*'): 
             print 'Setting RegExp filter: %s'%self.regEx
             self._ui.regExLine.setText(str(self.regEx))
+            self.onRegExUpdate()
+            
+        refresh = int(options.get('refresh',self.REFRESH_TIME))
+        self.REFRESH_TIME = AlarmRow.REFRESH_TIME = refresh
         
         self.api = panic.AlarmAPI(self.scope)
         trace('AlarmGUI(%s): api done'%self.scope)
@@ -133,8 +137,6 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         if N<150: 
             self._ui.sevDebugCheckBox.setChecked(True)
             self._ui.activeCheckBox.setChecked(False)
-            self.REFRESH_TIME = 5000
-            AlarmRow.REFRESH_TIME = 5000
         else:
             self._ui.sevDebugCheckBox.setChecked(False)
             self._ui.activeCheckBox.setChecked(True)
@@ -374,22 +376,19 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.changed = changed or self.changed
         trace('buildList(%s)'%self.changed)
 
-        #print "%s -> AlarmGUI.buildList(%s)"%(time.ctime(), ['%s=%s'%(
-        #    s,getattr(self,s,None)) for s in ('regEx','severities','timeSortingEnabled','changed',)])
+        trace("%s -> AlarmGUI.buildList(%s)"%(time.ctime(), ['%s=%s'%(
+            s,getattr(self,s,None)) for s in 
+            ('regEx','severities','timeSortingEnabled','changed',)]))
         try:
-
             ## TODO: update filters from GUI and apply to AlarmView
-
-            # self.view.apply_filters(self.getFilters())
-            
-            for nr, alarm in enumerate(self.getCurrents()):
-              ## sort/update is done by AlarmView, nothing to do here?
-              pass
-            
+            self.view.apply_filters(**self.getFilters())            
+            #for nr, alarm in enumerate(self.getCurrents()):
+              ### sort/update is done by AlarmView, nothing to do here?
+              #pass            
             #self.buildRowList()
-
         except:
             trace('AlarmGUI.buildList(): Failed!\n%s'%traceback.format_exc())
+            
         #if not self.changed: print '\tAlarm list not changed'
         if block: self._ui.listWidget.blockSignals(False)
         #print '*'*80
@@ -411,19 +410,16 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 #del delItem
             
         trace('\t\tdisplaying the list ...')
-        ActiveCheck = self._ui.activeCheckBox.isChecked() or self.timeSortingEnabled
-        
-        #data = self.view.export(to_type=list)
-        #sep = ' - '
-        #cols = range(len(data[0]) if data else 0)
-        #print data[0]
-        #for i,c in enumerate(cols):
-            #cols[i] = max([len(str(d[i])) for d in data])
-        #print cols0
+        ActiveCheck = self._ui.activeCheckBox.isChecked() \
+                        or self.timeSortingEnabled
         
         data = self.view.sort()
-        self.ALARM_LENGTHS[0] = max(len(str(t).split('/')[-1]) for t in data)
-        self.ALARM_LENGTHS[3] = max(len(str(t).rsplit('/',1)[0]) for t in data)
+        if not data:
+            trace('NO ALARMS FOUND!!!')
+        else:
+            self.ALARM_LENGTHS[0] = max(len(str(t).split('/')[-1]) for t in data)
+            self.ALARM_LENGTHS[3] = max(len(str(t).rsplit('/',1)[0]) for t in data)
+            
         for i in range(len(data)): #self.getVisibleRows():
             t = data[i]
             try:
@@ -487,17 +483,45 @@ class QFilterGUI(QAlarmList):
         self.setFirstCombo()
         self.setSecondCombo()
         self._ui.infoLabel0_1.setText(self._ui.contextComboBox.currentText())
-        Qt.QObject.connect(self._ui.contextComboBox, Qt.SIGNAL("currentIndexChanged(QString)"), self._ui.infoLabel0_1.setText)
-        Qt.QObject.connect(self._ui.contextComboBox, Qt.SIGNAL("currentIndexChanged(int)"), self.setSecondCombo)
-        Qt.QObject.connect(self._ui.comboBoxx, Qt.SIGNAL("currentIndexChanged(QString)"), self.onFilter)
+        Qt.QObject.connect(self._ui.contextComboBox, 
+                           Qt.SIGNAL("currentIndexChanged(QString)"), 
+                           self._ui.infoLabel0_1.setText)
+        Qt.QObject.connect(self._ui.contextComboBox, 
+                           Qt.SIGNAL("currentIndexChanged(int)"), 
+                           self.setSecondCombo)
+        Qt.QObject.connect(self._ui.comboBoxx, 
+                           Qt.SIGNAL("currentIndexChanged(QString)"), self.onFilter)
         
-        Qt.QObject.connect(self._ui.regExUpdate, Qt.SIGNAL("clicked(bool)"), self.onRegExUpdate)
-        Qt.QObject.connect(self._ui.selectCheckBox, Qt.SIGNAL('stateChanged(int)'), self.onSelectAllNone)
-        Qt.QObject.connect(self._ui.activeCheckBox, Qt.SIGNAL('stateChanged(int)'), self.onFilter)
-        Qt.QObject.connect(self._ui.sevAlarmCheckBox, Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevErrorCheckBox, Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevWarningCheckBox, Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevDebugCheckBox, Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)  
+        Qt.QObject.connect(self._ui.regExUpdate, 
+                           Qt.SIGNAL("clicked(bool)"), self.onRegExUpdate)
+        Qt.QObject.connect(self._ui.selectCheckBox, 
+                           Qt.SIGNAL('stateChanged(int)'), self.onSelectAllNone)
+        Qt.QObject.connect(self._ui.activeCheckBox, 
+                           Qt.SIGNAL('stateChanged(int)'), self.onFilter)
+        Qt.QObject.connect(self._ui.sevAlarmCheckBox, 
+                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        Qt.QObject.connect(self._ui.sevErrorCheckBox, 
+                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        Qt.QObject.connect(self._ui.sevWarningCheckBox, 
+                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        Qt.QObject.connect(self._ui.sevDebugCheckBox, 
+                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)  
+        
+    def getFilters(self):
+        #@TODO: Only regexp filter implemented
+        
+        tag = device = receiver = formula = ''
+        regexp = str(self.regEx).lower().strip().replace(' ','*')
+        
+        if regexp and not clmatch('^[\!\*].*',regexp): 
+            regexp = '*'+regexp+'*'
+            
+        return {'tag':tag or regexp,
+                'device':device or regexp,
+                'receiver':receiver or regexp,
+                'formula':regexp,
+                }
+        
     
     def setFirstCombo(self):
         self.setComboBox(self._ui.contextComboBox,['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],sort=False)
@@ -579,7 +603,7 @@ class QFilterGUI(QAlarmList):
 
     @Catched
     def regExFiltering(self, source):
-        alarms,regexp=[],str(self.regEx).lower().strip()
+        alarms,regexp=[],str(self.regEx).lower().strip().replace(' ','*')
         exclude = regexp.startswith('!')
         if exclude: regexp = regexp.replace('!','').strip()
         for a in source:
@@ -587,8 +611,10 @@ class QFilterGUI(QAlarmList):
                         +a.severity.lower()+' '+a.description.lower()
                         +' '+a.tag.lower()+' '+a.formula.lower()+' '
                         +a.device.lower())
-            if (exclude and not match) or (not exclude and match): alarms.append(a)
-        trace('\tregExFiltering(%d): %d alarms returned'%(len(source),len(alarms)))
+            if (exclude and not match) or (not exclude and match): 
+                alarms.append(a)
+        trace('\tregExFiltering(%d): %d alarms returned'
+              %(len(source),len(alarms)))
         return alarms    
       
     
@@ -620,8 +646,8 @@ class AlarmGUI(QFilterGUI):
             
         if self.mainwindow:
             
-            self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(
-                self.scope or self.default_regEx or '',
+            self.mainwindow.setWindowTitle('PANIC (%s[%s]@%s)'%(
+                self.scope,self.default_regEx,
                 fn.get_tango_host().split(':')[0]))
             
             icon = '/gui/icon/panic-6-big.png' #'.svg'
@@ -643,7 +669,8 @@ class AlarmGUI(QFilterGUI):
                            Qt.SIGNAL("timeout()"), self.onRefresh)
         Qt.QObject.connect(self.reloadTimer, 
                            Qt.SIGNAL("timeout()"), self.onReload)
-        self.reloadTimer.start(self.REFRESH_TIME/2.) #first fast loading
+        #first fast loading
+        self.reloadTimer.start(min((5000,self.REFRESH_TIME/2.))) 
         self.refreshTimer.start(self.REFRESH_TIME)
         
     def connectAll(self):
