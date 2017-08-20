@@ -32,7 +32,8 @@ from widgets import WindowManager
 from editor import FormulaEditor,AlarmForm
 from core import Ui_AlarmList
 from alarmhistory import *
-    
+
+PANIC_URL = 'http://www.pythonhosted.org/panic'    
 OPEN_WINDOWS = []
 
 import widgets
@@ -568,16 +569,236 @@ class QFilterGUI(QAlarmList):
         exclude = regexp.startswith('!')
         if exclude: regexp = regexp.replace('!','').strip()
         for a in source:
-            match = fn.searchCl(regexp, a.receivers.lower()+' '+a.severity.lower()+' '+a.description.lower()+' '+a.tag.lower()+' '+a.formula.lower()+' '+a.device.lower())
+            match = fn.searchCl(regexp, a.receivers.lower()+' '
+                        +a.severity.lower()+' '+a.description.lower()
+                        +' '+a.tag.lower()+' '+a.formula.lower()+' '
+                        +a.device.lower())
             if (exclude and not match) or (not exclude and match): alarms.append(a)
         trace('\tregExFiltering(%d): %d alarms returned'%(len(source),len(alarms)))
         return alarms    
       
     
 class AlarmGUI(QFilterGUI):
+      
+    ###########################################################################
+    
+    def init_ui(self,parent,mainwindow):
+        
+        try:
+            PARENT_CLASS.__init__(self,parent)
+            self._connected = False
+            self._ui = Ui_AlarmList()
+            self._ui.setupUi(self)
+            if mainwindow:
+                mainwindow = self.init_mw(mainwindow)
+            self.mainwindow = mainwindow
+            
+            url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6-banner.png'
+            trace('... splash ...')
+            px = Qt.QPixmap(url)
+            self.splash = Qt.QSplashScreen(px)
+            self.splash.showMessage('initializing application...')
+            self.splash.show()
+            trace('showing splash ... %s'%px.size())
+            
+        except: 
+            print traceback.format_exc()
+            
+        if self.mainwindow:
+            
+            self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(
+                self.scope or self.default_regEx or '',
+                fn.get_tango_host().split(':')[0]))
+            
+            icon = '/gui/icon/panic-6-big.png' #'.svg'
+            url = os.path.dirname(panic.__file__)+icon
+            px = Qt.QPixmap(url)
+            self.mainwindow.setWindowIcon(Qt.QIcon(px))
+            
+        self.setExpertView(False)
+
+        self._message = Qt.QMessageBox(self)
+        self._message.setWindowTitle("Empty fields")
+        self._message.setIcon(Qt.QMessageBox.Critical)
+        
+    def init_timers(self):
+        #TIMERS (to reload database and refresh alarm list).
+        self.reloadTimer = Qt.QTimer()
+        self.refreshTimer = Qt.QTimer()
+        Qt.QObject.connect(self.refreshTimer, 
+                           Qt.SIGNAL("timeout()"), self.onRefresh)
+        Qt.QObject.connect(self.reloadTimer, 
+                           Qt.SIGNAL("timeout()"), self.onReload)
+        self.reloadTimer.start(self.REFRESH_TIME/2.) #first fast loading
+        self.refreshTimer.start(self.REFRESH_TIME)
+        
+    def connectAll(self):
+        trace('connecting')
+        #Qt.QObject.connect(self.refreshTimer, Qt.SIGNAL("timeout()"), self.onRefresh)
+        if self.USE_EVENT_REFRESH: Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
+        Qt.QObject.connect(self, Qt.SIGNAL('setfontsandcolors'),AlarmRow.setFontsAndColors)
+
+        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
+        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
+        #Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("currentRowChanged(int)"), self.setAlarmData)
+        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), self.onContextMenu)
+        
+        #Qt.QObject.connect(self._ui.actionExpert,Qt.SIGNAL("changed()"),self.setExpertView)
+        Qt.QObject.connect(self._ui.newButton, Qt.SIGNAL("clicked()"), self.onNew) # "New"
+        Qt.QObject.connect(self._ui.deleteButton, Qt.SIGNAL("clicked(bool)"), self.onDelete) # Delete
+        Qt.QObject.connect(self._ui.refreshButton, Qt.SIGNAL("clicked()"), self.onReload) # "Refresh"        
+        Qt.QObject.connect(self._ui.buttonClose,Qt.SIGNAL("clicked()"), self.close)
+
+        trace('all connected')
+        
+    def init_mw(self,tmw = None):    
+        """ 
+        Method to initialize main window (menus and frames) 
+        """
+        t0 = time.time()
+        alarmApp = self
+        tmw = tmw if isinstance(tmw,Qt.QMainWindow) else CleanMainWindow()
+        tmw.setWindowTitle('PANIC')
+        tmw.menuBar = Qt.QMenuBar(tmw)
+        tmw.toolsMenu = Qt.QMenu('Tools',tmw.menuBar)
+        tmw.fileMenu = Qt.QMenu('File',tmw.menuBar)
+        tmw.viewMenu = Qt.QMenu('View',tmw.menuBar)
+        tmw.helpMenu = Qt.QMenu('Help',tmw.menuBar)
+
+        tmw.setMenuBar(tmw.menuBar)
+        [tmw.menuBar.addAction(a.menuAction()) 
+                for a in (tmw.fileMenu,tmw.toolsMenu,tmw.helpMenu,tmw.viewMenu)]
+        toolbar = Qt.QToolBar(tmw)
+        toolbar.setIconSize(Qt.QSize(20,20))
+        
+        tmw.helpMenu.addAction(getThemeIcon("applications-system"),
+            "Webpage",lambda : os.system('konqueror %s &'%PANIC_URL))
+        tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
+            "Jive",lambda : os.system('jive &'))
+        tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
+            "Astor",lambda : os.system('astor &'))
+        tmw.fileMenu.addAction(getThemeIcon(":/designer/back.png"),
+            "Export to CSV file",alarmApp.saveToFile)
+        tmw.fileMenu.addAction(getThemeIcon(":/designer/forward.png"),
+            "Import from CSV file",alarmApp.loadFromFile)
+        tmw.fileMenu.addAction(getThemeIcon(":/designer/filereader.png"),
+            "Use external editor",alarmApp.editFile)
+        tmw.fileMenu.addAction(getThemeIcon("applications-system"),
+            "Exit",tmw.close)
+        tmw.viewMenu.connect(tmw.viewMenu,
+            Qt.SIGNAL('aboutToShow()'),alarmApp.setViewMenu)
+        
+        from phonebook import PhoneBook
+        alarmApp.tools['bookApp'] = WindowManager.addWindow(
+            PhoneBook(container=tmw))
+        tmw.toolsMenu.addAction(getThemeIcon("x-office-address-book"), 
+            "PhoneBook", alarmApp.tools['bookApp'].show)
+        toolbar.addAction(getThemeIcon("x-office-address-book") ,
+            "PhoneBook",alarmApp.tools['bookApp'].show)
+        
+        trend_action = (getThemeIcon(":/designer/qwtplot.png"),
+            'Trend',
+            lambda:WindowManager.addWindow(widgets.get_archive_trend(show=True))
+            )
+        tmw.toolsMenu.addAction(*trend_action)
+        toolbar.addAction(*trend_action)
+        
+        alarmApp.tools['config'] = WindowManager.addWindow(
+            widgets.dacWidget(container=tmw))
+        tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
+            "Advanced Configuration", alarmApp.tools['config'].show)
+        toolbar.addAction(getThemeIcon("applications-system") ,
+            "Advanced Configuration",alarmApp.tools['config'].show)
+        
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        tmw.addToolBar(toolbar)
+        
+        if SNAP_ALLOWED:
+            alarmApp.tools['history'] = WindowManager.addWindow(
+                widgets.ahWidget(container=tmw))
+            tmw.toolsMenu.addAction(getThemeIcon("office-calendar"),
+                "Alarm History Viewer",alarmApp.tools['history'].show)
+            toolbar.addAction(getThemeIcon("office-calendar") ,
+                "Alarm History Viewer",alarmApp.tools['history'].show)
+        else:
+            trace("Unable to load SNAP",'History Viewer Disabled!')
+            
+        alarm_preview_action = (getThemeIcon("accessories-calculator"),
+            "Alarm Calculator",lambda g=alarmApp:WindowManager.addWindow(
+                AlarmPreview.showEmptyAlarmPreview(g)))
+            
+        [o.addAction(*alarm_preview_action) for o in (tmw.toolsMenu,toolbar)]
+            
+        print('Toolbars created after %s seconds'%(time.time()-t0))
+        tmw.setCentralWidget(alarmApp)
+        tmw.show()
+        return tmw        
+            
+    ###########################################################################
+    # GUI Main
+
+    @staticmethod
+    def main(args=[]):
+        """Main launcher, load views and stops threads on exit"""
+        
+        from taurus.qt.qtgui.application import TaurusApplication    
+        uniqueapp = TaurusApplication([]) #opts)
+        import widgets
+        t0 = time.time()
+        args = args or ft.get_free_property('PANIC','DefaultArgs')    
+        opts = [a for a in args if a.startswith('-')]
+        args = [a for a in args if not a.startswith('-')]    
+        
+        if '--calc' in opts:
+            args = args or ['']
+            form = AlarmPreview(*args)
+            form.show()
+            uniqueapp.exec_()
+            return
+
+        # ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else []))
+        
+        ## @TODO: Global views (multi-host) to be added
+        #if not views:
+            #vc = ViewChooser()
+            #vc.exec_()
+            #views = vc.view
+        #if not views or not any(views):
+            #sys.exit(-1)
+
+        print '='*80
+        trace('launching AlarmGUI ... %s, %s'%(args,opts))
+        print '='*80
+        alarmApp = AlarmGUI(filters='|'.join(args),
+                            options=opts,mainwindow=True)
+        print('AlarmGUI created after %s seconds'%(time.time()-t0))    
+        #alarmApp.tmw.show()
+        n = uniqueapp.exec_()
+
+        print('AlarmGUI exits ...')    
+        # Unsubscribing all event sources
+        import fandango.threads
+        import fandango.callbacks
+        [s.unsubscribeEvents() for s 
+            in fandango.callbacks.EventSource.get_thread().sources]
+        fandango.threads.ThreadedObject.kill_all()
+        sys.exit(n) 
+        
+    
+    def close(self):
+        print('AlarmGUI.close()')
+        Qt.QApplication.quit()        
+        
+    ##########################################################################
+    
+    def printRows(self):
+        for row in self._ui.listWidget.selectedItems():
+          print row.__repr__()
     
     def saveToFile(self):
-        filename = str(Qt.QFileDialog.getSaveFileName(self.mainwindow,'File to save','.','*.csv'))
+        filename = str(Qt.QFileDialog.getSaveFileName(
+            self.mainwindow,'File to save','.','*.csv'))
         self.api.export_to_csv(filename,alarms=self.getCurrents())
         return filename
         
@@ -637,221 +858,15 @@ class AlarmGUI(QFilterGUI):
         self._ui.deleteButton.setEnabled(self.expert) #show()
         self.expert = check
         return
-
-      
+    
     ###########################################################################
     
-    def init_ui(self,parent,mainwindow):
-        
-        try:
-            PARENT_CLASS.__init__(self,parent)
-            self._connected = False
-            self._ui = Ui_AlarmList()
-            self._ui.setupUi(self)
-            self.mainwindow = mainwindow
-            url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6-banner.png'
-            px = Qt.QPixmap(url)
-            self.splash = Qt.QSplashScreen(px)
-            self.splash.showMessage('initializing application...')
-            self.splash.show()
-            trace('showing splash ... %s'%px.size())
-            
-        except: 
-            print traceback.format_exc()
-            
-        if self.mainwindow:
-            
-            self.mainwindow.setWindowTitle('PANIC (%s@%s)'%(
-                self.scope or self.default_regEx or '',
-                fn.get_tango_host().split(':')[0]))
-            
-            icon = '/gui/icon/panic-6-big.png' #'.svg'
-            url = os.path.dirname(panic.__file__)+icon
-            px = Qt.QPixmap(url)
-            self.mainwindow.setWindowIcon(Qt.QIcon(px))
-            
-        self.setExpertView(False)
-
-        self._message = Qt.QMessageBox(self)
-        self._message.setWindowTitle("Empty fields")
-        self._message.setIcon(Qt.QMessageBox.Critical)
-        
-    def init_timers(self):
-        #TIMERS (to reload database and refresh alarm list).
-        self.reloadTimer = Qt.QTimer()
-        self.refreshTimer = Qt.QTimer()
-        Qt.QObject.connect(self.refreshTimer, 
-                           Qt.SIGNAL("timeout()"), self.onRefresh)
-        Qt.QObject.connect(self.reloadTimer, 
-                           Qt.SIGNAL("timeout()"), self.onReload)
-        self.reloadTimer.start(self.REFRESH_TIME/2.) #first fast loading
-        self.refreshTimer.start(self.REFRESH_TIME)
-        
-    def connectAll(self):
-        trace('connecting')
-        #Qt.QObject.connect(self.refreshTimer, Qt.SIGNAL("timeout()"), self.onRefresh)
-        if self.USE_EVENT_REFRESH: Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
-        Qt.QObject.connect(self, Qt.SIGNAL('setfontsandcolors'),AlarmRow.setFontsAndColors)
-
-        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
-        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
-        #Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("currentRowChanged(int)"), self.setAlarmData)
-        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), self.onContextMenu)
-        
-        #Qt.QObject.connect(self._ui.actionExpert,Qt.SIGNAL("changed()"),self.setExpertView)
-        Qt.QObject.connect(self._ui.newButton, Qt.SIGNAL("clicked()"), self.onNew) # "New"
-        Qt.QObject.connect(self._ui.deleteButton, Qt.SIGNAL("clicked(bool)"), self.onDelete) # Delete
-        Qt.QObject.connect(self._ui.refreshButton, Qt.SIGNAL("clicked()"), self.onReload) # "Refresh"        
-        Qt.QObject.connect(self._ui.buttonClose,Qt.SIGNAL("clicked()"), self.close)
-
-        trace('all connected')
-        
-    def printRows(self):
-        for row in self._ui.listWidget.selectedItems():
-          print row.__repr__()
-    
-    def close(self):
-        Qt.QApplication.quit()        
-        
-    ###########################################################################
-            
-###########################################################################
-# GUI Main
-
-def main(args=[]):
-    import widgets
-
-    t0 = time.time()
-    opts = [a for a in args if a.startswith('-')]
-    args = [a for a in args if not a.startswith('-')]
-    URL = 'http://www.cells.es/Intranet/Divisions/Computing/'\
-        'Controls/Help/Alarms/panic'
-   
-    print '='*80
-    trace(' Launching Panic ...')
-    print '='*80
-    
-    tmw = CleanMainWindow()
-    tmw.setWindowTitle('PANIC')
-    tmw.menuBar = Qt.QMenuBar(tmw)
-    tmw.toolsMenu = Qt.QMenu('Tools',tmw.menuBar)
-    tmw.fileMenu = Qt.QMenu('File',tmw.menuBar)
-    tmw.viewMenu = Qt.QMenu('View',tmw.menuBar)
-    tmw.helpMenu = Qt.QMenu('Help',tmw.menuBar)
-    
-    trace('\tlaunching AlarmGUI ... %s'%sys.argv)
-    alarmApp = AlarmGUI(filters='|'.join(args),options=opts,mainwindow=tmw)
-    tmw.setCentralWidget(alarmApp)
-    print('AlarmGUI created after %s seconds'%(time.time()-t0))
-
-    tmw.setMenuBar(tmw.menuBar)
-    [tmw.menuBar.addAction(a.menuAction()) 
-            for a in (tmw.fileMenu,tmw.toolsMenu,tmw.helpMenu,tmw.viewMenu)]
-    toolbar = Qt.QToolBar(tmw)
-    toolbar.setIconSize(Qt.QSize(20,20))
-    
-    tmw.helpMenu.addAction(getThemeIcon("applications-system"),
-        "Webpage",lambda : os.system('konqueror %s &'%URL))
-    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
-        "Jive",lambda : os.system('jive &'))
-    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
-        "Astor",lambda : os.system('astor &'))
-    tmw.fileMenu.addAction(getThemeIcon(":/designer/back.png"),
-        "Export to CSV file",alarmApp.saveToFile)
-    tmw.fileMenu.addAction(getThemeIcon(":/designer/forward.png"),
-        "Import from CSV file",alarmApp.loadFromFile)
-    tmw.fileMenu.addAction(getThemeIcon(":/designer/filereader.png"),
-        "Use external editor",alarmApp.editFile)
-    tmw.fileMenu.addAction(getThemeIcon("applications-system"),
-        "Exit",tmw.close)
-    tmw.viewMenu.connect(tmw.viewMenu,
-        Qt.SIGNAL('aboutToShow()'),alarmApp.setViewMenu)
-    
-    from phonebook import PhoneBook
-    alarmApp.tools['bookApp'] = WindowManager.addWindow(
-        PhoneBook(container=tmw))
-    tmw.toolsMenu.addAction(getThemeIcon("x-office-address-book"), 
-        "PhoneBook", alarmApp.tools['bookApp'].show)
-    toolbar.addAction(getThemeIcon("x-office-address-book") ,
-        "PhoneBook",alarmApp.tools['bookApp'].show)
-    
-    trend_action = (getThemeIcon(":/designer/qwtplot.png"),
-        'Trend',
-        lambda:WindowManager.addWindow(widgets.get_archive_trend(show=True))
-        )
-    tmw.toolsMenu.addAction(*trend_action)
-    toolbar.addAction(*trend_action)
-    
-    alarmApp.tools['config'] = WindowManager.addWindow(
-        widgets.dacWidget(container=tmw))
-    tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
-        "Advanced Configuration", alarmApp.tools['config'].show)
-    toolbar.addAction(getThemeIcon("applications-system") ,
-        "Advanced Configuration",alarmApp.tools['config'].show)
-    
-    toolbar.setMovable(False)
-    toolbar.setFloatable(False)
-    tmw.addToolBar(toolbar)
-    
-    if SNAP_ALLOWED:
-        alarmApp.tools['history'] = WindowManager.addWindow(
-            widgets.ahWidget(container=tmw))
-        tmw.toolsMenu.addAction(getThemeIcon("office-calendar"),
-            "Alarm History Viewer",alarmApp.tools['history'].show)
-        toolbar.addAction(getThemeIcon("office-calendar") ,
-            "Alarm History Viewer",alarmApp.tools['history'].show)
-    else:
-        trace("Unable to load SNAP",'History Viewer Disabled!')
-        
-    alarm_preview_action = (getThemeIcon("accessories-calculator"),
-        "Alarm Calculator",lambda g=alarmApp:WindowManager.addWindow(
-            AlarmPreview.showEmptyAlarmPreview(g)))
-    [o.addAction(*alarm_preview_action) for o in (tmw.toolsMenu,toolbar)]
-        
-    print('Toolbars created after %s seconds'%(time.time()-t0))
-    tmw.show()
-    return #uniqueapp #.exec_()
+def main(args):
+    AlarmGUI.main(args)
   
-    ###########################################################################
-  
-def main_gui():
-    import sys
-    
-    from taurus.qt.qtgui.application import TaurusApplication    
-    #uniqueapp = Qt.QApplication([])
-    uniqueapp = TaurusApplication([]) #opts)
-    
-    if '--calc' in sys.argv:
-        args = args or ['']
-        form = AlarmPreview(*args)
-        form.show()
-        uniqueapp.exec_()
-        return
-    
-    views = sys.argv[1:]
-    if not views:
-        vc = ViewChooser()
-        vc.exec_()
-        views = vc.view
-    if not views or not any(views):
-        sys.exit(-1)
-        
-    main(views)
-    # ([os.getenv('PANIC_DEFAULT')] if os.getenv('PANIC_DEFAULT') else []))
-    print('app created')
-    n = uniqueapp.exec_()
-    print('exit')
-    
-    import fandango.threads
-    import fandango.callbacks
-    [s.unsubscribeEvents() for s 
-        in fandango.callbacks.EventSource.get_thread().sources]
-    fandango.threads.ThreadedObject.kill_all()
-    sys.exit(n) 
-    
 if __name__ == "__main__":
-    main_gui()
-    print('done')
+    import sys
+    main(sys.argv[1:])
 
 try:
     from fandango.doc import get_fn_autodoc

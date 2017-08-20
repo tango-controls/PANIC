@@ -2,49 +2,18 @@
 
 PANIC=$(python -c "import imp;print(imp.find_module('panic')[1])")
 
-PANIC_DEFAULT="--filter=!EXCLUDEDALARMS"
-PANIC_ARGS="$*"
-
-if [ "$(echo $PANIC_ARGS | grep '\-\-')" ] ; then
-  PANIC_ARGS=$PANIC_ARGS
-else
-  PANIC_ARGS=$PANIC_DEFAULT
-fi
-
-HASSCREEN=
-#$(which screen 2>/dev/null)
-CMD="python $PANIC/gui/gui.py $PANIC_ARGS"
+CMD="python $PANIC/gui/gui.py"
 
 if [ "$( echo $1 | grep '\?\|\-h' )" ] ; then
   echo "Usage:"
   echo "    > panic [-?] [-v/--attach] [--filter=...]"
   echo ""
-  echo "Console output will be disabled unless attach/v options are passed"
-  echo "SCREEN is used as default shell if present"
-  echo ""
+  echo "Without arguments, it will parse defaults from "
+  echo "PANIC.DefaultArgs property of Tango Database"
   
 else
-  echo "Launching panic-gui ..."
-  if [ "$*" ] && [ "$( echo "$*" | grep '\-v' )" ] ; then
-    echo "raw"
-    CMD=${CMD}
-
-  elif [ "$*" ] && [ "$( echo "$*" | grep 'attach' )" ] ; then
-    echo "run attached"
-    if [ "${HASSCREEN}" ] ; then
-      CMD="screen -S panic-gui ${CMD}"
-    fi
-    
-  else
-    if [ "${HASSCREEN}" ] ; then
-      echo "run detached"
-      CMD="screen -dm -S panic-gui ${CMD}"
-    else
-      CMD="${CMD} > /dev/null"
-    fi
-  fi
-  echo $CMD
-  $CMD
+  echo ${CMD} $*
+  $CMD $*
 fi
 
 

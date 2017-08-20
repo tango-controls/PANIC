@@ -42,7 +42,7 @@ class ViewChooser(Qt.QDialog):
 
         print('ViewChooser(%s)'%views)
         self.view = ''
-        self.views = dict()
+        self.views = fd.dicts.SortedDict()
         for v in views:
             if ':' in v:
                 self.views[v] = v
@@ -56,7 +56,7 @@ class ViewChooser(Qt.QDialog):
         self.setLayout(Qt.QVBoxLayout())
         self.layout().addWidget(Qt.QLabel('Choose an AlarmView'))
         self.chooser = Qt.QComboBox()
-        self.chooser.addItems(sorted(self.views.keys()))
+        self.chooser.addItems(self.views.keys())
         self.layout().addWidget(self.chooser)
         self.button = Qt.QPushButton('Done')
         self.layout().addWidget(self.button)
