@@ -27,8 +27,8 @@ except:
 
 from row import AlarmRow, QAlarm, QAlarmManager
 from views import ViewChooser
-from widgets import * #< getThemeIcon, getIconForAlarm imported here
-from widgets import WindowManager
+from utils import * #< getThemeIcon, getIconForAlarm imported here
+from utils import WindowManager
 from editor import FormulaEditor,AlarmForm
 from core import Ui_AlarmList
 from alarmhistory import *
@@ -51,7 +51,7 @@ Filters/args just initialize the regular expression search to a default value.
 
 OPEN_WINDOWS = []
 
-import widgets
+import utils as widgets
 widgets.TRACE_LEVEL = 1 #-1
 
     ###########################################################################
@@ -795,7 +795,6 @@ class AlarmGUI(QFilterGUI):
 
         from taurus.qt.qtgui.application import TaurusApplication    
         uniqueapp = TaurusApplication([]) #opts)
-        import widgets
         
         if '--calc' in opts:
             args = args or ['']

@@ -1,5 +1,5 @@
 import panic, fandango
-from widgets import *
+from utils import *
 from taurus.qt.qtgui.panel import TaurusForm
 from operator import itemgetter
 

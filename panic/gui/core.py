@@ -1,7 +1,7 @@
-from widgets import Qt, QtCore, QtGui
+from utils import Qt, QtCore, QtGui
 import taurus
 from taurus.qt.qtgui.panel import TaurusForm
-from widgets import getThemeIcon
+from utils import getThemeIcon
 
 class Ui_AlarmList(object):
     def setupUi(self, Form):

@@ -1,7 +1,7 @@
 import sys, panic, traceback
-from widgets import Qt, QtCore, QtGui
-from widgets import getThemeIcon
-from widgets import iValidatedWidget
+from utils import Qt, QtCore, QtGui
+from utils import getThemeIcon
+from utils import iValidatedWidget
 
 class PhoneBook(QtGui.QWidget):
     def __init__(self,parent=None,container=None):

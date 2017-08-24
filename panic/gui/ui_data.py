@@ -1,5 +1,5 @@
-from widgets import QtCore, QtGui
-from widgets import clickableQLineEdit, clickableQTextEdit,getThemeIcon
+from utils import QtCore, QtGui
+from utils import clickableQLineEdit, clickableQTextEdit,getThemeIcon
 
 """
 ui_data.py, this file contains the Ui Classes used for AlarmEditor form.
@@ -161,7 +161,7 @@ class Ui_Data(object):
         #self.formulaLabel.setFont(self.font)
         #self.formulaLabel.setObjectName("formulaLabel")
         #self.verticalLayout_2.addWidget(self.formulaLabel)
-        from widgets import AlarmFormula
+        from utils import AlarmFormula
         self.formulaTextEdit = AlarmFormula() #clickableQTextEdit(self.formulaWidget)
         self.formulaTextEdit.setReadOnly(True)
         self.formulaTextEdit.setObjectName("formulaTextEdit")

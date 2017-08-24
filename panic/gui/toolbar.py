@@ -1,5 +1,5 @@
 import sys, PyTango
-from widgets import Qt
+from utils import Qt
 from taurus.qt.qtgui import container
 from taurus.qt.qtgui.panel import TaurusForm
 

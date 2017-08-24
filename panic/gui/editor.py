@@ -1,15 +1,15 @@
 import sys, re
 import panic
-from widgets import QtCore, QtGui, Qt
+from utils import QtCore, QtGui, Qt
 from ui_data import Ui_Data,Ui_ReceiversLine
 from ui_data import uiBodyForm,uiRowForm
-from widgets import getThemeIcon
-from widgets import AlarmValueLabel,setCheckBox,getAlarmReport,get_user,trace
-from widgets import AttributesPreview,AlarmPreview,iValidatedWidget
+from utils import getThemeIcon
+from utils import AlarmValueLabel,setCheckBox,getAlarmReport,get_user,trace
+from utils import AttributesPreview,AlarmPreview,iValidatedWidget
 from fandango.excepts import Catched
 
 #AlarmFormula widget is added to the editor in the ui_data.py file
-from widgets import SNAP_ALLOWED,get_snap_api
+from utils import SNAP_ALLOWED,get_snap_api
 
 #get_next_index = lambda d: max([0]+list(d))+1
 
@@ -80,7 +80,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.preview = AlarmPreview(tag=self.getCurrentAlarm().tag,formula=self._wi.formulaTextEdit.toPlainText(),parent=self.parent())
         self.preview.connect(self.preview.upperPanel,Qt.SIGNAL('onSave'),
             lambda obj,s=self:(s.enableEditForm(False),s.setAlarmData(obj)))
-        from widgets import WindowManager
+        from utils import WindowManager
         WindowManager.addWindow(self.preview)
         self.preview.show()
         
@@ -96,7 +96,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.enableEditForm(False)
         
     def onDeviceConfig(self):
-        from widgets import dacWidget
+        from utils import dacWidget
         self.dac = dacWidget(device=self.getCurrentAlarm().device)
         self.dac.show()
         

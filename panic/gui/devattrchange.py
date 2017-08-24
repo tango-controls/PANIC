@@ -1,6 +1,6 @@
 import panic, fandango
-from widgets import Qt,QtCore,QtGui
-from widgets import iValidatedWidget,getThemeIcon
+from utils import Qt,QtCore,QtGui
+from utils import iValidatedWidget,getThemeIcon
 
 
 class dacWidget(QtGui.QWidget):
