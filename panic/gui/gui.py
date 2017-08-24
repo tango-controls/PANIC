@@ -100,7 +100,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.AlarmRows = {}
         self.timeSortingEnabled=None
         self.changed = True
-        self.severities = panic.properties.SEVERITIES
+        self.severities = [] #List to keep severities currently visible
         
         self.expert = False
         self.tools = {} #Widgets dictionary
@@ -140,7 +140,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         else:
             self._ui.sevDebugCheckBox.setChecked(False)
             self._ui.activeCheckBox.setChecked(True)
-            self.severities.remove('debug')
+            
         if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
         
 
@@ -414,6 +414,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                         or self.timeSortingEnabled
         
         data = self.view.sort()
+        trace(len(data))
         if not data:
             trace('NO ALARMS FOUND!!!')
         else:
