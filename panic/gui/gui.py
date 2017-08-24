@@ -683,7 +683,9 @@ class AlarmGUI(QFilterGUI):
         Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
         Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
         #Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("currentRowChanged(int)"), self.setAlarmData)
-        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), self.onContextMenu)
+        Qt.QObject.connect(self._ui.listWidget, 
+                Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), 
+                self.onContextMenu)
         
         #Qt.QObject.connect(self._ui.actionExpert,Qt.SIGNAL("changed()"),self.setExpertView)
         Qt.QObject.connect(self._ui.newButton, Qt.SIGNAL("clicked()"), self.onNew) # "New"

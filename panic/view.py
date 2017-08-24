@@ -468,7 +468,8 @@ class AlarmView(EventListener):
         cols = cols or ['tag','active','description']
         vals = [t.strip() for t in str(text).split(sep)]
         i = cols.index('tag') if 'tag' in cols else 0
-        return vals[i]
+        a = vals[i]
+        return self.get_alarm(a) if obj else a
     
     
     def get_source(self,alarm):

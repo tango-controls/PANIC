@@ -370,7 +370,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
         self.initStyle()
         
     def setModel(self,model=None,device=None):
-        if model in self.api:
+        if model and model in self.api:
             self.obj = self.api[model]
             self.formula = self.obj.formula
         else:

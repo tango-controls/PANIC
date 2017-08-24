@@ -287,9 +287,9 @@ class QAlarmManager(QAlarm):
         act = self.popMenu.addAction(getThemeIcon("edit-undo"), 
                                      "Reset Alarm(s)",self.ResetAlarm)
 
-        items = [view.get_alarm_from_text(i.text()) for i in items]
+        items = [view.get_alarm_from_text(i.text(),obj=True) for i in items]
         print('oncontextMenu(%s)'%items)
-        items = [self.api[a] for a in items]
+            
         act.setEnabled(any(i.active for i in items))
 
         if len([i.acknowledged for i in items]) in (len(items),0):

@@ -895,7 +895,9 @@ class AlarmAPI(fandango.SingletonMap):
 
     ## Dictionary-like methods
     def __get_tag(self,k):
-        if '/' in k: 
+        if isinstance(k,Alarm):
+            return self.__get_tag(k.tag)
+        elif '/' in str(k): 
             self.warning('AlarmAPI[%s] does not support multi-host!'%k)
             k = k.split('/')[-1]
         return k
