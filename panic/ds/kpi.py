@@ -25,7 +25,7 @@ def get_panic_report(api=None,timeout=3000.,tries=3,
     if api is None: api = panic.api()
     elif isString(api): api = panic.api(api)
     if not len(api.servers): 
-      if devfilter = '*':
+      if devfilter == '*':
           api.servers.load_by_name('PyAlarm/*')
       if isString(devfilter):
           api.servers.load_by_name(devfilter)
