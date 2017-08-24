@@ -336,6 +336,8 @@ class AlarmView(EventListener):
         """
         try:
             #self.lock.acquire()
+            self.ordered = []
+            self.last_sort = 0
             filters = FilterStack(filters) if filters else self.filters
             self.info('apply_filters(%s)'%repr(filters))
             self.filtered = self.get_alarms(filters)
@@ -378,7 +380,7 @@ class AlarmView(EventListener):
         setattr(alarm,'sortkey',str(r))
         return r
     
-    def sort(self,sortkey = None, as_text=False):
+    def sort(self,sortkey = None, as_text=False, filtered=True):
         """
         Returns a sorted list of alarm models
         
@@ -392,6 +394,7 @@ class AlarmView(EventListener):
         * failed
         """
         try:
+            self.setLogLevel('DEBUG')
             updated = [a for a in self.alarms.values() if a.updated]
             if len(updated) == len(self.alarms):
                 [a.get_active() for a in self.alarms.values() 
@@ -400,11 +403,19 @@ class AlarmView(EventListener):
                 self.info('sort(): %d alarms not updated yet'%(
                   len(self.alarms)-len(updated)))
                 
+            self.debug('%d alarms, %d filtered, %d updated'
+                       %tuple(map(len,(self.alarms,updated,self.filtered))))
+                
             #self.lock.acquire()
             if not self.ordered or (now()-self.last_sort) > self.get_period():
                 #self.last_keys = keys or self.last_keys
                 sortkey = sortkey or self.sortkey
-                self.ordered = sorted(self.alarms.values(),key=sortkey)
+                if filtered:
+                    objs = [self.api[f] for f in self.filtered]
+                else:
+                    objs = self.alarms.values()
+
+                self.ordered = sorted(objs,key=sortkey)
                 self.info('sort([%d])'%(len(self.ordered)))
                 
             if as_text:
