@@ -23,10 +23,10 @@ Disabled States
 
 Their meanings are:
 
-* OOSRV = Device server is Off, no process running
+* OOSRV = Device server is Off (not exported), no process running
 * DSUPR = Enabled property is False
 * SHLVD = Alarm is listed in DisabledAlarms attribute (temporary disabled)
-* ERROR = Device is alive but the alarm is not being evaluated (thread dead or exception).
+* ERROR = Device is alive but the alarm is not being evaluated (exported=1 and thread dead or exception).
 
 IEC 62682: AlarmStates Definition and related  Actions
 ------------------------------------------------------
