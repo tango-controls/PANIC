@@ -145,9 +145,15 @@ class PanicViewDS (PyTango.Device_4Impl):
         except:
             err = tb.format_exc()
             self.error_stream(err)
-            self.attr_ActiveAlarms_read = err.split('\n')            
+            self.attr_ActiveAlarms_read = err.split('\n')   
             
-        
+    def Eval(self,argin):
+        l = locals()
+        if argin.startswith('.'): 
+            argin = 'SELF'+argin
+        l['SELF'] = self
+        r = eval(argin,l)
+        return repr(r)
 
     # -------------------------------------------------------------------------
     #    PanicViewDS read/write attribute methods
@@ -290,6 +296,9 @@ class PanicViewDSClass(PyTango.DeviceClass):
         'Update':
             [[PyTango.DevVoid, "Updates all attribute lists"],
             [PyTango.DevVoid, ""]],        
+        'Eval':
+            [[PyTango.DevString, "Allows debugging and data extraction"],
+            [PyTango.DevString, ""]],                    
         }
 
 
