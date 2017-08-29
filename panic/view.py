@@ -43,10 +43,6 @@ from fandango.dicts import SortedDict,CaselessDict, \
 
 
 import fandango.callbacks
-fandango.callbacks.EventSource.get_thread().set_period_ms(200.)
-fandango.callbacks.EventThread.SHOW_ALIVE = 10000
-fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
-ft.check_device_cached.expire = 60.
 
 class FilterStack(SortedDict):
     """
@@ -122,6 +118,8 @@ class FilterStack(SortedDict):
 class AlarmView(EventListener):
     #ThreadedObject,
     
+    _LOADED = False
+    
     sources = CaselessDict() #Dictionary for Alarm sources    
     
     PRIORITY = ('Error','Active','Severity','Time')
@@ -157,6 +155,13 @@ class AlarmView(EventListener):
         self.lock = Lock()
         self.verbose = verbose
 
+        if not AlarmView._LOADED:
+            fandango.callbacks.EventSource.get_thread().set_period_ms(200.)
+            fandango.callbacks.EventThread.SHOW_ALIVE = 10000
+            fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
+            ft.check_device_cached.expire = 60.
+            AlarmView._LOADED = True
+            
         EventListener.__init__(self,name)
 
         self.setLogLevel(self.verbose>3 and 'DEBUG' or 

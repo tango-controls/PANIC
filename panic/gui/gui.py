@@ -37,15 +37,22 @@ PANIC_URL = 'http://www.pythonhosted.org/panic'
 
 HELP = """
 Usage:
-    > panic [-?] [-v/--attach] f0 f1 f2 [--scope=...] [--filter=...]
+    > panic [-?/--help] [-v/--attach] f0 f1 f2 [--scope=...] [--default=...]
 
 Without arguments, it will parse defaults from 
 PANIC.DefaultArgs property of Tango Database
 
-Scope will constrain the devices accessed by the application, cannot
+--scope will constrain the devices accessed by the application, cannot
 be changed on runtime.
 
-Filters/args just initialize the regular expression search to a default value.
+--default will setup a default regular expression to be applied when 
+the search field is empty. It will be overriden by any expression entered
+by user
+
+Filters (f0, f1, ...) just initialize the regular expression 
+search to a default value.
+
+
 
 """
 
@@ -59,18 +66,14 @@ widgets.TRACE_LEVEL = 1 #-1
 PARENT_CLASS = Qt.QWidget
 class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     """    
-    Arguments and options explained:
+    Class for managing the self updating alarm list in AlarmGUI.
     
-    - PANIC_DEFAULT is a default view, overriden by --view
-    - .scope and .default may be defined in the view, and later overriden by arguments
-    - --scope="*regexp*" would be the filter to be passed to the panic.api: gui.scope
-    - --scope=url1,url2,url3 would be used to open multiple api's
-    - --default="*regexp*" would be the default filter for the search bar: gui.default
-    - whenever the search bar is empty, .default is used instead
-    - args will be joined as gui default
-    - gui.current_search: the current contents of the search bar (gui.regEx)
-    - gui.current_view: the currently selected view (?)
+    Arguments and options explained in gui.HELP and AlarmGUI classes
+    
+    This is just the graphical part,  update/sorting algorithm 
+    is implemented by panic.AlarmView class 
     """
+    
     #Default period between list order updates
     REFRESH_TIME = 1000
     #Default period between database reloads
@@ -490,6 +493,11 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     ###########################################################################
     
 class QFilterGUI(QAlarmList):
+    """
+    Class for managing the multiple filter widgets in AlarmGUI
+    
+    Arguments and options explained in gui.HELP and AlarmGUI classes
+    """    
   
     def init_filters(self):
         trace('Setting combos ...')
@@ -633,11 +641,33 @@ class QFilterGUI(QAlarmList):
         trace('\tregExFiltering(%d): %d alarms returned'
               %(len(source),len(alarms)))
         return alarms    
-      
+
+    ###########################################################################      
     
 class AlarmGUI(QFilterGUI):
-      
-    ###########################################################################
+    """
+    AlarmGUI, to generate Main window menus and parse OS arguments.
+
+    GUI behaviour is implemented in QFilterGUI and QAlarmList classes.
+    
+    To see accepted OS arguments run: 
+
+        #python panic/gui/gui.py --help
+        
+    Summarized:
+        
+    - PANIC_DEFAULT is a default view, overriden by --view
+    - .scope and .default may be defined in the view, and later overriden by arguments
+    - --scope="*regexp*" would be the filter to be passed to the panic.api: gui.scope
+    - --scope=url1,url2,url3 would be used to open multiple api's
+    - --default="*regexp*" would be the default filter for the search bar: gui.default
+    - whenever the search bar is empty, .default is used instead
+    - args will be joined as gui default
+    - gui.current_search: the current contents of the search bar (gui.regEx)
+    - gui.current_view: the currently selected view (?)        
+    
+        
+    """
     
     def init_ui(self,parent,mainwindow):
         
