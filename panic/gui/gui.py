@@ -109,15 +109,15 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.default_regEx = options.get('default',filters or '*')
         self.regEx = self.default_regEx
         self.init_ui(parent,mainwindow) #init_mw is called here
+        self.NO_ICON = Qt.QIcon()
+        
+        refresh = int(options.get('refresh',self.REFRESH_TIME))
+        self.REFRESH_TIME = AlarmRow.REFRESH_TIME = refresh
         
         if self.regEx not in ('','*'): 
             print 'Setting RegExp filter: %s'%self.regEx
             self._ui.regExLine.setText(str(self.regEx))
-            self.onRegExUpdate()
-            
-        refresh = int(options.get('refresh',self.REFRESH_TIME))
-        self.REFRESH_TIME = AlarmRow.REFRESH_TIME = refresh
-        
+               
         self.api = panic.AlarmAPI(self.scope)
         trace('AlarmGUI(%s): api done'%self.scope)
 
@@ -145,11 +145,13 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         
 
         self.init_timers()
-        self.init_filters()
+        self.init_filters()        
+        
         trace('AlarmGUI(): signals done')
         ## connection of ui signals is delayed until first onRefresh()
         
         self.updateStatusLabel()
+                    
         trace('AlarmGUI(): done')
         
         ## TODO: in case of "Dead" Panic devices a message should be shown
@@ -331,8 +333,12 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             background = Qt.QColor("white")
             
         elif state in ('ACKED','ACTIVE','RTNUN'):
+            
+            if severity in ('ERROR',):
+                color = Qt.QColor("white")
+                background = Qt.QColor("red").lighter()            
 
-            if severity in ('ALARM',):
+            elif severity in ('ALARM',):
                 background = Qt.QColor("red").lighter()
                 
             elif severity == 'WARNING':
@@ -457,8 +463,15 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
 
             #obj.updateIfChanged()
             
+        for i in range(len(data),self._ui.listWidget.count()):
+            item = self._ui.listWidget.item(i)
+            item.setText('')
+            item.setBackgroundColor(Qt.QColor('white'))
+            item.setIcon(self.NO_ICON)
+            
         try:
             #THIS SHOULD BE DONE EMITTING A SIGNAL!
+            #CHECK IF CURRENTS ARE ACTUALLY VISIBLE!!!
             if currents is not None and len(currents):
                 self._ui.listWidget.setCurrentItem(currents[0])
                 for current in currents:
@@ -514,7 +527,7 @@ class QFilterGUI(QAlarmList):
         tag = device = receiver = formula = ''
         regexp = str(self.regEx).lower().strip().replace(' ','*')
         
-        if regexp and not clmatch('^[\!\*].*',regexp): 
+        if regexp and not clmatch('^[~\!\*].*',regexp): 
             regexp = '*'+regexp+'*'
             
         return {'tag':tag or regexp,
@@ -604,9 +617,12 @@ class QFilterGUI(QAlarmList):
 
     @Catched
     def regExFiltering(self, source):
+        msg = 'regExFiltering DEPRECATED by AlarmView'
+        print(msg)
+        raise Exception(msg)
         alarms,regexp=[],str(self.regEx).lower().strip().replace(' ','*')
-        exclude = regexp.startswith('!')
-        if exclude: regexp = regexp.replace('!','').strip()
+        exclude = regexp.startswith('!') or regexp.startswith('~')
+        if exclude: regexp = regexp.replace('!','').replace('~').strip()
         for a in source:
             match = fn.searchCl(regexp, a.receivers.lower()+' '
                         +a.severity.lower()+' '+a.description.lower()
@@ -677,21 +693,29 @@ class AlarmGUI(QFilterGUI):
     def connectAll(self):
         trace('connecting')
         #Qt.QObject.connect(self.refreshTimer, Qt.SIGNAL("timeout()"), self.onRefresh)
-        if self.USE_EVENT_REFRESH: Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
-        Qt.QObject.connect(self, Qt.SIGNAL('setfontsandcolors'),AlarmRow.setFontsAndColors)
-
-        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
-        Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
+        if self.USE_EVENT_REFRESH: 
+            Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
+        Qt.QObject.connect(self, 
+            Qt.SIGNAL('setfontsandcolors'),AlarmRow.setFontsAndColors)
+        Qt.QObject.connect(self._ui.listWidget, 
+            Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
+        Qt.QObject.connect(self._ui.listWidget, 
+            Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
         #Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("currentRowChanged(int)"), self.setAlarmData)
         Qt.QObject.connect(self._ui.listWidget, 
-                Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), 
-                self.onContextMenu)
+            Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), 
+            self.onContextMenu)
         
-        #Qt.QObject.connect(self._ui.actionExpert,Qt.SIGNAL("changed()"),self.setExpertView)
-        Qt.QObject.connect(self._ui.newButton, Qt.SIGNAL("clicked()"), self.onNew) # "New"
-        Qt.QObject.connect(self._ui.deleteButton, Qt.SIGNAL("clicked(bool)"), self.onDelete) # Delete
-        Qt.QObject.connect(self._ui.refreshButton, Qt.SIGNAL("clicked()"), self.onReload) # "Refresh"        
-        Qt.QObject.connect(self._ui.buttonClose,Qt.SIGNAL("clicked()"), self.close)
+        #Qt.QObject.connect(self._ui.actionExpert,
+                            #Qt.SIGNAL("changed()"),self.setExpertView)
+        Qt.QObject.connect(self._ui.newButton, 
+                           Qt.SIGNAL("clicked()"), self.onNew) # "New"
+        Qt.QObject.connect(self._ui.deleteButton, 
+                           Qt.SIGNAL("clicked(bool)"), self.onDelete) # Delete
+        Qt.QObject.connect(self._ui.refreshButton, 
+                           Qt.SIGNAL("clicked()"), self.onReload) # "Refresh"        
+        Qt.QObject.connect(self._ui.buttonClose,
+                           Qt.SIGNAL("clicked()"), self.close)
 
         trace('all connected')
         
@@ -856,36 +880,46 @@ class AlarmGUI(QFilterGUI):
             if ask or '*' in default:
                 if '/' in default: d,f = default.rsplit('/',1)
                 else: d,f = '.',default
-                filename = Qt.QFileDialog.getOpenFileName(self.mainwindow,'Import file',d,f)
+                filename = Qt.QFileDialog.getOpenFileName(self.mainwindow,
+                                                          'Import file',d,f)
             else:
                 filename = default
             if filename:
                 if not self.validate('LoadFromFile(%s)'%filename): return
                 alarms = self.api.load_from_csv(filename,write=False)
-                selected = AlarmsSelector(sorted(alarms.keys()),text='Choose alarms to import')
+                selected = AlarmsSelector(sorted(alarms.keys()),
+                                          text='Choose alarms to import')
                 devs = set()
                 for tag in selected:
                     v = alarms[tag]
-                    if v['device'] not in self.api.devices: errors.append('PyAlarm %s does not exist!!!'%v['device'])
+                    if v['device'] not in self.api.devices: 
+                        errors.append('%s does not exist!!!'%v['device'])
                     else:
                         devs.add(v['device'])
                         if tag not in self.api: self.api.add(**v)
                         else: self.api.modify(**v)
                 [self.api.devices[d].init() for d in devs]
-            if errors: Qt.QMessageBox.warning(self.mainwindow,'Error','\n'.join(errors),Qt.QMessageBox.Ok)
+            if errors: 
+                Qt.QMessageBox.warning(self.mainwindow,'Error',
+                                       '\n'.join(errors),Qt.QMessageBox.Ok)
             return filename
         except:
             import traceback
-            Qt.QMessageBox.warning(self.mainwindow,'Error',traceback.format_exc(),Qt.QMessageBox.Ok)
+            Qt.QMessageBox.warning(self.mainwindow,'Error',
+                                   traceback.format_exc(),Qt.QMessageBox.Ok)
             
     def editFile(self):
         filename = self.saveToFile()
-        editor,ok = Qt.QInputDialog.getText(self.mainwindow,'Choose your editor',"Type your editor choice, you'll have to call 'Import CSV' after editing",Qt.QLineEdit.Normal,'oocalc %s'%filename)
+        editor,ok = Qt.QInputDialog.getText(self.mainwindow,
+                    'Choose your editor',"Type your editor choice, "
+                    "you'll have to call 'Import CSV' after editing",
+                    Qt.QLineEdit.Normal,'oocalc %s'%filename)
         if ok:
             os.system('%s &'%str(editor))
             v = Qt.QMessageBox.warning(None,'Load from file', \
-                '%s file may have been modified, do you want to load your changes?'%filename, \
-                Qt.QMessageBox.Yes|Qt.QMessageBox.No);
+                    '%s file may have been modified, '
+                    'do you want to load your changes?'%filename, \
+                    Qt.QMessageBox.Yes|Qt.QMessageBox.No);
             if v == Qt.QMessageBox.Yes:
                 self.loadFromFile(filename,ask=False)
             return filename
@@ -895,8 +929,10 @@ class AlarmGUI(QFilterGUI):
         self.mainwindow.viewMenu.clear()
         windows = WindowManager.getWindowsNames()
         for w in windows:
-            self.mainwindow.viewMenu.addAction(w,lambda x=w:WindowManager.putOnTop(x))
-        self.mainwindow.viewMenu.addAction('Close All',lambda : WindowManager.closeAll())
+            self.mainwindow.viewMenu.addAction(w,
+                            lambda x=w:WindowManager.putOnTop(x))
+        self.mainwindow.viewMenu.addAction('Close All',
+                            lambda : WindowManager.closeAll())
         return
         
     def setExpertView(self,check=None):
