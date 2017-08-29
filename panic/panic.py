@@ -51,8 +51,9 @@ import fandango as fn
 
 from fandango import first,searchCl,matchCl,isString,isSequence,isNumber
 from fandango import isFalse,xor,now,str2time,time2str,END_OF_TIME
+from fandango.dicts import defaultdict
 from fandango.tango import CachedAttributeProxy, AttrDataFormat
-from fandango.tango import PyTango,get_tango_host
+from fandango.tango import PyTango,get_tango_host, check_device_cached
 from fandango.log import tracer,shortstr
 
 from .properties import *
@@ -70,16 +71,9 @@ The _proxies object allows to retrieve DeviceProxy or DeviceServer objects.
    to be returned (e.g. a device running in the same process)
 
 """
+   
+## Methods for matching device/attribute/alarm names
 
-def intversion(version):
-    try:
-        if type(version) in (list,tuple): 
-            return map(int,version[:3])
-        else:
-            return map(int,str(version).split('-')[0].split('.'))
-    except:
-        return None
-    
 def intersect(a,b):
     a,b = str(a).lower(),str(b).lower()
     return a in b or b in a
@@ -282,7 +276,7 @@ class Alarm(object):
       
     def set_state(self,state=None):
         """
-        withoug arguments, this method will update the state from flags
+        without arguments, this method will update the state from flags
         
         with an state as argument, it will just update the value and flags
         accordingly.
@@ -291,6 +285,7 @@ class Alarm(object):
         
         with an activealarms row; it will update Active/Norm/Error states only
         """
+        t0 = now()
         o,a,tag,stamp = self._state,state,self.tag,0
         #tracer('%s._state was %s since %s(%s)'
           #%(tag,o,self._time,time2str(self._time,us=True)))
@@ -312,9 +307,14 @@ class Alarm(object):
         elif not str(state).strip(): 
             state = 'NORM'
 
+        #print(1,1e3*(now()-t0))
         #######################################################################
         # Up to this point, state should be string
-        if '=' in state:
+        if ':' in state and state.split(':')[0]==tag:
+            #ActiveAlarms row
+            state = 'ACTIVE'
+            stamp = 0 # To be read from DS cache
+        elif '=' in state:
             #Dictionary-like (Elettra)
             dct = dict(t.split('=',1) for t in state.split(';'))
             stamp = dct.pop('time',stamp)
@@ -326,10 +326,6 @@ class Alarm(object):
         elif ';' in state:
             #Default sorting order
             tag,state,severity,stamp,desc = state.split(';')
-        elif ':' in state and state.split(':')[0]==tag:
-            #ActiveAlarms row
-            state = 'ACTIVE'
-            stamp = 0 # To be read from DS cache
 
         if stamp:
             try: stamp = float(stamp)
@@ -392,6 +388,7 @@ class Alarm(object):
             if state in ('ERROR'):
                 self.set_active(-1,t=stamp)
             
+        #print(2,1e3*(now()-t0))
         return self._state,self.get_time()
       
     def get_state(self,force=False):
@@ -650,8 +647,16 @@ class AlarmDS(object):
     
     def get_version(self):
         """ Returns the VersionNumber for this device """
-        v = self.config.get('VersionNumber',None)
-        self.version = intversion(v)
+        if self.version is None:
+            try:
+                assert check_device_cached(self.name)
+                v = self.get_proxy().read_attribute('VersionNumber').value
+            except:
+                tracer('AlarmDS(%s).get_version(): device not running'
+                       %self.name)
+                v = self.config.get('VersionNumber',None)
+                
+            self.version = fandango.objects.ReleaseNumber(v)
         return self.version
       
     def ping(self):
@@ -728,10 +733,12 @@ class AlarmDS(object):
         Returns the proper alarm summary attribute to subscribe.
         It depends on the PyAlarm version
         """
-        if self.get_version() >= intversion('6.1.0'):
+        v = self.get_version()
+        if v >= '6.1.0':
             model = self.name+'/alarmlist'
         else:
             model = self.name+'/activealarms'
+        print('%s.get_model(%s): %s'%(self.name,v,model))
         return model.lower()
       
     def get_active_alarms(self, value = None):
@@ -748,7 +755,7 @@ class AlarmDS(object):
         if not value: return {}
       
         #Parsing ActiveAlarms: TAG:DATE[:Formula]
-        r = {} 
+        r = defaultdict(float)
         for line in value:
             splitter = ';' if ';' in line else ':'
             tag,line = str(line).split(splitter,1)
@@ -759,14 +766,16 @@ class AlarmDS(object):
             
             date = ':'.join(line.split(':')[:3])
             try:
+                #assumes ctime format = '%a %b %d %H:%M:%S %Y'
                 r[tag] = time.mktime(time.strptime(date))
             except:
                 try:
                     r[tag] = str2time(date)
                 except:
-                    print('AlarmDS.get_active_alarms():'
-                        'failed to parse date from %s'%line)
-                    r[tag] = END_OF_TIME
+                    # Format not compatible (e.g. old PyAlarm)
+                    #print('AlarmDS.get_active_alarms():'
+                        #'failed to parse date from %s'%line)
+                    r[tag] = r[tag] or END_OF_TIME
         return r
 
     def state(self):
@@ -1420,7 +1429,7 @@ class AlarmAPI(fandango.SingletonMap):
         try:
             if formula.strip().lower() in ('and','or'):
                 return None
-            if device and not fandango.tango.check_device(device):
+            if device and not check_device_cached(device):
                 device = None
             if device and device in self.devices:
                 d = self.devices[device].get()
