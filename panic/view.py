@@ -623,6 +623,11 @@ class AlarmView(EventListener):
                 assert dev,'UnknownDevice:%s'%src.device
                 alarms = dev.alarms.keys()
                 
+            check =  check_device_cached(src.device)
+            if check in (None,'FAULT','UNKNOWN'):
+                error = 'AlarmView[%s] returned %s state'%(src.device,check)
+                self.warning(error)
+                
             if not error:
                 #self.debug('rvalue = %s(%s)'%(type(rvalue),str(rvalue)))
                 r = rvalue[0] if rvalue else ''

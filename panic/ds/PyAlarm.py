@@ -1435,6 +1435,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 
         except:
             self.warning( traceback.format_exc())
+            self.set_state(PyTango.DevState.UNKNOWN)
+            
         self.debug("Out of "+ self.get_name()+ "::always_excuted_hook()")
 
 
