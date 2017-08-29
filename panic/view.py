@@ -31,7 +31,8 @@ import fandango.tango as ft
 import panic
 from panic import *
 from fandango.functional import *
-from fandango.tango import parse_tango_model, check_device_cached
+from fandango.tango import parse_tango_model, check_device_cached, \
+        get_device_info
 from fandango.threads import ThreadedObject,Lock,RLock
 from fandango.callbacks import EventSource, EventListener, TangoAttribute
 from fandango.excepts import Catched
@@ -84,16 +85,20 @@ class FilterStack(SortedDict):
             hits = 0
 
             for p,r in v.items():
+                #get the parameter
                 t = value.get(p,'') if is_map else getattr(value,p,'')
+                #get the result of the matching method (~! will negate)
                 m = f(str(r),str(t),extend=True) if r else True
+
                 if m:
                     hits,gm = hits+1,m
-                elif r.startswith('!'):
+                elif fd.re.match('^[!~]',r):
+                    #Negated matches exclude the whole element
                     if verbose: print('%s excluded by %s'%(t,r))
-                    return m
+                    return False
 
             if not hits: 
-                print('%s not matched by %s'%(value,v))
+                #print('%s not matched by %s'%(value,v))
                 return 0
 
         return gm if hits else None
@@ -119,7 +124,7 @@ class AlarmView(EventListener):
     
     sources = CaselessDict() #Dictionary for Alarm sources    
     
-    PRIORITY = ('Active','Severity','Time')
+    PRIORITY = ('Error','Active','Severity','Time')
     
     ALARM_FORMATTERS = fd.defaultdict(lambda :str)
     ALARM_FORMATTERS.update({
@@ -210,7 +215,8 @@ class AlarmView(EventListener):
 
         self.apply_filters()
         self.info('view api init done, +%s'%(now()-self.t_init))
-        self.info('sources : %s'%fd.log.pformat(self.alarms))
+        self.info('%d sources : %s ...'
+                  %(len(self.alarms),fd.log.pformat(self.alarms)[:80]))
         
         N = len(self.alarms)
         
@@ -337,6 +343,7 @@ class AlarmView(EventListener):
         try:
             #self.lock.acquire()
             self.ordered = []
+            self.filtered = []
             self.last_sort = 0
             filters = FilterStack(filters) if filters else self.filters
             self.info('apply_filters(%s)'%repr(filters))
@@ -345,18 +352,21 @@ class AlarmView(EventListener):
             objs = [self.api[f] for f in self.filtered]
             models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
             self.alarms = self.models = CaselessDict(models)
-            self.info('apply_filters: \n%s\n'%'\n'.join(self.filtered))
-            return self.filtered
+            self.info('apply_filters: %d -> %d\n'
+                      %(len(self.api),len(self.filtered)))
         except:
             self.error(traceback.format_exc())
         finally:
-            #self.lock.release()
-            pass
+            pass #self.lock.release()
+
+        return self.filtered
       
     @staticmethod
     def sortkey(alarm,priority=None):
         """
         Return alarms ordered from LEAST critical to MOST
+        
+        This is the REVERSE order of that shown in the GUI
         """
         r = []
         priority = priority or AlarmView.PRIORITY
@@ -364,14 +374,18 @@ class AlarmView(EventListener):
             m,p = None,str(p).lower()
             if p in ('time','state'):
                 m = getattr(alarm,'get_'+p,None)
-            v = m() if m else getattr(alarm,p,None)               
+
+            v = m() if m else getattr(alarm,p,None)
             
-            if p=='active':
+            if p == 'active':
                 v = alarm.disabled and -1 or \
                         v > 0 and 1 or \
                         v < 0 and -1 or 0
+                    
+            if p == 'error':
+                v = alarm.get_state() in ('ERROR',)
 
-            if p=='severity':
+            if p == 'severity':
                 v = str(v).upper()
                 v = panic.SEVERITIES.get(v,'UNKNOWN')
                 
@@ -579,9 +593,11 @@ class AlarmView(EventListener):
         """ 
         EventListener.eventReceived will jump to this method
         Method to implement the event notification
-        Source will be an object, type a PyTango EventType, evt_value an AttrValue
+        Source will be an object, type a PyTango EventType, 
+        evt_value an AttrValue
         """
         tt0 = now()
+        tsets = 0
         array = {}
         try:
             # convert empty arrays to [] , pass exceptions
@@ -609,38 +625,44 @@ class AlarmView(EventListener):
                 array = dict((l.split(splitter)[0].split('=')[-1],l) 
                              for l in rvalue)
                 self.debug('%s.rvalue = %s'%(src,fd.log.pformat(array)))
+            else:
+                l = self.info #(self.info('ERROR','OOSRV') else self.info)
+                #devup = check_device_cached(src.device)
+                devup = get_device_info(src.device).exported
+                s = ('OOSRV','ERROR')[bool(devup)]    
+                if s=='ERROR': 
+                    self.warning('%s seems hung!'%(src.device))
+                l('event_hook(%s).Error(s=%s,%s): %s'%(src,s,devup,rvalue))                
                 
             assert len(alarms), 'EventUnprocessed!'
                 
             for a in alarms:
                 av = self.get_alarm(a)
-                self.debug('event_hook() %s was %s since %s(%s)'
-                            %(a,av._state,av._time,
-                              time2str(av._time,us=True)))
+                #self.debug('event_hook() %s was %s since %s(%s)'
+                            #%(a,av._state,av._time,
+                              #time2str(av._time,us=True)))
                 av.updated = now()
 
                 if error:
-                    devup = check_device_cached(src.device)
-                    l = (self.warning if av.state not in ('ERROR','OOSRV') 
-                         else self.info)
-                    s = ('OOSRV','ERROR')[bool(devup)]
-                    l('event_hook(%s).Error(s=%s,%s): %s'%(src,s,devup,rvalue))
                     #['CantConnectToDevice' in str(rvalue)]
+                    s = ('OOSRV','ERROR')[bool(devup)]
                     av.set_state(s)
 
                 elif isSequence(rvalue):
                     try:
                         EMPTY = ''
                         row = array.get(av.tag,EMPTY)
-                        self.debug('[%s]:\t"%s"'%(av.tag,row or EMPTY))
+                        #self.debug('[%s]:\t"%s"'%(av.tag,row or EMPTY))
                         if not row: 
                             if clsearch('activealarms',src.full_name):
                                 row = 'NORM'
                             else:
                                 self.warning('%s Not found in %s(%s)'%(
                                     av.tag,src.full_name,splitter))
-
+                        ts0 = now()
+                        #self.info('%s.set_state(%s)'%(a,row))
                         av.set_state(row)
+                        tsets += now()-ts0
                         #if av.active:
                             #self.info('%s active since %s'
                               #%(av.tag,fd.time2str(av.active or 0)))
@@ -658,12 +680,15 @@ class AlarmView(EventListener):
                 curr = av.active if not error else -1
 
                 if curr != prev:
-                    (self.info if self.verbose else self.debug)(
+                    self.debug(#(self.info if self.verbose else self.debug)(
                       'event_hook(%s,%s): %s => %s'%(
                       av.tag,av.get_state(),prev,curr))
                         
                 self.values[av.get_model()] = curr
-                self.debug('event_hook() done ... \n')
+            tt,ts,ta = (1e3*t for t in (now()-tt0,tsets,tsets/len(alarms)))
+            self.info('event_hook() done in %.2e ms '
+                      '(%.2e in set_state, %.2e per alarm)\n'
+                       %(tt,ts,ta))
                     
         except Exception,e:
             self.error('AlarmView(%s).event_hook(%s,%s,%s)'%(
