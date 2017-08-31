@@ -133,7 +133,10 @@ class PanicViewDS (PyTango.Device_4Impl):
             self.attr_ActiveAlarms_read = []
             self.attr_DisabledAlarms_read = []
             self.attr_FailedAlarms_read = []
-            self.attr_AlarmList_read = al = self.view.sort(as_text=True)
+            al = self.attr_Summary_read = self.view.sort(as_text=True)
+            self.attr_AlarmList_read = list(
+                        a.to_str(self.view.DEFAULT_COLUMNS) 
+                        for a in reversed(self.view.ordered))
 
             for i,a in enumerate(reversed(self.view.ordered)):
                 if a.disabled:
@@ -230,7 +233,6 @@ class PanicViewDS (PyTango.Device_4Impl):
     def read_Summary(self, attr):
         self.debug_stream("In read_Summary()")
         #----- PROTECTED REGION ID(PanicViewDS.Summary_read) ENABLED START -----#
-        self.attr_Summary_read = self.view.sort(as_text=True)
         attr.set_value(self.attr_Summary_read)
         
         #----- PROTECTED REGION END -----#	//	PanicViewDS.Summary_read

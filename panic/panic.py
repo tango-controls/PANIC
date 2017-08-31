@@ -273,7 +273,13 @@ class Alarm(object):
         except:
             self.active = None
         return self.active
-      
+    
+    def is_active(self,cache=True):
+        v = self.active if cache else self.get_active()
+        if self.disabled or v < 0: return -1
+        elif v > 0: return 1
+        else: return 0
+
     def set_state(self,state=None):
         """
         without arguments, this method will update the state from flags
@@ -613,12 +619,36 @@ class Alarm(object):
         self.remove_receiver(old,False)
         self.add_receiver(new,write)
         
-    def to_dict(self):
-        isprivate = lambda k: k.startswith('_') or k=='api'
-        return dict((k,v) for k,v in self.__dict__.items() if not isprivate(k))
+    def get_any(self,k):
+        """ 
+        this method will return public or private members calling
+        a getter when necessary 
         
-    def to_str(self):
-        return str(self.to_dict().items())
+        @TODO: this method as well as to_dict can be added to fd.Object
+        """
+        #state/time as returned by getters
+        if k.startswith('get_'):
+            v = getattr(self,k)()
+        elif k not in self.__dict__ and hasattr(self,'get_%s'%k):
+            v = getattr(self,'get_'+k)()
+        # _time/_state will not be returned unless explicitly said
+        else:
+            v = self.__dict__.get(k,None)        
+        return v
+        
+    def to_dict(self,keys=None):
+        dct = {}
+        isprivate = lambda k: k.startswith('_') or k=='api'
+        for k in (keys or self.__dict__):
+            if keys or not isprivate(k):
+                dct[k] = self.get_any(k)
+        return dct
+        
+    def to_str(self,keys=None):
+        d = self.to_dict(keys)
+        keys = keys or d.keys()
+        s = ';'.join('%s=%s'%(k,d[k]) for k in keys)
+        return s
 
     def __repr__(self):
         return 'Alarm(%s:%s:%s)' % (self.tag,self.device,self.active)

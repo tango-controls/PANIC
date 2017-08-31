@@ -124,6 +124,10 @@ class AlarmView(EventListener):
     
     PRIORITY = ('Error','Active','Severity','Time')
     
+    #ALARM_ROW = ['tag','get_state','get_time','device','description']
+    #DEFAULT_COLUMNS = ['tag','get_state','active','get_time','severity']
+    DEFAULT_COLUMNS = ['tag','device','state','severity','time']
+    
     ALARM_FORMATTERS = fd.defaultdict(lambda :str)
     ALARM_FORMATTERS.update({
         'tag' : lambda s,l=10: ('{0:<%d}'%(l or 4)).format(s),
@@ -136,7 +140,8 @@ class AlarmView(EventListener):
         
         'get_state' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
         
-        'get_time' : lambda s,l=20: ('{0:^%d}'%(l or 4)).format(time2str(s,bt=0)),
+        'get_time' : 
+            lambda s,l=20: ('{0:^%d}'%(l or 4)).format(time2str(s,bt=0)),
 
         'active' : lambda s,l=20: (('{0:^%d}'%(l or 4)).format(
           'FAILED!' if s is None else (
@@ -377,22 +382,19 @@ class AlarmView(EventListener):
         priority = priority or AlarmView.PRIORITY
         for p in priority:
             m,p = None,str(p).lower()
-            if p in ('time','state'):
-                m = getattr(alarm,'get_'+p,None)
 
-            v = m() if m else getattr(alarm,p,None)
-            
-            if p == 'active':
-                v = alarm.disabled and -1 or \
-                        v > 0 and 1 or \
-                        v < 0 and -1 or 0
-                    
             if p == 'error':
-                v = alarm.get_state() in ('ERROR',)
+                v = alarm.get_state() in ('ERROR',)            
+            elif p == 'active':
+                v = alarm.is_active()
+            else:
+                if p in ('time','state'):
+                    m = getattr(alarm,'get_'+p,None)
 
-            if p == 'severity':
-                v = str(v).upper()
-                v = panic.SEVERITIES.get(v,'UNKNOWN')
+                v = m() if m else getattr(alarm,p,None)
+                    
+                if p == 'severity':
+                    v = panic.SEVERITIES.get(str(v).upper(),'UNKNOWN')
                 
             r.append(v)
         
@@ -453,7 +455,8 @@ class AlarmView(EventListener):
             pass
     
     def export(self,keys=('active','severity','device',
-                          'tag','description','formula'),to_type=list):
+                          'tag','description','formula'),
+                        to_type=list):
         objs = [self.alarms[a] for a in self.sort()]
         if to_type is list:
             return [[getattr(o,k) for k in keys] for o in objs]
@@ -466,7 +469,7 @@ class AlarmView(EventListener):
     def get_alarm_as_text(self,alarm=None,cols=None,
             formatters=None,lengths=[],sep=' - '):
         alarm = self.get_alarm(alarm)
-        cols = cols or ['tag','get_state','active','get_time','severity']
+        cols = cols or self.DEFAULT_COLUMNS
         formatters = formatters or self.ALARM_FORMATTERS
         s = '  '
         try:
@@ -482,7 +485,7 @@ class AlarmView(EventListener):
             return s
           
     def get_alarm_from_text(self,text,cols=None,
-                            formatters=None,lengths=[],sep=' - ',obj=True):
+                    formatters=None,lengths=[],sep=' - ',obj=True):
         if hasattr(text,'text'): text = text.text()
         cols = cols or ['tag','active','description']
         vals = [t.strip() for t in str(text).split(sep)]

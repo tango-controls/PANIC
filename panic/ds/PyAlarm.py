@@ -60,7 +60,7 @@ from panic.properties import *
 
 try: 
   __RELEASE__ = panic.__RELEASE__
-except Exception,e: __RELEASE__ = '?.?'
+except Exception,e: __RELEASE__ = '6.?'
 print '> PyAlarm %s'%__RELEASE__
 
 try:
@@ -85,6 +85,9 @@ except Exception,e:
 #SNAP_ALLOWED=False
 
 USE_STATIC_METHODS = getattr(PyTango,'__version_number__',0)<722
+
+#Setting size of tango DB query cache (for FIND macros)
+fandango.tango.get_matching_devices.depth = 200 
 
 ###############################################################################
 
