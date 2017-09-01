@@ -1,4 +1,4 @@
-import time,traceback,os
+import time,traceback,os,sys
 import taurus,fandango,fandango.qt
 from fandango.qt import Qt, QtCore, QtGui
 
@@ -187,19 +187,28 @@ class iValidatedWidget(object):
       
         if not hasattr(self,'validator'):
           self.UserValidator,self.validator = '',None
+          log,p = '',str(sys.path)
           try:
-              props = self.api.servers.db.get_class_property('PyAlarm',['UserValidator','PanicAdminUsers'])
+              props = self.api.servers.db.get_class_property(
+                  'PyAlarm',['UserValidator','PanicAdminUsers'])
               self.UserValidator = fandango.first(props['UserValidator'],'')
               self.AdminUsers = list(props['PanicAdminUsers'])
               if self.UserValidator:
                 mod,klass = self.UserValidator.rsplit('.',1)
                 mod = fandango.objects.loadModule(mod)
+                p = mod.__file__
                 klass = getattr(mod,klass)
                 self.validator = klass()
-                log = (self.api.get_class_property('PyAlarm','PanicLogFile') or [''])[0]
-                if log: self.validator.setLogging(True,log)
+                try:
+                    log = (self.api.get_class_property(
+                            'PyAlarm','PanicLogFile') or [''])[0]
+                    if log: self.validator.setLogging(True,log)
+                except:
+                    print('Unable to write log %s'%log)
+                    traceback.print_exc()
           except:
-              print('iValidateWidget: %s module not found'%(self.UserValidator or 'PyAlarm.UserValidator'))
+              print('iValidateWidget: %s module not found in %s'
+                    %(self.UserValidator or 'PyAlarm.UserValidator',p))
               return -1
 
         if not self.AdminUsers and not self.UserValidator:
