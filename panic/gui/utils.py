@@ -167,21 +167,26 @@ def multiline2line(lines):
 
 class iValidatedWidget(object):
     """
-    This class assumes that you have a self.api=PanicAPI() member in your subclass 
+    This class assumes that you have a self.api=PanicAPI() member 
+    in your subclass 
     
     Typical usage:
     
-        self.setAllowedUsers(self.api.get_admins_for_alarm(len(items)==1 and items[0].get_alarm_tag()))
-        if not self.validate('onDisable/Enable(%s,%s)'%(checked,[a.get_alarm_tag() for a in items])):
+        self.setAllowedUsers(self.api.get_admins_for_alarm(len(items)==1 
+                and items[0].get_alarm_tag()))
+        if not self.validate('onDisable/Enable(%s,%s)'
+                %(checked,[a.get_alarm_tag() for a in items])):
             return
             
-    This class requires PanicAdminUsers and UserValidator PyAlarm properties to be declared.
+    This class requires PanicAdminUsers and UserValidator PyAlarm properties 
+    to be declared.
     
       PanicAdminUsers : [root, tester]
       UserValidator : user_login.TangoLoginDialog
     
     """
-    KEEP = int(fandango.tango.get_class_property('PyAlarm','PanicUserTimeout') or 60)
+    KEEP = int(fandango.tango.get_class_property('PyAlarm','PanicUserTimeout')
+               or 60)
     
     def init(self,tag=''):
       

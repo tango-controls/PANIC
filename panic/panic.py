@@ -191,6 +191,7 @@ class Alarm(object):
         self.disabled = 0 #If disabled the alarm is not evaluated
         self.sent = 0 #Messages sent
         self.last_sent = 0 #Time when last message was sent
+        self.last_error = '' #Last exception
 
     @staticmethod
     def parse_formula(formula):
@@ -290,6 +291,7 @@ class Alarm(object):
         with an alarm summary as argument, it will update everything from it
         
         with an activealarms row; it will update Active/Norm/Error states only
+        
         """
         t0 = now()
         o,a,tag,stamp = self._state,state,self.tag,0
@@ -301,6 +303,7 @@ class Alarm(object):
             return self.get_state(True)
 
         elif isinstance(state,(Exception,PyTango.DevError)):
+            self.last_error = shortstr(state)
             state = 'state=ERROR;desc=%s'%shortstr(state)
             
         elif state in AlarmStates.values():
@@ -393,6 +396,8 @@ class Alarm(object):
 
             if state in ('ERROR'):
                 self.set_active(-1,t=stamp)
+            else:
+                self.last_error = ''
             
         #print(2,1e3*(now()-t0))
         return self._state,self.get_time()
@@ -937,7 +942,8 @@ class AlarmAPI(fandango.SingletonMap):
         if isinstance(k,Alarm):
             return self.__get_tag(k.tag)
         elif '/' in str(k): 
-            self.warning('AlarmAPI[%s] does not support multi-host!'%k)
+            if ':' in k:
+                self.warning('[%s]: AlarmAPI does not support multi-host!'%k)
             k = k.split('/')[-1]
         return k
     def __getitem__(self,k): #*a,**k): 

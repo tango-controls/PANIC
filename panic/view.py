@@ -84,11 +84,16 @@ class FilterStack(SortedDict):
                 #get the parameter
                 t = value.get(p,'') if is_map else getattr(value,p,'')
                 #get the result of the matching method (~! will negate)
-                m = f(str(r),str(t),extend=True) if r else True
+                if isString(r):
+                    m = f(str(r),str(t),extend=True) if r else True
+                elif r in (True,False):
+                    m = (r == bool(t))
+                else:
+                    m = (r == t)
 
                 if m:
                     hits,gm = hits+1,m
-                elif fd.re.match('^[!~]',r):
+                elif fd.re.match('^[!~]',str(r)):
                     #Negated matches exclude the whole element
                     if verbose: print('%s excluded by %s'%(t,r))
                     return False
@@ -660,6 +665,7 @@ class AlarmView(EventListener):
                     #['CantConnectToDevice' in str(rvalue)]
                     s = ('OOSRV','ERROR')[bool(devup)]
                     av.set_state(s)
+                    av.last_error = str(rvalue)
 
                 elif isSequence(rvalue):
                     try:
@@ -698,6 +704,7 @@ class AlarmView(EventListener):
                       av.tag,av.get_state(),prev,curr))
                         
                 self.values[av.get_model()] = curr
+                
             tt,ts,ta = (1e3*t for t in (now()-tt0,tsets,tsets/len(alarms)))
             self.info('event_hook() done in %.2e ms '
                       '(%.2e in set_state, %.2e per alarm)\n'
