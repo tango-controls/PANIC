@@ -98,19 +98,29 @@ class SingletonTangoEval(fandango.tango.TangoEval,Singleton):
 class AlarmHook(fandango.Object):
     """
     This class identifies an Action to be executed as response to an alarm.
-    :param condition:   a boolean function that will return True if this action is appliable to the given argument.
-                        e.g. (condition=lambda s: '@' in s) will apply for mail addresses
-    :param action:      function([tag,receivers,...]) to be executed when the action is applied.
+    :param condition:   a boolean function that will return True if this action
+                        is appliable to the given argument.
+
+            e.g. (condition=lambda s: '@' in s) will apply for mail addresses
+                        
+    :param action:      function([tag,receivers,...]) to be executed when the 
+                        action is applied.
     """
     def __init__(self,condition=None,action=None):
         self._condition = condition
         self._action = action
         pass
     def match(self,argument):
-        """This method will apply the given condition to the argument. Overridable in subclasses"""
+        """
+        This method will apply the given condition to the argument. 
+        Overridable in subclasses
+        """
         return self._condition(argument)
     def apply(self,tag,receivers):
-        """This method will apply the given action to the argument. Overridable in subclasses"""
+        """
+        This method will apply the given action to the argument. 
+        Overridable in subclasses
+        """
         return self._action(tag,receivers)
 
 
@@ -177,8 +187,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         This is the method where you control the value assignt to each Alarm attributes
         """
         tag_name = attr.get_name()
-        value = any(re.match(tag_name.replace('_','.')+'$',a) for a in self.get_active_alarms())
-        self.debug('PyAlarm(%s).read_alarm_attribute(%s) is %s; Active Alarms: %s' % (self.get_name(),tag_name,value,self.get_active_alarms()))
+        value = any(re.match(tag_name.replace('_','.')+'$',a) 
+                    for a in self.get_active_alarms())
+        self.debug('PyAlarm(%s).read_alarm_attribute(%s) is %s;'\
+                    ' Active Alarms: %s' 
+                % (self.get_name(),tag_name,value,self.get_active_alarms()))
         
         self.quality=PyTango.AttrQuality.ATTR_WARNING
         if tag_name in self.FailedAlarms or self.CheckDisabled(tag_name):
@@ -187,28 +200,36 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.quality=PyTango.AttrQuality.ATTR_VALID
         elif(self.Alarms[tag_name].severity=='WARNING'):
             self.quality=PyTango.AttrQuality.ATTR_WARNING
-        elif(self.Alarms[tag_name].severity=='ALARM' or self.Alarms[tag_name].severity=='ERROR'):
+        elif(self.Alarms[tag_name].severity=='ALARM' 
+             or self.Alarms[tag_name].severity=='ERROR'):
             self.quality=PyTango.AttrQuality.ATTR_ALARM
         else: self.quality=PyTango.AttrQuality.ATTR_WARNING
         
         attr.set_value_date_quality(value,time.time(),self.quality)
     
-    if USE_STATIC_METHODS: alarm_attr_read = staticmethod(self_locked(alarm_attr_read))
+    if USE_STATIC_METHODS: 
+        alarm_attr_read = staticmethod(self_locked(alarm_attr_read))
 
     def alarm_attr_allowed(self,req_type):
         """
-        Alarms should be always readable, the quality of the alarm will change if needed
+        Alarms should be always readable, the quality of the alarm 
+        will change if needed
         """
         return True
-    if USE_STATIC_METHODS: alarm_attr_allowed = staticmethod(alarm_attr_allowed)
+
+    if USE_STATIC_METHODS: 
+        alarm_attr_allowed = staticmethod(alarm_attr_allowed)
 
     def create_alarm_attribute(self,argin):
         new_attr_name = self.Alarms[argin].get_attribute()
         if new_attr_name in self.DynamicAttributes:
-            self.info('PyAlarm(%s): attribute %s already exists' % (self.get_name(),new_attr_name))
+            self.info('PyAlarm(%s): attribute %s already exists' 
+                      % (self.get_name(),new_attr_name))
         else:
-            self.info('PyAlarm(%s): Creating attribute %s for %s alarm' % (self.get_name(),new_attr_name,argin))
-            self.add_attribute(PyTango.Attr(new_attr_name,PyTango.ArgType.DevBoolean,PyTango.AttrWriteType.READ),
+            self.info('PyAlarm(%s): Creating attribute %s for %s alarm' 
+                      % (self.get_name(),new_attr_name,argin))
+            self.add_attribute(PyTango.Attr(new_attr_name,
+                PyTango.ArgType.DevBoolean,PyTango.AttrWriteType.READ),
                 self.alarm_attr_read,
                 None, #self.write_new_attribute #(attr)
                 self.alarm_attr_allowed
@@ -1927,7 +1948,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #    argout: DevVarStringArray
 #------------------------------------------------------------------
 
-    def GenerateReport(self,tag_name,mail_receivers='',message='DETAILS',values=None, user_comment=None, html=False):
+    def GenerateReport(self,tag_name,mail_receivers='',message='DETAILS',
+                       values=None, user_comment=None, html=False,
+                       evals=False,others=False,pasts=False):
         """
         When called from Tango a single argument is received; which is a list containing all arguments
         :param message: Can be one of self.MESSAGE_TYPES or a different text
@@ -2012,12 +2035,13 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.error('Error parsing values for email:\n%s'%msg)
             else: report+= str(values).strip()
             
-        report += '\n\n' + 'EvalTimes are: \n %s\n'%(self.EvalTimes)
         report += '\n\n' + 'Alarm receivers are: ' + '\n\t%s'%alarm.receivers
-        if len(actives) > 1:
+        if evals:
+            report += '\n\n' + 'EvalTimes are: \n %s\n'%(self.EvalTimes)
+        if others and len(actives) > 1:
             try: report+= '\n\n' + 'Other Active Alarms are:' + '\n\t'.join([''] + sorted(['%s:%s:%s'%(k,fun.time2str(v.active),self.Alarms[k].formula) for k,v in self.Alarms.items() if v.active]))
             except: pass
-        if self.PastAlarms:
+        if pasts and self.PastAlarms:
             report+= '\n\n' + 'Past Alarms were:' + '\n\t'.join([''] + ['%s:%s'%(','.join(k),fun.time2str(d)) for d,k in sorted(self.PastAlarms.items())[-10:]])
         if html:
             result = [report, subject]
@@ -2103,13 +2127,30 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         Arguments: message, subject, receivers
         """
-        self.info('SendMail(%s)'%str(argin))
+        self.info('SendMail(%s,%s)'%(self.MailMethod,argin))
         def format4sendmail(report):
             out = report.replace('\r','\n').replace('\n\n','\n')
             out = out.replace('\n','\\n').replace('"',"'") #.replace("'",'')
             return out
         try:
-            if self.MailMethod == 'mail':
+            if self.MailMethod.startswith('smtp'):
+                import smtplib
+                from email.mime.text import MIMEText
+                text = argin[0]
+                msg = MIMEText(text)
+                msg['Subject'] = argin[1]
+                msg['From'] = self.FromAddress
+                receivers = argin[2] if isSequence(argin[2]) \
+                                else str(argin[2]).split(',')
+                msg['To'] = receivers[0]
+                s = smtplib.SMTP()
+                args = self.FromAddress,receivers,msg.as_string()
+                self.info( 'Launching %s command: '%self.MailMethod
+                            +shortstr(str(args)))
+                s.connect(*(self.MailMethod.split(':')[1:]))
+                s.sendmail(*args)
+
+            elif self.MailMethod == 'mail':
                 command = 'echo -e "'+format4sendmail(argin[0])+'" '
                 command += '| mail -s "%s" ' % argin[1]
                 command += '-S from=%s ' % self.FromAddress 
@@ -2176,7 +2217,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         self.info( 'In SendSMS(%s,%s,%s,%s)'%(tag,receivers,message,values))
         if not SMS_ALLOWED or not 'smslib' in globals():
-            self.warning( 'SMS Messaging is not allowed or smslib not available!!!')
+            self.warning( 'SMS Messaging is not allowed '
+                +'or smslib not available!!!')
             return
         report = ''
         username,password=self.SMSConfig.split(':',1)
@@ -2186,7 +2228,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         now = time.time()
         try:
             self.lock.acquire()
-            while self.SMS_Sent and self.SMS_Sent[0]<now-(24*60*60): self.SMS_Sent.popleft()
+            while self.SMS_Sent and self.SMS_Sent[0]<now-(24*60*60): 
+                self.SMS_Sent.popleft()
             sends = len(self.SMS_Sent)
         finally:
             self.lock.release()
@@ -2223,19 +2266,25 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         
                     self.info( 'SMS Sending: message is: %s' % (report))
                 except:
-                    self.warning( 'Exception generating SMS report: %s' % traceback.format_exc())
+                    self.warning( 'Exception generating SMS report: %s' 
+                                 % traceback.format_exc())
                 finally:
                     self.lock.release()
 
-                if 'sms' not in self.AlertOnRecovery.lower() and message.strip() not in ('ALARM','TEST'):
-                    self.warning('SMS sending not allowed for %s message type.'%message)
+                if 'sms' not in self.AlertOnRecovery.lower() \
+                        and message.strip() not in ('ALARM','TEST'):
+                    self.warning('SMS sending not allowed for %s message type.'
+                                 %message)
                 else:
-                    #To avoid device hungs all SMS messages are sent in a background thread
+                    #To avoid device hungs all SMS messages are sent 
+                    #in a background thread
                     if not hasattr(self,'sms_threads'): self.sms_threads = 0
                     self.sms_threads += 1
-                    self.info( 'Sending SMS in a different Thread ... '+'SMS-Send%d'%self.sms_threads)
+                    self.info( 'Sending SMS in a different Thread ... '
+                        +'SMS-Send%d'%self.sms_threads)
                     source = (re.findall('[a-zA-Z]+',str(source)) or [''])[0]
-                    thr = smslib.SMSThread(message=report, dest=smslist, username=username, password=password, source=source)
+                    thr = smslib.SMSThread(message=report, dest=smslist, 
+                        username=username, password=password, source=source)
                     thr.setDaemon(True)
                     thr.start()
                     self.SMS_Sent.append(now)
@@ -2446,16 +2495,27 @@ class PyAlarmClass(PyTango.DeviceClass):
 #    PyAlarmClass Constructor
 #------------------------------------------------------------------
     def __init__(self, name):
-        print ( "In PyAlarmClass  constructor")
+        print ( "In PyAlarmClass  constructor ...")
         import panic
         # Reload default property values
         # @TODO This update seems not needed!
-        for k in panic.PyAlarmDefaultProperties:
-            p = panic.PyAlarmDefaultProperties[k][-1]
-            PyAlarmClass.device_property_list[k][-1] = p
+        s = ''
+        try:
+            for k in panic.PyAlarmDefaultProperties:
+                s = k
+                p = panic.PyAlarmDefaultProperties[k][-1]
+                s = str((k,p))
+                PyAlarmClass.device_property_list[k][-1] = p
         
-        PyTango.DeviceClass.__init__(self, name)
-        self.set_type(name);
+            s = name
+            print(s+'...')
+            PyTango.DeviceClass.__init__(self, name)
+            self.set_type(name);
+        except:
+            print(s)
+            traceback.print_exc()
+            raise        
+        print('done ...')
 
 #==================================================================
 #

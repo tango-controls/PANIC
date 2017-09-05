@@ -76,14 +76,14 @@ PANIC_PROPERTIES = {
     'SMSMaxLength':
         [PyTango.DevLong,
          "Maximum length of SMS messages",
-         [ 160 ] ],
+         [ 135 ] ],
     'SMSMaxPerDay':
         [PyTango.DevLong,
          "Maximum SMS messages per day",
          [ 50 ] ],
     'MailMethod':
         [PyTango.DevString,
-         "mail or smtp",
+         "mail or smtp[:host[:port]]",
          [ "mail" ] ],
     'FromAddress':
         [PyTango.DevString,
@@ -116,6 +116,7 @@ PANIC_PROPERTIES = {
         Declared as FILTER:receiver,ACTION(MESSAGE:...) like\n\
         \t*VC*:vacuum@cells.es,ACTION(RESET:command,t/t/t/stop)",
         [ 0 ] ],
+     
     }
 
 __doc__+="""
