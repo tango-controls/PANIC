@@ -117,9 +117,9 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         refresh = int(options.get('refresh',self.REFRESH_TIME))
         self.REFRESH_TIME = AlarmRow.REFRESH_TIME = refresh
         
-        if self.regEx not in ('','*'): 
-            print 'Setting RegExp filter: %s'%self.regEx
-            self._ui.regExLine.setText(str(self.regEx))
+        #if self.regEx not in ('','*'): 
+            #print 'Setting RegExp filter: %s'%self.regEx
+            #self._ui.regExLine.setText(str(self.regEx))
                
         self.api = panic.AlarmAPI(self.scope)
         trace('AlarmGUI(%s): api done'%self.scope)
@@ -375,6 +375,17 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         f = item.font()
         f.setBold(bold)
         item.setFont(f)
+        
+        status = [
+            'Severity: '+alarm.severity,
+            'Formula: '+alarm.formula,
+            'Description: %s'%alarm.description,
+            'Alarm Device: %s'%alarm.device,
+            'Archived: %s'%('Yes' if 'SNAP' in alarm.receivers else 'No'),
+            ]
+        if getattr(alarm,'last_error',None):
+            status = ['Error: '+alarm.last_error]+status
+        item.setToolTip('\n'.join(status))
 
         return item
 
@@ -512,7 +523,8 @@ class QFilterGUI(QAlarmList):
                            Qt.SIGNAL("currentIndexChanged(int)"), 
                            self.setSecondCombo)
         Qt.QObject.connect(self._ui.comboBoxx, 
-                           Qt.SIGNAL("currentIndexChanged(QString)"), self.onFilter)
+                           Qt.SIGNAL("currentIndexChanged(QString)"), 
+                           self.onFilter)
         
         Qt.QObject.connect(self._ui.regExUpdate, 
                            Qt.SIGNAL("clicked(bool)"), self.onRegExUpdate)
@@ -535,18 +547,44 @@ class QFilterGUI(QAlarmList):
         tag = device = receiver = formula = ''
         regexp = str(self.regEx).lower().strip().replace(' ','*')
         
+        active = self._ui.activeCheckBox.isChecked() \
+                        or self.timeSortingEnabled
+                    
+        combo1 = str(self._ui.contextComboBox.currentText())
+        combo2 = str(self._ui.comboBoxx.currentText()).strip()
+        if combo1 == 'Alarm': 
+            #@TODO: To be replaced by state: ANY/NORM/ALARM/....
+            pass        
+        elif combo1 == 'Time':
+            time_sorting = True
+        elif combo1 == 'Devices': 
+            device = combo2
+        elif combo1 == 'Hierarchy': 
+            pass
+        elif combo1 == 'Receiver':
+            receiver = combo2
+        #elif combo1 == 'Severity': 
+            #pass
+        
         if regexp and not clmatch('^[~\!\*].*',regexp): 
             regexp = '*'+regexp+'*'
             
-        return {'tag':tag or regexp,
+        regexp = regexp or self.default_regEx
+        dct = {'tag':regexp or self.default_regEx}
+        #if not any(device,r
+        dct = {'tag':tag or regexp,
                 'device':device or regexp,
                 'receiver':receiver or regexp,
                 'formula':regexp,
+                'active':active,
                 }
+        return dct
         
     
     def setFirstCombo(self):
-        self.setComboBox(self._ui.contextComboBox,['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],sort=False)
+        self.setComboBox(self._ui.contextComboBox,
+                         ['Alarm','Time','Devices',
+                        'Hierarchy','Receiver','Severity'],sort=False)
 
     def setSecondCombo(self):
         source = str(self._ui.contextComboBox.currentText())
@@ -558,7 +596,8 @@ class QFilterGUI(QAlarmList):
         self._ui.infoLabel0_1.show()
         self._ui.comboBoxx.setEnabled(True)
         if source =='Devices':
-            r,sort,values = 1,True,sorted(set(a.device for a in self.getAlarms()))
+            r,sort,values = 1,True,sorted(set(a.device 
+                                              for a in self.getAlarms()))
         elif source =='Receiver':
             #r,sort,values = 2,True,list(set(a for a in self.api.phonebook.keys() for l in self.api.values() if a in l.receivers))
             r,sort,values = 2,True,list(set(s for a in self.getAlarms() for s in ['SNAP','SMS']+[r.strip() for r in a.receivers.split(',')]))
@@ -620,7 +659,7 @@ class QFilterGUI(QAlarmList):
         # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
         self.regEx = (str(self._ui.regExLine.text()).strip() 
             or self.default_regEx)
-        self._ui.activeCheckBox.setChecked(False)
+        #self._ui.activeCheckBox.setChecked(False)
         self.onFilter()
 
     @Catched
