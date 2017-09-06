@@ -8,6 +8,7 @@ import fandango.qt
 from fandango.functional import *
 from fandango.qt import Qt
 from fandango.excepts import Catched
+from fandango.objects import Cached
 from fandango.log import tracer
 
 import panic
@@ -126,7 +127,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
 
         # @TODO: api-based views are not multi-host
         self.view = panic.view.AlarmView(api=self.api,scope=self.scope,
-                                         events=False,verbose=2) 
+                refresh = self.REFRESH_TIME/1e3,events=False,verbose=1) 
         trace('AlarmGUI(): view done')
         
         self.snapi = None
@@ -162,21 +163,27 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     
     ###########################################################################
         
+    @Cached(expire=0.2)
     def getAlarms(self):
         """
         It returns a list with all alarms matching the default View filter
-        BUT!, ignoring the current filters set by user.
+        @TODO: it should ignore the current filters set by user.
         """
-        trace('sorting ...')
+        trace('getAlarms(): sorting ...',level=0)
         self.view.sort()
-        trace('... done')
         return self.view.ordered
     
+    @Cached(expire=0.2)
     def getCurrents(self):
-        """ It returns only the currently shown alarms """
+        """
+        It returns only the currently shown alarms matching user filters
+        """
         return self.getAlarms() #_ordered
     
     def setModel(self,model):
+        """
+        Method called when a model is set externally (synoptic of drop event)
+        """
         # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
         try:
             if model!= self.regEx:
@@ -234,7 +241,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     @Catched
     def onRefresh(self):
         """Just checks order, no reload, no filters"""
-        trace('onRefresh(%s)'%self.REFRESH_TIME)
+        trace('onRefresh(%s)'%self.REFRESH_TIME,level=1)
         self.buildList(changed=False)
         #if self.changed: ## Changed to be computed row by row
         self.showList()
@@ -242,7 +249,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         
     def updateStatusLabel(self):
         #nones = len([v for v in self.AlarmRows.values() if v.alarm is None])
-        alarms = self.getAlarms()
+        alarms = self.getCurrents()
         size = len(self.api)
         nones = len([v for v in alarms if not v.updated])
         added = len(alarms) #self._ui.listWidget.count()
@@ -394,34 +401,25 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         if block: self._ui.listWidget.blockSignals(True)
         
         self.changed = changed or self.changed
-        trace('buildList(%s)'%self.changed)
+        trace('buildList(%s)'%self.changed,level=2)
 
-        trace("%s -> AlarmGUI.buildList(%s)"%(time.ctime(), ['%s=%s'%(
-            s,getattr(self,s,None)) for s in 
-            ('regEx','severities','timeSortingEnabled','changed',)]))
         try:
-            ## TODO: update filters from GUI and apply to AlarmView
-            self.view.apply_filters(**self.getFilters())            
-            #for nr, alarm in enumerate(self.getCurrents()):
-              ### sort/update is done by AlarmView, nothing to do here?
-              #pass            
-            #self.buildRowList()
+            self.view.apply_filters(**self.getFilters())     
         except:
             trace('AlarmGUI.buildList(): Failed!\n%s'%traceback.format_exc())
             
         #if not self.changed: print '\tAlarm list not changed'
         if block: self._ui.listWidget.blockSignals(False)
-        #print '*'*80
 
     @Catched
     def showList(self,delete=False):
         """
         This method just redraws the list keeping the currently selected items
         """
-        trace('%s -> AlarmGUI.showList()'%time.ctime())
+        trace('%s -> AlarmGUI.showList()'%time.ctime(),level=2)
         #self._ui.listWidget.blockSignals(True)
         currents = self._ui.listWidget.selectedItems()
-        trace('\t\t%d items selected'%len(currents))
+        trace('\t\t%d items selected'%len(currents),level=3)
         
         if delete:
             trace('\t\tremoving objects from the list ...')
@@ -429,17 +427,19 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 delItem = self._ui.listWidget.takeItem(0)
                 #del delItem
             
-        trace('\t\tdisplaying the list ...')
+        trace('\t\tdisplaying the list ...',level=2)
         ActiveCheck = self._ui.activeCheckBox.isChecked() \
                         or self.timeSortingEnabled
         
         data = self.view.sort()
-        trace(len(data))
+        
         if not data:
-            trace('NO ALARMS FOUND!!!')
+            trace('NO ALARMS FOUND!!!',level=1)
         else:
-            self.ALARM_LENGTHS[0] = max(len(str(t).split('/')[-1]) for t in data)
-            self.ALARM_LENGTHS[3] = max(len(str(t).rsplit('/',1)[0]) for t in data)
+            self.ALARM_LENGTHS[0] = max(len(str(t).split('/')[-1]) 
+                                        for t in data)
+            self.ALARM_LENGTHS[3] = max(len(str(t).rsplit('/',1)[0]) 
+                                        for t in data)
             
         for i in range(len(data)): #self.getVisibleRows():
             t = data[i]
@@ -495,9 +495,12 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 #if self.expert: self.setAlarmData(current) #Not necessary
         except:
             print traceback.format_exc()
+            
         self.changed = False
-        trace('\t\tshowList(): %d alarms added to listWidget.'%self._ui.listWidget.count())
-        self.updateStatusLabel()
+        trace('\t\tshowList(): %d alarms match filters.'
+              %self._ui.listWidget.count())
+        self.updateStatusLabel() #< getAlarms() called again here
+        
         #self._ui.listWidget.blockSignals(False)
         
       
@@ -543,6 +546,9 @@ class QFilterGUI(QAlarmList):
         
     def getFilters(self):
         #@TODO: Only regexp filter implemented
+        trace("%s -> AlarmGUI.getFilters(%s)"%(time.ctime(), ['%s=%s'%(
+            s,getattr(self,s,None)) for s in 
+            ('regEx','severities','timeSortingEnabled','changed',)]),level=2)
         
         tag = device = receiver = formula = ''
         regexp = str(self.regEx).lower().strip().replace(' ','*')
@@ -741,7 +747,7 @@ class AlarmGUI(QFilterGUI):
             px = Qt.QPixmap(url)
             self.mainwindow.setWindowIcon(Qt.QIcon(px))
             
-        self.setExpertView(False)
+        self.setExpertView(True)
 
         self._message = Qt.QMessageBox(self)
         self._message.setWindowTitle("Empty fields")
