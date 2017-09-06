@@ -57,17 +57,27 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         #self._ui.gridLayout.addWidget(self._dataWidget)
         self._dataWidget._wi.formulaStacked.addWidget(self.formulaeditor)
         
-        QtCore.QObject.connect(self._receiversLine._wi.okButton, QtCore.SIGNAL("clicked(bool)"), self.onPlusOk) # Add
-        QtCore.QObject.connect(self.formulaeditor._ui.rowEditButton, QtCore.SIGNAL("clicked(bool)"), self.onRowEdit)
+        QtCore.QObject.connect(self._receiversLine._wi.okButton, 
+                QtCore.SIGNAL("clicked(bool)"), self.onPlusOk) # Add
+        QtCore.QObject.connect(self.formulaeditor._ui.rowEditButton, 
+                QtCore.SIGNAL("clicked(bool)"), self.onRowEdit)
         
-        QtCore.QObject.connect(self._dataWidget._wi.addReceiversButton, QtCore.SIGNAL("clicked(bool)"), self.onPlus)
-        QtCore.QObject.connect(self._dataWidget._wi.previewButton, QtCore.SIGNAL("clicked()"), self.showAlarmPreview)
-        QtCore.QObject.connect(self._dataWidget._wi.cancelButton, QtCore.SIGNAL("clicked()"), self.onCancel) # "Cancel"
-        QtCore.QObject.connect(self._dataWidget._wi.saveButton, QtCore.SIGNAL("clicked()"), self.onSave) # "Save"
-        QtCore.QObject.connect(self._dataWidget._wi.editButton, QtCore.SIGNAL("clicked()"), self.onEdit) # "Edit"
-        QtCore.QObject.connect(self._dataWidget._wi.disabledCheckBox, QtCore.SIGNAL("stateChanged(int)"), self.onDisStateChanged)
-        QtCore.QObject.connect(self._dataWidget._wi.ackCheckBox, QtCore.SIGNAL("stateChanged(int)"), self.onAckStateChanged)
-        QtCore.QObject.connect(self._dataWidget._wi.deviceConfig, QtCore.SIGNAL("clicked()"), self.onDeviceConfig)
+        QtCore.QObject.connect(self._dataWidget._wi.addReceiversButton, 
+                QtCore.SIGNAL("clicked(bool)"), self.onPlus)
+        QtCore.QObject.connect(self._dataWidget._wi.previewButton, 
+                QtCore.SIGNAL("clicked()"), self.showAlarmPreview)
+        QtCore.QObject.connect(self._dataWidget._wi.cancelButton, 
+                QtCore.SIGNAL("clicked()"), self.onCancel) # "Cancel"
+        QtCore.QObject.connect(self._dataWidget._wi.saveButton, 
+                QtCore.SIGNAL("clicked()"), self.onSave) # "Save"
+        QtCore.QObject.connect(self._dataWidget._wi.editButton, 
+                QtCore.SIGNAL("clicked()"), self.onEdit) # "Edit"
+        QtCore.QObject.connect(self._dataWidget._wi.disabledCheckBox, 
+                QtCore.SIGNAL("stateChanged(int)"), self.onDisStateChanged)
+        QtCore.QObject.connect(self._dataWidget._wi.ackCheckBox, 
+                QtCore.SIGNAL("stateChanged(int)"), self.onAckStateChanged)
+        QtCore.QObject.connect(self._dataWidget._wi.deviceConfig, 
+                QtCore.SIGNAL("clicked()"), self.onDeviceConfig)
         
         self._dataWidget._wi.nameLineEdit.setClickHook(self.onEdit)
         self._dataWidget._wi.deviceLineEdit.setClickHook(self.onEdit)
@@ -119,9 +129,11 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
 
     def onSave(self):
         print'onSave()'+'<'*80
-        if self.checkEmptyFields() and self.validate('onSave',self._currentAlarm.tag):
+        if self.checkDataFields() and \
+                self.validate('onSave',self._currentAlarm.tag):
             old_name = self.getCurrentAlarm().tag
-            self.saveData(old_name = old_name) #<- it will save data and will remove unused alarm rows
+            #<- it will save data and will remove unused alarm rows
+            self.saveData(old_name = old_name) 
             self.enableEditForm(False)
         else:
             self._message.critical(self, "Critical", "Alarm not saved!")
@@ -324,13 +336,19 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         print 'getDataFields(%s): %s'%(data['tag'],data)
         return data
 
-    def checkEmptyFields(self):
+    def checkDataFields(self):
         data = self.getDataFields()
-        if all(data.values()): 
-            return True
-        else:
-            self._message.warning(self, "Warning", "Fill these fields: %s" % ','.join(k for k,v in data.items() if not v))
+        must = ['tag','device','formula','severity','description']
+        if not all(data[k] for k in must): 
+            self._message.warning(self, "Warning", "Fill these fields: %s" 
+                        % ','.join(k for k in must if not data[k]))
             return False
+        elif not clmatch('^[a-zA-Z_][a-zA-Z_0-9]*$',data['tag']):
+            self._message.warning(self, "Warning", 
+                    "Tag contains invalid characters: %s"%data['tag'])
+            return False
+        else:
+            return True
 
     def saveData(self, old_name=None):
         print 'In saveData(%s)'%old_name
