@@ -163,7 +163,8 @@ class AlarmView(EventListener):
 
         self.t_init = now()
         self.lock = Lock()
-        self.verbose = verbose
+        self.verbose = verbose if not isNumber(verbose) else (
+            {verbose>3:'DEBUG',4>verbose>1:'INFO',verbose<=1:'WARNING'}[True])
 
         if not AlarmView._LOADED:
             fandango.callbacks.EventSource.get_thread().set_period_ms(200.)
@@ -174,8 +175,7 @@ class AlarmView(EventListener):
             
         EventListener.__init__(self,name)
 
-        self.setLogLevel(self.verbose>3 and 'DEBUG' or 
-                (self.verbose>1 and 'INFO' or 'WARNING'))
+        self.setLogLevel(self.verbose)
         
         if isString(filters): filters = {'tag':filters}
         self.filters = FilterStack(filters)
@@ -249,9 +249,6 @@ class AlarmView(EventListener):
         #ThreadedObject.__init__(self,target=self.sort,
                                 #period=refresh,start=False)
         #ThreadedObject.__init__(self,period=1.,nthreads=1,start=True,min_wait=1e-5,first=0)
-        
-        self.setLogLevel(self.verbose>3 and 'DEBUG' or 
-                (self.verbose>1 and 'INFO' or 'WARNING'))
         
         self.update_sources()
         self.info('event sources updated, +%s'%(now()-self.t_init))
@@ -329,18 +326,16 @@ class AlarmView(EventListener):
         Alarms should be returned matching the current sortkey.
         """
         if not self.filtered and not filters:
-            r = self.filtered
+            r = self.api.keys()[:]
         else:
-            if filters and not isinstance(filters,FilterStack):
-                filters = FilterStack(filters)
-            else:
-                filters = filters or self.filters
-            r = [a.tag for a in filters.apply(self.api.values(),verbose=0)]
+            if filters:
+                self.apply_filters(self,**filters)        
+            r = self.filtered
 
-        self.info('get_alarms(%s): %d alarms found'%(repr(filters),len(r)))
+        self.debug('get_alarms(%s): %d alarms found'%(repr(filters),len(r)))
         return r
       
-    def apply_filters(self,**filters):
+    def apply_filters(self,*args,**filters):
         """
         valid filters are:
         * device
@@ -360,10 +355,17 @@ class AlarmView(EventListener):
             self.ordered = []
             self.filtered = []
             self.last_sort = 0
-            filters = FilterStack(filters) if filters else self.filters
-            self.info('apply_filters(%s)'%repr(filters))
-            self.filtered = self.get_alarms(filters)
+            filters = filters or (args and args[0])
+            if filters and not isinstance(filters,FilterStack):
+                filters = FilterStack(filters)
+            else:
+                filters = filters or self.filters
+                
+            self.debug('apply_filters(%s)'%repr(filters))
+            self.filtered = [a.tag for a in 
+                             filters.apply(self.api.values(),verbose=0)]
             self.filters = filters
+            
             objs = [self.api[f] for f in self.filtered]
             models  = [(a.get_model().split('tango://')[-1],a) for a in objs]
             self.alarms = self.models = CaselessDict(models)
@@ -420,7 +422,6 @@ class AlarmView(EventListener):
         * failed
         """
         try:
-            self.setLogLevel('DEBUG')
             updated = [a for a in self.alarms.values() if a.updated]
             if len(updated) == len(self.alarms):
                 [a.get_active() for a in self.alarms.values() 
@@ -442,7 +443,7 @@ class AlarmView(EventListener):
                     objs = self.alarms.values()
 
                 self.ordered = sorted(objs,key=sortkey)
-                self.info('sort([%d])'%(len(self.ordered)))
+                self.debug('sort([%d])'%(len(self.ordered)))
                 
             if as_text:
                 kw = fd.isMapping(as_text) and as_text or {}
@@ -540,8 +541,8 @@ class AlarmView(EventListener):
         return str(alarm).lower()
       
     def get_sources(self):
-        return [s for s,v in AlarmView.sources.items()
-                if any(l() is self for l in v.listeners)]
+        return dict((s,v) for s,v in AlarmView.sources.items()
+                if any(l() is self for l in v.listeners))
       
     def update_sources(self):
         self.info('update_sources(%d)'%len(self.alarms))
@@ -581,8 +582,7 @@ class AlarmView(EventListener):
                   tango_asynch = self.__asynch,
                   enable_polling = 1e3*self.__refresh,
                   )
-            ta.setLogLevel(self.verbose>3 and 'DEBUG' or 
-                (self.verbose>1 and 'INFO' or 'WARNING'))
+            ta.setLogLevel(self.getLogLevel())
             self.sources[ta.full_name] = ta
             self.sources[ta.full_name].addListener(self,
                 use_events=events, use_polling=not events)
