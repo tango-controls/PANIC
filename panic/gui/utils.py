@@ -167,8 +167,8 @@ def multiline2line(lines):
 
 class iValidatedWidget(object):
     """
-    This class assumes that you have a self.api=PanicAPI() member 
-    in your subclass 
+    This Class assumes that you have a self.api=PanicAPI() member 
+    in your subtype 
     
     Typical usage:
     
@@ -178,7 +178,7 @@ class iValidatedWidget(object):
                 %(checked,[a.get_alarm_tag() for a in items])):
             return
             
-    This class requires PanicAdminUsers and UserValidator PyAlarm properties 
+    This Class requires PanicAdminUsers and UserValidator PyAlarm properties 
     to be declared.
     
       PanicAdminUsers : [root, tester]
@@ -212,27 +212,31 @@ class iValidatedWidget(object):
                     print('Unable to write log %s'%log)
                     traceback.print_exc()
           except:
+              traceback.print_exc()
               print('iValidateWidget: %s module not found in %s'
                     %(self.UserValidator or 'PyAlarm.UserValidator',p))
               return -1
 
+        if self.AdminUsers and not self.UserValidator:
+            print('iValidateWidget: wrong properties definition')
+            return -1
         if not self.AdminUsers and not self.UserValidator:
-          #passwords not available
-          return None
+            #passwords not available
+            return None
         users = sorted(self.api.get_admins_for_alarm(tag))
         if not users: 
-          #Not using passwords for this alarm
-          self.last_users = None
-          return None
+            #Not using passwords for this alarm
+            self.last_users = None
+            return None
         elif self.validator is None:
-          #Failed to initialize
-          return -1
+            #Failed to initialize
+            return -1
         else:
-          if users != getattr(self,'last_users',[]):
-            self.last_valid = 0
-          self.validator.setAllowedUsers(users)
-          self.last_users = users
-          return self.validator
+            if users != getattr(self,'last_users',[]):
+                self.last_valid = 0
+            self.validator.setAllowedUsers(users)
+            self.last_users = users
+            return self.validator
         
     def setAllowedUsers(self,users):
         if self.init() is None: return
@@ -247,9 +251,11 @@ class iValidatedWidget(object):
           if err is None: 
             return True
           if err == -1:
+            msg = "%s module not found"%(
+                self.UserValidator or 'PyAlarm.UserValidator')
+            print('iValidateWidget: %s'%msg)
             Qt.QMessageBox.critical(None,
-                "Error!",
-                "%s module not found"%(self.UserValidator or 'PyAlarm.UserValidator'),
+                "Error!",msg,
                 QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
             return False
           
