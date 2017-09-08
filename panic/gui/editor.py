@@ -237,7 +237,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     def update_button_states(self,alarm=None):
         alarm = alarm or self.getCurrentAlarm()
         print('update_button_states(%s)'%alarm.tag)
-        if alarm.get_active():
+        if alarm.active:
             self._detailsButton.setEnabled(True)
             self._resetButton.setEnabled(True)
         else: 

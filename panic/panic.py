@@ -523,11 +523,12 @@ class Alarm(object):
             config = {}
         return config
 
-    def get_enabled(self):
-        try: 
+    def get_enabled(self,force=True):
+        if force:
+            try: 
                 self.disabled = self.get_ds().get().CheckDisabled(self.tag)
-                return not self.disabled
-        except: return None
+            except: return None
+        return not self.disabled
 
     def enable(self):
         """ Enables alarm evaluation """

@@ -9,7 +9,7 @@ from fandango.functional import *
 from fandango.qt import Qt
 from fandango.excepts import Catched
 from fandango.objects import Cached
-from fandango.log import tracer
+from fandango.log import tracer,shortstr
 
 import panic
 import panic.view
@@ -392,6 +392,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         item.setTextColor(color)
         item.setBackgroundColor(background)
         f = item.font()
+        f.setFixedPitch(True)
         f.setBold(bold)
         item.setFont(f)
         
@@ -402,8 +403,10 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             'Alarm Device: %s'%alarm.device,
             'Archived: %s'%('Yes' if 'SNAP' in alarm.receivers else 'No'),
             ]
-        if getattr(alarm,'last_error',None):
-            status = ['Error: '+alarm.last_error]+status
+        for t in ('last_error','acknowledged','disabled','sortkey'):
+            v = getattr(alarm,t,None)
+            if v: status.append('%s%s: %s'%(t[0].upper(),t[1:],shortstr(v)))
+            
         item.setToolTip('\n'.join(status))
         
         try:
@@ -414,6 +417,9 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                     if tag == alarm.tag:
                         forms.append(f)
             if forms:
+                #@TODO: these checks will be not needed after full update
+                alarm.get_enabled(force=True)
+                alarm.get_acknowledged(force=True)
                 tracer("\tupdating %d %s forms"%(len(forms),alarm))
                 [f.valueChanged() for f in forms]
             else:
@@ -421,9 +427,6 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         except:
             tracer(traceback.format_exc())
                 
-        #font = self._ui.listWidget.item(i).font()
-        #font.setFixedPitch(True)
-
         return item
 
     @Catched
@@ -448,7 +451,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         """
         trace('%s -> AlarmGUI.showList()'%time.ctime(),level=2)
         #self._ui.listWidget.blockSignals(True)
-        currents = self._ui.listWidget.selectedItems()
+        currents,news = [a.tag for a in self.getSelectedAlarms()],[]
         trace('\t\t%d items selected'%len(currents),level=3)
         
         if delete:
@@ -501,25 +504,22 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 #self._ui.listWidget.item(i).setFont(font)
                 item.setText(text)
                 self.setFontsAndColors(item,alarm)
+
+            if alarm.tag in currents:
+                try:
+                    trace('\tselect %s'%alarm.tag)
+                    item.setSelected(True)
+                    if alarm.tag == currents[0]:
+                        self._ui.listWidget.setCurrentItem(item)
+                except: traceback.print_exc()
+            else:
+                item.setSelected(False)
             
         for i in range(len(data),self._ui.listWidget.count()):
             item = self._ui.listWidget.item(i)
             item.setText('')
             item.setBackgroundColor(Qt.QColor('white'))
             item.setIcon(self.NO_ICON)
-            
-        try:
-            #THIS SHOULD BE DONE EMITTING A SIGNAL!
-            #CHECK IF CURRENTS ARE ACTUALLY VISIBLE!!!
-            if currents is not None and len(currents):
-                self._ui.listWidget.setCurrentItem(currents[0])
-                for current in currents:
-                    trace('\t\tselecting %s item'%current.text())
-                    #self._ui.listWidget.setCurrentItem(current)
-                    current.setSelected(True)
-                #if self.expert: self.setAlarmData(current) #Not necessary
-        except:
-            print traceback.format_exc()
             
         self.changed = False
         trace('\t\tshowList(): %d alarms match filters.'

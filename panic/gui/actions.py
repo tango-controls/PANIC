@@ -104,7 +104,7 @@ class QAlarmManager(object): #QAlarm):
             form.show()
         else: #Create a new form
             form = WindowManager.addWindow(AlarmForm(self.parent()))
-            form.connect(form,Qt.SIGNAL('valueChanged'),self.hurry)
+            #form.connect(form,Qt.SIGNAL('valueChanged'),self.hurry)
             if edit: form.onEdit(alarm)
             else: form.setAlarmData(alarm)
         form.show()
@@ -123,7 +123,7 @@ class QAlarmManager(object): #QAlarm):
                 self._ui.listWidget.currentItem().setSelected(False)
             form = AlarmForm(self.parent())
             trace('form')
-            form.connect(form,Qt.SIGNAL('valueChanged'),self.hurry)
+            #form.connect(form,Qt.SIGNAL('valueChanged'),self.hurry)
             form.onNew()
             form.show()
             return form
@@ -330,49 +330,6 @@ def ChangeDisabled(parent,alarm=None):
         msg = traceback.format_exc()
         v = QtGui.QMessageBox.warning(self,'Warning',msg,QtGui.QMessageBox.Ok)
 
-#def ChangeDisable(self,checked=False):
-    #raise Exception('@TODO!')
-    #items = self.getSelectedRows(extend=False)
-    #trace( 'onDisStateChanged(%s)'%[r.get_alarm_tag() for r in items])
-    #print list((i.get_alarm_tag(),i.alarmDisabled) for i in items)
-    #if len(set(bool(i.alarmDisabled) for i in items))!=1:
-        #q = Qt.QMessageBox.warning(self,"Warning!",
-                    #'Not all elements selected have the same state')
-        #return
-    #waiting=threading.Event()
-    #checked = not all([i.alarmDisabled for i in items])
-    #if checked:
-        #reply=Qt.QMessageBox.question(self,"Warning!",
-                #"Alarm will be disabled.\nDo you want to continue?\n"
-                #+'\n'.join(i.get_alarm_tag() for i in items),
-            #QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.Yes)
-        #if reply == QtGui.QMessageBox.Yes:
-            #self.setAllowedUsers(self.api.get_admins_for_alarm(len(items)==1 
-                        #and items[0].get_alarm_tag()))
-            #if not self.validate('onDisable/Enable(%s,%s)'%(
-                        #checked,[a.get_alarm_tag() for a in items])):
-                #return
-            
-            #comment='DISABLED by '+get_user()
-            #for a in items:
-                #try:
-                    #trace('\tdisabling '+a.get_alarm_tag())
-                    #taurus.Device(a.get_alarm_object().device).command_inout('Disable',[str(a.get_alarm_tag()), str(comment)])
-                    #waiting.wait(0.2)
-                #except: trace(traceback.format_exc())
-            
-        #else: return
-    #else:
-        #for a in items:
-            #try:
-                #trace('\tenabling '+a.get_alarm_tag())
-                #taurus.Device(a.get_alarm_object().device).command_inout('Enable',str(a.get_alarm_tag()))
-                #waiting.wait(0.2)
-            #except: trace(traceback.format_exc())
-    #[o.get_disabled(force=True) for o in items]
-    #[f.setAlarmData() for f in WindowManager.WINDOWS if isinstance(f,AlarmForm)]
-    #self.onFilter()
-    
   
 
 
