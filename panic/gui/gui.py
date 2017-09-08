@@ -725,7 +725,7 @@ class AlarmGUI(QFilterGUI):
     
         
     """
-    
+       
     def init_ui(self,parent,mainwindow):
         
         try:
@@ -779,6 +779,7 @@ class AlarmGUI(QFilterGUI):
         
     def connectAll(self):
         trace('connecting')
+        
         #Qt.QObject.connect(self.refreshTimer, Qt.SIGNAL("timeout()"), self.onRefresh)
         if self.USE_EVENT_REFRESH: 
             Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
@@ -884,6 +885,18 @@ class AlarmGUI(QFilterGUI):
                 AlarmPreview.showEmptyAlarmPreview(g)))
             
         [o.addAction(*alarm_preview_action) for o in (tmw.toolsMenu,toolbar)]
+        
+        try:
+            import PyTangoArchiving.widget.ArchivingBrowser
+            MSW = PyTangoArchiving.widget.ArchivingBrowser.ModelSearchWidget
+            alarmApp.tools['finder'] = WindowManager.addWindow(MSW())
+            tmw.toolsMenu.addAction(getThemeIcon("system-search"),
+                "Attribute Finder",alarmApp.tools['finder'].show)      
+            toolbar.addAction(getThemeIcon("system-search"),
+                "Attribute Finder",alarmApp.tools['finder'].show) 
+        except:
+            print('PyTangoArchiving not available')
+            #traceback.print_exc()        
             
         print('Toolbars created after %s seconds'%(time.time()-t0))
         tmw.setCentralWidget(alarmApp)

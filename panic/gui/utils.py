@@ -382,7 +382,8 @@ def get_archive_trend(models=None,length=4*3600,show=False):
         
 class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
   
-    def __init__(self,model=None,parent=None,device=None,_locals=None,allow_edit=False):
+    def __init__(self,model=None,parent=None,device=None,
+                 _locals=None,allow_edit=False):
         Qt.QWidget.__init__(self,parent)
         self.api = panic.current() #Singletone, reuses existing object ... Sure? What happens if filters apply?
         self.setModel(model,device)
@@ -399,6 +400,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
         else:
             self.obj = model if hasattr(model,'formula') else None
             self.formula = model if self.obj is None else self.obj.formula
+            
         self.device = device or getattr(self.obj,'device',None)
         self._locals = device and dict(zip('DOMAIN FAMILY MEMBER'.split(),self.device.split('/'))) or {}
         
@@ -425,6 +427,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
             self.savebt = Qt.QPushButton()
             l = Qt.QLabel('Formula:')
             l.setFont(get_bold_font())
+
             self.tf = fandango.qt.QDropTextEdit() #Qt.QTextBrowser()
             self.tf.setMinimumHeight(100)
             if self.obj is not None:
@@ -443,8 +446,9 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
                 self.savebt.setEnabled(False)
                 upperPanel.layout().addWidget(self.savebt,0,6,1,1)
                 self.connect(self.savebt,Qt.SIGNAL('pressed()'),self.onSave)
+
             upperPanel.layout().addWidget(l,0,0,1,1)
-            upperPanel.layout().addWidget(self.tf,1,0,1,7)
+            upperPanel.layout().addWidget(self.tf,1,0,1,7)            
             ###################################################################
             lowerPanel,row = Qt.QFrame(),0 #self,2
             lowerPanel.setLayout(Qt.QGridLayout())
