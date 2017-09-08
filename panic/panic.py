@@ -54,6 +54,7 @@ from fandango import isFalse,xor,now,str2time,time2str,END_OF_TIME
 from fandango.dicts import defaultdict
 from fandango.tango import CachedAttributeProxy, AttrDataFormat
 from fandango.tango import PyTango,get_tango_host, check_device_cached
+from fandango.tango import parse_tango_model
 from fandango.log import tracer,shortstr
 
 from .properties import *
@@ -1216,7 +1217,8 @@ class AlarmAPI(fandango.SingletonMap):
         if key in self.alarms:
             return self.devices[self.alarms[key].device]
         if not full and ':' in key:
-            key = key.split(':',1)[-1].split('/',1)[1]
+            key = parse_tango_model(key).devicename
+            #key = key.split(':',1)[-1].split('/',1)[1]
         if key in self.devices:
             return self.devices[key]
         return None

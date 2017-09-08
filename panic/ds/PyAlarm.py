@@ -184,9 +184,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     
     #--------------------------------------------------------------------------
 
-    def alarm_attr_read(self,attr,fire_event=True):
+    def alarm_attr_read(self,attr): #,fire_event=True):
         """
-        This is the method where you control the value assignt to each Alarm attributes
+        This is the method where you control the value assigned
+        to each Alarm attributes
         """
         tag_name = attr.get_name()
         value = any(re.match(tag_name.replace('_','.')+'$',a) 
@@ -2127,7 +2128,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 try: 
                     invkey = lambda t:(t[-1],t[0])
                     for k,v in sorted(values.items(),key=invkey):
-                        dev,attr = k.rsplit('/',1) if '/' in k else (0,0)
+                        m = fandango.tango.parse_tango_model(k)
+                        dev = m and m.get('devicename')
+                        attr = m and m.get('attribute')
                         if dev in self.Panic.devices and attr in self.Panic:
                             k = attr
                         elif k.lower().strip().endswith('/state'): 
