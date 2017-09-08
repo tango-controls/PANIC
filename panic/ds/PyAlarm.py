@@ -1606,7 +1606,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
         attr.set_value(attr_PastAlarms_read, len(attr_PastAlarms_read))
 
-
 #------------------------------------------------------------------
 #    Read AlarmList attribute
 #------------------------------------------------------------------
@@ -1614,17 +1613,28 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #self.debug( "In "+self.get_name()+"::read_AlarmList()")
 
         #    Add your own code here
+        attr_AlarmList_read = sorted('%s:%s'%(a.tag,a.formula) 
+                                     for a in self.Alarms.values())
+        attr.set_value(attr_AlarmList_read, len(attr_AlarmList_read))
+        
+#------------------------------------------------------------------
+#    Read AlarmSummary attribute
+#------------------------------------------------------------------
+    def read_AlarmSummary(self, attr):
+        #self.debug( "In "+self.get_name()+"::read_AlarmSummary()")
+
+        #    Add your own code here
         sep = ';' #':'
         #setup = 'tag','description','formula'
         setup = 'tag','state','severity','time','formula','description'
         
-        attr_AlarmList_read = sorted(
+        attr_AlarmSummary_read = sorted(
             sep.join('%s=%s'
             %(s,(str if s!='time' else time2str)(getattr(alarm,s)))
             for s in setup)
           for alarm in self.Alarms.values())
         
-        attr.set_value(attr_AlarmList_read, len(self.Alarms))
+        attr.set_value(attr_AlarmSummary_read, len(self.Alarms))
 
 #------------------------------------------------------------------
 #    Read AlarmReceivers attribute
@@ -2010,7 +2020,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             for l in data_fields:
                 result.append('%s:%s'%(l,alarm.get_any(l)))
         elif request == 'STATE':
-            for l in :
+            for l in state_fields:
                 result.append('%s:%s'%(l,alarm.get_any(l)))
         elif request in ('VALUES','SNAP'):
             def vals_to_str(vs):
@@ -2541,9 +2551,17 @@ class PyAlarmClass(PyTango.DeviceClass):
             PyTango.SPECTRUM,
             PyTango.READ, 512],
             {
-                'description':"Returns the current state and definition of"
+                'description':"Returns the current definition of"
                               " alarms managed by this device",
             } ],
+        'AlarmSummary':
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ, 512],
+            {
+                'description':"Returns the current state and definition of"
+                    " alarms managed by this device using key=value; syntax",
+            } ],            
         'AlarmReceivers':
             [[PyTango.DevString,
             PyTango.SPECTRUM,

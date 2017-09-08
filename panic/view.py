@@ -618,7 +618,7 @@ class AlarmView(EventListener):
             error =  (getattr(value,'err',False) 
                 or isinstance(rvalue,(type(None),Exception,PyTango.DevError)))
             
-            #self.info('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
+            self.info('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
             ## eventReceived already log that
             
             #if locked is True: self.lock.acquire()

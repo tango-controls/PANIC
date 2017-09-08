@@ -769,8 +769,8 @@ class AlarmDS(object):
         It depends on the PyAlarm version
         """
         v = self.get_version()
-        if v >= '6.1.0':
-            model = self.name+'/alarmlist'
+        if v >= '6.2.0':
+            model = self.name+'/alarmsummary'
         else:
             model = self.name+'/activealarms'
         print('%s.get_model(%s): %s'%(self.name,v,model))
