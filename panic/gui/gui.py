@@ -405,6 +405,16 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         if getattr(alarm,'last_error',None):
             status = ['Error: '+alarm.last_error]+status
         item.setToolTip('\n'.join(status))
+        
+        forms = [f for f in WindowManager.WINDOWS 
+            if isinstance(f,AlarmForm) 
+            and f.getCurrentAlarm().tag==alarm.tag]
+        if forms:
+            tracer("\tupdating %d %s forms"%(len(forms),alarm))
+            [f.valueChanged() for f in forms]
+                
+        #font = self._ui.listWidget.item(i).font()
+        #font.setFixedPitch(True)
 
         return item
 
@@ -483,11 +493,6 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 #self._ui.listWidget.item(i).setFont(font)
                 item.setText(text)
                 self.setFontsAndColors(item,alarm)
-                
-            #font = self._ui.listWidget.item(i).font()
-            #font.setFixedPitch(True)
-
-            #obj.updateIfChanged()
             
         for i in range(len(data),self._ui.listWidget.count()):
             item = self._ui.listWidget.item(i)

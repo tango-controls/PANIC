@@ -94,34 +94,43 @@ class GuiWidget(QtGui.QWidget):
 
 ##############################################################################
         
-class AlarmValueLabel(TaurusValueLabel):
+class AlarmValueLabel(Qt.QLabel):#TaurusValueLabel):
+    
     def setModel(self,model):
+        print('AlarmValueLabel.setModel(%s(%s))'
+              %(type(model),str(model)))
         if fandango.isString(model) and '/' not in model:
             model = str(model)
-            model = panic.AlarmAPI(model)[model]
+            self.alarm = panic.AlarmAPI(model)[model]
         if isinstance(model,panic.Alarm):
-            model = model.device + '/' + model.get_attribute()
-        TaurusValueLabel.setModel(self,model)
+            self.alarm = model
+            #model = model.device + '/' + model.get_attribute()
+        self.model = self.alarm.get_model()
+        #TaurusValueLabel.setModel(self,model)
             
     def updateStyle(self,extra=''):
+        print('<'*80)
         self.setAlignment(QtCore.Qt.AlignCenter)
-        obj = self.getModelValueObj()
-        if hasattr(obj,'rvalue'):
+        obj = self.alarm #obj = self.getModelValueObj()
+        print('AlarmValueLabel.updateStyle(%s,%s)'%(type(obj),obj))
+        if hasattr(obj,'active'):
+            value = obj.active
+        elif hasattr(obj,'rvalue'):
             value = obj.rvalue
         else:
             value = getattr(obj,'value',None)
         if value:
             self.ss = "background-color:red; color:black;"
-            self.setText("ALARM")
-        elif value is None:
+            self.setText(getattr(obj,'state',"ALARM"))
+        elif value is None or value<0:
             self.ss = "background-color:grey; color:black;"
-            self.setText("NONE")
+            self.setText(getattr(obj,'state',"UNKNOWN"))
         else:
             self.ss = "background-color:lightgreen; color:black;"
-            self.setText("OK")
+            self.setText(getattr(obj,'state',"OK"))
         self.setStyleSheet(self.ss)
         self.alarmUpdated()
-        TaurusBaseWidget.updateStyle(self)
+        #TaurusBaseWidget.updateStyle(self)
 
     def alarmUpdated(self):
         print('AlarmValueLabel.alarmUpdated()')

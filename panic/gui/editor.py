@@ -186,7 +186,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             self.AcknowledgeAlarm()
             
     def valueChanged(self):
-        print 'AlarmForm.valueChanged()'
+        print('AlarmForm.valueChanged()')
         self.emit(Qt.SIGNAL('valueChanged'))
         
     ###########################################################################
@@ -196,17 +196,22 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.w = Qt.QWidget()
         self.w.setLayout(Qt.QHBoxLayout())
         self._tvl = AlarmValueLabel(self.w)
-        self._tvl.setShowQuality(False)
-        self._tvl.connect(self._tvl,'alarmUpdated',self.update_button_states)
+        #self._tvl.setShowQuality(False)
+        self._tvl.connect(self,Qt.SIGNAL('valueChanged'),
+                          self._tvl.updateStyle)
+        self.connect(self,Qt.SIGNAL('valueChanged'),
+                          self.update_button_states)
         self._detailsButton = Qt.QPushButton(self.w)
         self._detailsButton.setText('Last Report')
         self._detailsButton.setIcon(getThemeIcon("edit-find"))
-        self._detailsButton.connect(self._detailsButton,Qt.SIGNAL("clicked()"),self.showAlarmReport)
+        self._detailsButton.connect(self._detailsButton,Qt.SIGNAL("clicked()"),
+                                    self.showAlarmReport)
         self._detailsButton.setEnabled(False)
         self._resetButton = Qt.QPushButton(self.w)
         self._resetButton.setText('Reset')
         self._resetButton.setIcon(getThemeIcon("edit-undo"))
-        self._resetButton.connect(self._resetButton,Qt.SIGNAL("clicked()"),self.ResetAlarm)
+        self._resetButton.connect(self._resetButton,Qt.SIGNAL("clicked()"),
+                                  self.ResetAlarm)
         self._resetButton.setEnabled(False)
         self.w.layout().addWidget(self._tvl)
         self.w.layout().addWidget(self._detailsButton)
@@ -249,7 +254,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._dataWidget._wi.receiversLineEdit.setText(alarm.receivers)
         self._dataWidget._wi.formulaTextEdit.setText(alarm.formula)
 
-        self._tvl.setModel(alarm.device+'/'+alarm.get_attribute())
+        self._tvl.setModel(alarm) #.device+'/'+alarm.get_attribute())
         self._dataWidget._wi.previewButton.setEnabled(True)
         self._dataWidget._wi.editButton.setEnabled(True)
         self.update_button_states()
@@ -264,8 +269,10 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         else: 
             self._detailsButton.setEnabled(False)
             self._resetButton.setEnabled(False)
-        setCheckBox(self._dataWidget._wi.disabledCheckBox,not alarm.get_enabled())
-        setCheckBox(self._dataWidget._wi.ackCheckBox,alarm.acknowledged)
+        setCheckBox(self._dataWidget._wi.disabledCheckBox,
+                    not alarm.get_enabled())
+        setCheckBox(self._dataWidget._wi.ackCheckBox,
+                    alarm.acknowledged)
         return
         
     def enableDelete(self, tmp):
@@ -377,7 +384,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             if device!=self.api[tag].device:
                 self.api.rename(tag,tag,new_device=device)
                 alarm = self.api[tag]
-                self._tvl.setModel(alarm.device+'/'+alarm.get_attribute())
+                self._tvl.setModel(alarm) #.device+'/'+alarm.get_attribute())
                 self.valueChanged()
                 #setAlarmModel() moved to AlarmGUI
                 #self.AlarmRows[tag].setAlarmModel(self.api[tag])
@@ -391,7 +398,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             if device: self.api.rename(old_name,new_tag=tag,new_device=device)
             else: self.api.rename(old_name,new_tag=tag)
             alarm = self.api[tag]
-            self._tvl.setModel(alarm.device+'/'+alarm.get_attribute())
+            self._tvl.setModel(alarm) #.device+'/'+alarm.get_attribute())
             alarm.setup(write=True,**data)
             self.setAlarmData(alarm)
             # Renamed alarms will not appear until the next onReload() call
