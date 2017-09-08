@@ -228,6 +228,11 @@ class Alarm(object):
         """ Gets and AlarmDS object related to this alarm """
         try: return self.api.devices[self.device]
         except: return AlarmDS(self.device,api=self.api)
+    
+    def get_engine(self):
+        """@TODO this method should return the DevImpl
+        PyAlarm instance or a DeviceProxy to it"""
+        return self.get_ds().get_proxy()
       
     def set_active(self,value,count=1,t=None):
         """
@@ -535,17 +540,26 @@ class Alarm(object):
         result = self.get_ds().get().Disable(args)
         return result
         
-    def get_acknowledged(self):
-        try: 
-            self.acknowledged = not self.get_ds().get().CheckDisabled(self.tag)
-            return self.acknowledged
-        except: return None        
+    def get_acknowledged(self,force=False):
+        if force:
+            self.acknowledged = self.get_engine().CheckAcknowledged(self.tag)
+        return self.acknowledged
     
     def reset(self, comment):
-        """ Acknowledges and resets the Alarm in its PyAlarm device """
-        result = self.get_ds().acknowledge(self.tag, comment)
+        """ Resets the Alarm in its PyAlarm device """
+        result = self.get_ds().reset(self.tag, comment)
         self.clear()
         return result
+    
+    def acknowledge(self,comment):
+        """ Acknowledges the Alarm in its PyAlarm device """
+        result = self.get_ds().acknowledge(self.tag, comment)
+        return self.get_acknowledged(force=True)
+    
+    def renounce(self,comment):
+        """ Acknowledges the Alarm in its PyAlarm device """
+        result = self.get_engine().Renounce(self.tag)
+        return not self.get_acknowledged(force=True)    
 
     def write(self,device='',exclude='',update=True):
         """
@@ -670,159 +684,15 @@ class AlarmDS(object):
         self.version = None        
         self.get_config(True)
         
-    def get(self,alarm=None):
-        """ Returns alarm object or device proxy 
-        (for backwards compatibility) """
-        return self.alarms.get(alarm) if alarm else self.get_proxy()
-
-    def get_proxy(self):
-        """ Returns a device proxy """
-        if self.proxy is None:
-            self.proxy = self.api.get_ds_proxy(self.name)
-        return self.proxy
-    
-    def get_version(self):
-        """ Returns the VersionNumber for this device """
-        if self.version is None:
-            try:
-                assert check_device_cached(self.name)
-                v = self.get_proxy().read_attribute('VersionNumber').value
-            except:
-                tracer('AlarmDS(%s).get_version(): device not running'
-                       %self.name)
-                v = self.config.get('VersionNumber',None)
-                
-            self.version = fandango.objects.ReleaseNumber(v)
-        return self.version
-      
-    def ping(self):
+    def init(self):
+        """ forces the device to reload its configuration"""
         try:
-          return self.get().ping()
+            self.read()
+            self.get().init()
+            self.config = None
         except:
-          return None
+            print 'Device %s is not running' % self.name            
         
-    def get_config(self,update=False):
-        if not getattr(self,'config',None) or update: 
-            props = self.api.get_db_properties(self.name,ALARM_CONFIG)
-            for p,v in props.items():
-                if v in (False,True):
-                    props[p] = v
-                elif v and v[0] not in ('',None):
-                    props[p] = v[0]
-                else: #Using default property value
-                    try: 
-                        props[p] = (PyAlarmDefaultProperties[p][-1] or [''])[0]
-                    except: print traceback.format_exc()
-            self.config = props
-        return self.config
-                    
-    def get_property(self,prop):
-        if isSequence(prop): return self.api.get_db_properties(self.name,prop)
-        else: return self.api.get_db_property(self.name,prop)
-        
-    def put_property(self,prop,value):
-        return self.api.put_db_property(self.name,prop,value)
-                    
-    def enable(self,tag=None):
-        """ If Tag is None, this method will enable the whole device,
-        but individual disables will be kept 
-        """
-        if tag is None:
-            self.api.put_db_property(self.name,'Enabled',True)
-            self.init()
-            print('%s: Enabled!' %self.name)
-        else:
-            tags = [a for a in self.alarms if matchCl(tag,a)]
-            print('%s: Enabling %d alarms: %s' % (self.name,len(tags),tags))
-            [self.get().Enable([str(a)]) for t in tags]
-                    
-    def disable(self,tag=None,comment=None,timeout=None):
-        """ If Tag is None this method disables the whole device 
-        """
-        if tag is None:
-            self.api.put_db_property(self.name,'Enabled',False)
-            self.init()
-            print('%s: Disabled!' %self.name)
-        else:
-            tags = [a for a in self.alarms if matchCl(tag,a)]
-            print('%s: Disabling %d alarms: %s'%(self.name,len(tags),tags))
-            [self.get().Disable(
-              [str(a) for a in (t,comment,timeout) if a is not None]) 
-              for t in tags]
-                    
-    def get_alarm_properties(self):
-        """ Method used in all panic classes """
-        props = self.api.get_db_properties(self.name,ALARM_TABLES.keys())
-        #Updating old property names
-        if not props['AlarmList']:
-            props['AlarmList'] = \
-                self.api.get_db_property(self.name,'AlarmsList')
-            if props['AlarmList']:
-                print('%s:AlarmsList property renamed to AlarmList'%self.name)
-                self.api.put_db_properties(self.name,
-                    {'AlarmList':props['AlarmList'],'AlarmsList':[]})
-                
-        return props
-    
-    def get_model(self):
-        """ 
-        Returns the proper alarm summary attribute to subscribe.
-        It depends on the PyAlarm version
-        """
-        v = self.get_version()
-        if v >= '6.2.0':
-            model = self.name+'/alarmsummary'
-        else:
-            model = self.name+'/activealarms'
-        print('%s.get_model(%s): %s'%(self.name,v,model))
-        return model.lower()
-      
-    def get_active_alarms(self, value = None):
-        """ Returns the list of currently active alarms """
-        if self._actives is None:
-            self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',
-                                               keeptime=3000.)
-        if value is None:
-            try:
-                value = getAttrValue(self._actives.read(),None)
-            except Exception,e:
-                return e
-            
-        if not value: return {}
-      
-        #Parsing ActiveAlarms: TAG:DATE[:Formula]
-        r = defaultdict(float)
-        for line in value:
-            splitter = ';' if ';' in line else ':'
-            tag,line = str(line).split(splitter,1)
-
-            if not line:
-                r[tag] = 0
-                continue
-            
-            date = ':'.join(line.split(':')[:3])
-            try:
-                #assumes ctime format = '%a %b %d %H:%M:%S %Y'
-                r[tag] = time.mktime(time.strptime(date))
-            except:
-                try:
-                    r[tag] = str2time(date)
-                except:
-                    # Format not compatible (e.g. old PyAlarm)
-                    #print('AlarmDS.get_active_alarms():'
-                        #'failed to parse date from %s'%line)
-                    r[tag] = r[tag] or END_OF_TIME
-        return r
-
-    def state(self):
-        """ Returns device state """
-        try: return self.get().State()
-        except: return None
-    
-    def status(self):
-        """ Returns device status """
-        return self.get().Status()
-
     def read(self,filters='*'):
         """ 
         Updates from the database the Alarms related to this device 
@@ -866,16 +736,178 @@ class AlarmDS(object):
                 print('Unparsable Alarm!: %s' % line)
         #print('%s device manages %d alarms: %s'
         #   %(self.name,len(self.alarms),self.alarms.keys()))
-        return self.alarms
+        return self.alarms        
+        
+    def get(self,alarm=None):
+        """ Returns alarm object or device proxy 
+        (for backwards compatibility) """
+        return self.alarms.get(alarm) if alarm else self.get_proxy()
 
-    def init(self):
-        """ forces the device to reload its configuration"""
+    def get_config(self,update=False):
+        if not getattr(self,'config',None) or update: 
+            props = self.api.get_db_properties(self.name,ALARM_CONFIG)
+            for p,v in props.items():
+                if v in (False,True):
+                    props[p] = v
+                elif v and v[0] not in ('',None):
+                    props[p] = v[0]
+                else: #Using default property value
+                    try: 
+                        props[p] = (PyAlarmDefaultProperties[p][-1] or [''])[0]
+                    except: print traceback.format_exc()
+            self.config = props
+        return self.config
+                    
+    def get_property(self,prop):
+        if isSequence(prop): return self.api.get_db_properties(self.name,prop)
+        else: return self.api.get_db_property(self.name,prop)
+        
+    def put_property(self,prop,value):
+        return self.api.put_db_property(self.name,prop,value)
+                       
+    def get_alarm_properties(self):
+        """ Method used in all panic classes """
+        props = self.api.get_db_properties(self.name,ALARM_TABLES.keys())
+        #Updating old property names
+        if not props['AlarmList']:
+            props['AlarmList'] = \
+                self.api.get_db_property(self.name,'AlarmsList')
+            if props['AlarmList']:
+                print('%s:AlarmsList property renamed to AlarmList'%self.name)
+                self.api.put_db_properties(self.name,
+                    {'AlarmList':props['AlarmList'],'AlarmsList':[]})
+                
+        return props
+    
+    ##########################################################################
+    # Device Proxy Methods
+    
+    def get_proxy(self):
+        """ Returns a device proxy """
+        if self.proxy is None:
+            self.proxy = self.api.get_ds_proxy(self.name)
+        return self.proxy
+    
+    def get_version(self):
+        """ Returns the VersionNumber for this device """
+        if self.version is None:
+            try:
+                assert check_device_cached(self.name)
+                v = self.get_proxy().read_attribute('VersionNumber').value
+            except:
+                tracer('AlarmDS(%s).get_version(): device not running'
+                       %self.name)
+                v = self.config.get('VersionNumber',None)
+                
+            self.version = fandango.objects.ReleaseNumber(v)
+        return self.version 
+    
+    def get_model(self):
+        """ 
+        Returns the proper alarm summary attribute to subscribe.
+        It depends on the PyAlarm version
+        """
+        v = self.get_version()
+        if v >= '6.2.0':
+            model = self.name+'/alarmsummary'
+        else:
+            model = self.name+'/activealarms'
+        print('%s.get_model(%s): %s'%(self.name,v,model))
+        return model.lower()    
+    
+    def ping(self):
         try:
-            self.read()
-            self.get().init()
-            self.config = None
+          return self.get().ping()
+        except:
+          return None           
+
+    def state(self):
+        """ Returns device state """
+        try: return self.get().State()
+        except: return None
+    
+    def status(self):
+        """ Returns device status """
+        return self.get().Status()
+    
+    def enable(self,tag=None):
+        """ If Tag is None, this method will enable the whole device,
+        but individual disables will be kept 
+        """
+        if tag is None:
+            self.api.put_db_property(self.name,'Enabled',True)
+            self.init()
+            print('%s: Enabled!' %self.name)
+        else:
+            tags = [a for a in self.alarms if matchCl(tag,a)]
+            print('%s: Enabling %d alarms: %s' % (self.name,len(tags),tags))
+            [self.get().Enable([str(a)]) for t in tags]
+                    
+    def disable(self,tag=None,comment=None,timeout=None):
+        """ If Tag is None this method disables the whole device 
+        """
+        if tag is None:
+            self.api.put_db_property(self.name,'Enabled',False)
+            self.init()
+            print('%s: Disabled!' %self.name)
+        else:
+            tags = [a for a in self.alarms if matchCl(tag,a)]
+            print('%s: Disabling %d alarms: %s'%(self.name,len(tags),tags))
+            [self.get().Disable(
+              [str(a) for a in (t,comment,timeout) if a is not None]) 
+              for t in tags]    
+      
+    def get_active_alarms(self, value = None):
+        """ Returns the list of currently active alarms """
+        if self._actives is None:
+            self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',
+                                               keeptime=3000.)
+        if value is None:
+            try:
+                value = getAttrValue(self._actives.read(),None)
+            except Exception,e:
+                return e
+            
+        if not value: return {}
+      
+        #Parsing ActiveAlarms: TAG:DATE[:Formula]
+        r = defaultdict(float)
+        for line in value:
+            splitter = ';' if ';' in line else ':'
+            tag,line = str(line).split(splitter,1)
+
+            if not line:
+                r[tag] = 0
+                continue
+            
+            date = ':'.join(line.split(':')[:3])
+            try:
+                #assumes ctime format = '%a %b %d %H:%M:%S %Y'
+                r[tag] = time.mktime(time.strptime(date))
+            except:
+                try:
+                    r[tag] = str2time(date)
+                except:
+                    # Format not compatible (e.g. old PyAlarm)
+                    #print('AlarmDS.get_active_alarms():'
+                        #'failed to parse date from %s'%line)
+                    r[tag] = r[tag] or END_OF_TIME
+        return r    
+
+    def reset(self,alarm,comment):
+        """
+        Reset of an active Alarm
+        Returns True if there's no more active alarms, else returns False
+        """
+        args=[]
+        args.append(str(alarm))
+        args.append(str(comment))
+        try:
+            return (False if self.get().ResetAlarm(args) else True)
         except:
             print 'Device %s is not running' % self.name
+            print traceback.format_exc()
+            return None            
 
     def acknowledge(self,alarm,comment):
         """
@@ -886,7 +918,7 @@ class AlarmDS(object):
         args.append(str(alarm))
         args.append(str(comment))
         try:
-            return (False if self.get().ResetAlarm(args) else True)
+            return (False if self.get().Acknowledge(args) else True)
         except:
             print 'Device %s is not running' % self.name
             print traceback.format_exc()

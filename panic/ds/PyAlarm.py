@@ -1851,7 +1851,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def Renounce(self, argin):
         self.info( "In "+self.get_name()+"::Renounce()")
         #    Add your own code here
-        argin = str(argin)
+        argin = str(argin[0] if isSequence(argin) else argin)
         if argin in self.Alarms:
             self.Alarms[argin].acknowledged = 0
             self.AcknowledgedAlarms.remove(argin)
