@@ -631,6 +631,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             
             # counter and active will not have same values if the alarm is not acknowledged for a while
             
+            if not alarm.counter and not alarm.active:
+                # Storing the data at first condition trigger
+                self.PastValues[tag_name] = variables.copy() \
+                        if hasattr(variables,'copy') else None             
+            
             if WAS_OK:
                 #Alarm counters are not increased above Threshold
                 alarm.counter+=1
@@ -647,8 +652,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.set_alarm(tag_name)
                     self.LastAlarms.append(time.ctime(now)+': '+tag_name)
                     #Storing the values that will be sent in the report
-                    self.PastValues[tag_name] = variables.copy() \
-                        if hasattr(variables,'copy') else None 
+
                     if alarm.tag not in self.AcknowledgedAlarms: 
                         # <=== HERE IS WHERE THE ALARM IS SENT!
                         self.send_alarm(tag_name,message='ALARM',values=variables or None) 
@@ -667,6 +671,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
             if alarm.counter: 
                 alarm.counter-=1
+                
             if not alarm.counter and alarm.active: #The alarm condition was active in the previous cycle
                 #Storing the values that will be sent in the report
                 self.PastValues[tag_name] = variables.copy() \
