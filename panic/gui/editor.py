@@ -197,6 +197,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.w.setLayout(Qt.QHBoxLayout())
         self._tvl = AlarmValueLabel(self.w)
         self._tvl.setShowQuality(False)
+        self._tvl.connect(self._tvl,'alarmUpdated',self.update_button_states)
         self._detailsButton = Qt.QPushButton(self.w)
         self._detailsButton.setText('Last Report')
         self._detailsButton.setIcon(getThemeIcon("edit-find"))
@@ -251,6 +252,12 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._tvl.setModel(alarm.device+'/'+alarm.get_attribute())
         self._dataWidget._wi.previewButton.setEnabled(True)
         self._dataWidget._wi.editButton.setEnabled(True)
+        self.update_button_states()
+        return
+    
+    def update_button_states(self,alarm=None):
+        alarm = alarm or self.getCurrentAlarm()
+        print('update_button_states(%s)'%alarm.tag)
         if alarm.get_active():
             self._detailsButton.setEnabled(True)
             self._resetButton.setEnabled(True)

@@ -120,7 +120,12 @@ class AlarmValueLabel(TaurusValueLabel):
             self.ss = "background-color:lightgreen; color:black;"
             self.setText("OK")
         self.setStyleSheet(self.ss)
+        self.alarmUpdated()
         TaurusBaseWidget.updateStyle(self)
+
+    def alarmUpdated(self):
+        print('AlarmValueLabel.alarmUpdated()')
+        self.emit(Qt.SIGNAL('alarmUpdated'))        
         
         
 ###############################################################################
