@@ -1,6 +1,9 @@
 import time,traceback,os,sys
 import taurus,fandango,fandango.qt
 from fandango.qt import Qt, QtCore, QtGui
+from fandango.functional import *
+from fandango.objects import Cached
+from fandango.excepts import Catched
 
 from taurus.qt.qtgui.base import TaurusBaseWidget
 from taurus.qt.qtgui.container import TaurusWidget

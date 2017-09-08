@@ -26,7 +26,8 @@ except:
   #Taurus3
   from taurus.core import AttributeNameValidator
 
-from row import AlarmRow, QAlarm, QAlarmManager
+#from row import AlarmRow, QAlarm, QAlarmManager
+from actions import QAlarmManager
 from views import ViewChooser
 from utils import * #< getThemeIcon, getIconForAlarm imported here
 from utils import WindowManager
@@ -76,7 +77,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     """
     
     #Default period between list order updates
-    REFRESH_TIME = 1000
+    REFRESH_TIME = 3000
     #Default period between database reloads
     RELOAD_TIME = 60000 
     # new refresh set by hurry()
@@ -116,7 +117,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.NO_ICON = Qt.QIcon()
         
         refresh = int(options.get('refresh',self.REFRESH_TIME))
-        self.REFRESH_TIME = AlarmRow.REFRESH_TIME = refresh
+        self.REFRESH_TIME = refresh
+         #AlarmRow.REFRESH_TIME = refresh
         
         #if self.regEx not in ('','*'): 
             #print 'Setting RegExp filter: %s'%self.regEx
@@ -134,7 +136,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         self.ctx_names = []
 
         if not self.api.keys(): trace('NO ALARMS FOUND IN DATABASE!?!?')
-        AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
+        #AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
         
         N = len(self.getAlarms())
         trace('AlarmGUI(): %d alarms'%N)
@@ -258,7 +260,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             text = 'Loading %s ... %d / %d'%(
               self.scope,size-nones,size)
         else: 
-            text = ('Showing %d %s alarms,'
+            text = (time2str()+': Showing %d %s alarms,'
               ' %d in database.'%(added,self.scope,size))
 
         trace(text+', nones = %d'%nones)
@@ -283,18 +285,19 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 a = self.view.get_alarm_from_text(items[0])
                 tags = a.tag.split('_')
                 self.emit(Qt.SIGNAL('alarmSelected'),a.tag)
-                models = self.api.parse_attributes(a.alarm.formula)
-                devices = sorted(set(fn.tango.parse_tango_model(m)['device'] for m in models))
+                models = self.api.parse_attributes(a.formula)
+                devices = sorted(set(fn.tango.parse_tango_model(m)['device'] 
+                                     for m in models))
                 print 'onItemSelected(%s): %s'%(a,devices)
                 self.emit(Qt.SIGNAL('devicesSelected'),'|'.join(devices+tags))
         except: traceback.print_exc()      
             
-    def getCurrentAlarm(self):
-        tag = self.getCurrentTag()
+    def getCurrentAlarm(self,item=None):
+        tag = self.getCurrentTag(item)
         return self.api[tag]
     
-    def getCurrentTag(self):
-        row = self._ui.listWidget.currentItem()
+    def getCurrentTag(self,item=None):
+        row = item or self._ui.listWidget.currentItem()
         return self.view.get_alarm_from_text(row.text())
       
     def onSelectAllNone(self):
@@ -304,11 +307,20 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             self._ui.listWidget.clearSelection()
         
     def getSelectedRows(self,extend=False):
+        """
+        extend=True will add children alarms, be careful
+        """
         targets = self._ui.listWidget.selectedItems()
         if extend:
-            subs = [a for t in targets for a in self.api.parse_alarms(t.alarm.formula)]
-            targets.extend(self.AlarmRows.get(a) for a in subs if a in self.AlarmRows and not any(t.tag==a for t in targets))
+            subs = [a for t in targets 
+                    for a in self.api.parse_alarms(t.alarm.formula)]
+            targets.extend(self.AlarmRows.get(a) 
+                    for a in subs if a in self.AlarmRows and not any(t.tag==a for t in targets))
         return targets
+    
+    def getSelectedAlarms(self):
+        rows = self.getSelectedRows()
+        return [self.getCurrentAlarm(r) for r in rows]
       
     def getVisibleRows(self,margin=10):
         ql = self._ui.listWidget
@@ -770,8 +782,8 @@ class AlarmGUI(QFilterGUI):
         #Qt.QObject.connect(self.refreshTimer, Qt.SIGNAL("timeout()"), self.onRefresh)
         if self.USE_EVENT_REFRESH: 
             Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
-        Qt.QObject.connect(self, 
-            Qt.SIGNAL('setfontsandcolors'),AlarmRow.setFontsAndColors)
+        #Qt.QObject.connect(self, 
+            #Qt.SIGNAL('setfontsandcolors'),AlarmRow.setFontsAndColors)
         Qt.QObject.connect(self._ui.listWidget, 
             Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
         Qt.QObject.connect(self._ui.listWidget, 

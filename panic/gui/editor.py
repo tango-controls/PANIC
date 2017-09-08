@@ -1,15 +1,12 @@
 import sys, re
 import panic
-from utils import QtCore, QtGui, Qt
+
+# All that is needed (Qt, SNAP_ALLOWED, fandango)
+from panic.gui.utils import *
+
+#AlarmFormula widget is added in the ui_data.py file
 from ui_data import Ui_Data,Ui_ReceiversLine
 from ui_data import uiBodyForm,uiRowForm
-from utils import getThemeIcon
-from utils import AlarmValueLabel,setCheckBox,getAlarmReport,get_user,trace
-from utils import AttributesPreview,AlarmPreview,iValidatedWidget
-from fandango.excepts import Catched
-
-#AlarmFormula widget is added to the editor in the ui_data.py file
-from utils import SNAP_ALLOWED,get_snap_api
 
 #get_next_index = lambda d: max([0]+list(d))+1
 
