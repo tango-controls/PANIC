@@ -1432,7 +1432,8 @@ class AlarmAPI(fandango.SingletonMap):
             #print 'replace_alarms(%s): %s'%(formula,var)
             if var:
                 for l,a in reversed([(len(s),s) for s in var]):
-                    x = '(?:^|[^/a-zA-Z0-9-_])(%s)(?:$|[^/a-zA-Z0-9-_])'%a
+                    x = '[^/a-zA-Z0-9-_\"\']'
+                    x = '(?:^|%s)(%s)(?:$|%s)'%(x,a,x)
                     attr = self[a].device+'/'+a
                     m,new_formula = True,''
                     #print 'replacing %s by %s'%(a,attr)
