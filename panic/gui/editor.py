@@ -155,35 +155,9 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             newText = ','.join([str(text), str(newText)])
         self._dataWidget._wi.receiversLineEdit.setText(newText)
         
-    def ResetAlarm(self,alarm=None):
-        prompt,cmt=QtGui.QInputDialog,''
-        alarms = [self.getCurrentAlarm()]
-        msg = 'The following alarms will be reseted:\n\t'+'\n\t'.join([t.tag for t in alarms])
-        print 'In AlarmGUI.ResetAlarm(): %s'%msg
-        while len(cmt)==0:
-            cmt, ok=prompt.getText(self,'Input dialog',msg+'\n\n'+'Must type a comment to continue:')
-            if not ok: return
-        comment=get_user()+': '+cmt
-        for alarm in alarms:
-            try: alarm.reset(comment) #It also tries to reset hidden alarms
-            except: print traceback.format_exc()
-        self.valueChanged()
-
-    def AcknowledgeAlarm(self):
-        """THIS METHOD IS NEVER CALLED!?!?!?!?!?!?!"""
-        alarm = self.getCurrentAlarm()
-        print 'In AlarmForm.AcknowledgeAlarm(%s)' % (alarm.tag)
-        comment, ok = QtGui.QInputDialog.getText(self,'Input dialog','Type a comment to continue:')
-        comment = get_user()+': '+comment
-        if ok and len(str(comment)) != 0:
-            try:
-                alarm.reset(comment) #... Why it resets instead of Acknowledge?
-                #taurus.Device(alarm.device).command_inout('Acknowledge',[tag, comment])
-            except:
-                print traceback.format_exc()
-            self.valueChanged()
-        elif ok and len(str(comment)) < 3:
-            self.AcknowledgeAlarm()
+    def onReset(self,alarm=None):
+        import panic.gui.actions
+        panic.gui.actions.ResetAlarm(self,alarm)
             
     def valueChanged(self):
         print('AlarmForm.valueChanged()')
@@ -211,7 +185,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._resetButton.setText('Reset')
         self._resetButton.setIcon(getThemeIcon("edit-undo"))
         self._resetButton.connect(self._resetButton,Qt.SIGNAL("clicked()"),
-                                  self.ResetAlarm)
+                                  self.onReset)
         self._resetButton.setEnabled(False)
         self.w.layout().addWidget(self._tvl)
         self.w.layout().addWidget(self._detailsButton)
@@ -257,7 +231,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._tvl.setModel(alarm) #.device+'/'+alarm.get_attribute())
         self._dataWidget._wi.previewButton.setEnabled(True)
         self._dataWidget._wi.editButton.setEnabled(True)
-        self.update_button_states()
+        self.valueChanged()
         return
     
     def update_button_states(self,alarm=None):

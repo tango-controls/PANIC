@@ -27,13 +27,13 @@ except:
   from taurus.core import AttributeNameValidator
 
 #from row import AlarmRow, QAlarm, QAlarmManager
-from actions import QAlarmManager
-from views import ViewChooser
-from utils import * #< getThemeIcon, getIconForAlarm imported here
-from utils import WindowManager
-from editor import FormulaEditor,AlarmForm
-from core import Ui_AlarmList
-from alarmhistory import *
+from panic.gui.actions import QAlarmManager
+from panic.gui.views import ViewChooser
+from panic.gui.utils import * #< getThemeIcon, getIconForAlarm imported here
+from panic.gui.utils import WindowManager #Order of imports matters!
+from panic.gui.editor import FormulaEditor,AlarmForm
+from panic.gui.core import Ui_AlarmList
+from panic.gui.alarmhistory import *
 
 PANIC_URL = 'http://www.pythonhosted.org/panic'    
 
@@ -406,12 +406,20 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             status = ['Error: '+alarm.last_error]+status
         item.setToolTip('\n'.join(status))
         
-        forms = [f for f in WindowManager.WINDOWS 
-            if isinstance(f,AlarmForm) 
-            and f.getCurrentAlarm().tag==alarm.tag]
-        if forms:
-            tracer("\tupdating %d %s forms"%(len(forms),alarm))
-            [f.valueChanged() for f in forms]
+        try:
+            forms = []
+            for f in WindowManager.WINDOWS:
+                if isinstance(f,AlarmForm):
+                    tag = f.getCurrentAlarm().tag
+                    if tag == alarm.tag:
+                        forms.append(f)
+            if forms:
+                tracer("\tupdating %d %s forms"%(len(forms),alarm))
+                [f.valueChanged() for f in forms]
+            else:
+                tracer("no forms open?")
+        except:
+            tracer(traceback.format_exc())
                 
         #font = self._ui.listWidget.item(i).font()
         #font.setFixedPitch(True)
