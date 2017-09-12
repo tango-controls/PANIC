@@ -57,7 +57,7 @@ from fandango.tango import PyTango,get_tango_host, check_device_cached
 from fandango.tango import parse_tango_model
 from fandango.log import tracer,shortstr
 
-from .properties import *
+from panic.properties import *
 
 _TANGO = PyTango.Database()
 
@@ -501,6 +501,16 @@ class Alarm(object):
         quality = PyTango.AttrQuality.names['ATTR_%s'
                             %qualities.get(self.severity,'WARNING')]
         return quality
+    
+    # Methods for PANIC 6 <> 7 compatibility
+    
+    def get_priority(self): return self.severity
+    def set_priority(self,prio): self.severity = prio
+    priority = property(fget=get_priority,fset=set_priority)
+    
+    def get_message(self): return self.description
+    def set_message(self,prio): self.description = prio
+    message = property(fget=get_message,fset=set_message)        
 
     def parse_config(self):
         """ Checks the Alarm config related to this alarm """
@@ -1119,8 +1129,6 @@ class AlarmAPI(fandango.SingletonMap):
           'other checks %s'% (time.time()-t0,tdevs,tprops,tcheck))
         return
     
-    CSV_COLUMNS = 'tag,device,description,severity,receivers,formula'.split(',')
-
     def load_from_csv(self,filename,device=None,write=True):
         #fun.tango.add_new_device('PyAlarm/RF','PyAlarm','SR/RF/ALARMS')
         #DEVICE='sr/rf/alarms'
@@ -1135,13 +1143,13 @@ class AlarmAPI(fandango.SingletonMap):
                 or '%s/%s/ALARMS'%(line.get('system'),line.get('subsystem') 
                 or 'CT')).lower()
             alarms[line['tag']] = dict([('load',False)]
-                +[(k,line.get(k)) for k in self.CSV_COLUMNS] )
+                +[(k,line.get(k)) for k in CSV_FIELDS] )
             
         loaded = alarms.keys()[:]
         for i,tag in enumerate(loaded):
             new,old = alarms[tag],self.alarms.get(tag,None)
             if old and all(new.get(k)==getattr(old,k) 
-                           for k in self.CSV_COLUMNS):
+                           for k in CSV_FIELDS):
                 alarms.pop(tag)
             elif write:
                 print('%d/%d: Loading %s from %s: %s'%(
@@ -1168,12 +1176,12 @@ class AlarmAPI(fandango.SingletonMap):
         """
         csv = fandango.CSVArray(header=0,comment='#',offset=1)
         alarms = self.filter_alarms(regexp,alarms=alarms)
-        columns = self.CSV_COLUMNS + (['ACTIVE'] if states else [])
-        csv.resize(1+len(alarms),len(self.CSV_COLUMNS))
-        csv.setRow(0,map(str.upper,self.CSV_COLUMNS))
+        columns = CSV_FIELDS + (['ACTIVE'] if states else [])
+        csv.resize(1+len(alarms),len(CSV_FIELDS))
+        csv.setRow(0,map(str.upper,CSV_FIELDS))
         
         for i,(d,alarm) in enumerate(sorted((a.device,a) for a in alarms)):
-            row = [getattr(alarm,k) for k in self.CSV_COLUMNS]
+            row = [getattr(alarm,k) for k in CSV_FIELDS]
             if states: row += alarm.get_active()
             csv.setRow(i+1,row)
             
