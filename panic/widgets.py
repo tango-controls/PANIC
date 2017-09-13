@@ -8,7 +8,8 @@ Sergi Rubio, 2010
 """
 
 import sys, os, taurus, fandango, PyTango, getpass, traceback, time
-from PyQt4 import Qt, QtCore, QtGui
+import fandango as fd
+from fandango.qt import Qt, QtCore, QtGui, DoubleClickable
 
 from taurus.qt.qtgui.base.taurusbase import TaurusBaseComponent
 from taurus.qt.qtgui.base.taurusbase import TaurusBaseWidget
@@ -21,7 +22,7 @@ except:
 from taurus.qt.qtgui.container import TaurusMainWindow
 from taurus.qt.qtgui.panel import TaurusForm
 import panic
-from panic import AlarmAPI
+from panic import AlarmAPI, AlarmView
 
 try: 
   #if available, this module will try to load the full AlarmGUI
@@ -433,39 +434,223 @@ class PanicToolbar(TaurusBaseWidget, Qt.QToolBar):
             visible=visible+1
                     
         return
+    
+class PanicPanel(Qt.QWidget):
+    
+    REFRESH_TIME = 3000
+    
+    def setModel(self,model=None):
+        import panic,math
+        
+        if isinstance(model,AlarmView):
+            self.view = model
+        else: #if fd.isString(model):
+            self.view = AlarmView(scope=model)
+        self.alarms = self.view.alarms
+        self.tags = self.view.sort(sortkey=('priority','tag'))
+        self.old_devs = set()
+        self.actives = []
+        self.panels = []
+        
+        self.cols = int(math.ceil(math.sqrt(1+len(self.alarms))))
+        self.rows = ((self.cols-1) 
+                     if self.cols*(self.cols-1)>=1+len(self.alarms)
+                     else self.cols)
+        self.setLayout(Qt.QGridLayout())
+        self.labels = []
+        for i in range(self.rows):
+            self.labels.append([])
+            for j in range(self.cols):
+                self.labels[i].append(DoubleClickable(Qt.QLabel)())
+                self.layout().addWidget(self.labels[i][j],i,j,1,1)
+                
+        self._title = 'PanicPanel(%s)'%str(model or fd.get_tango_host())
+        self.setWindowTitle(self._title)
+        url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6-big.png'
+        px = Qt.QPixmap(url)
+        self.setWindowIcon(Qt.QIcon(px))        
+        #self.labels[self.rows-1][self.cols-1].resize(50,50)        
+
+        print('PanicPanel(%s): %d alarms , %d cols, %d rows: %s'
+              %(model,len(self.alarms),self.cols, self.rows, 
+                fd.log.shortstr(self.alarms.keys())) + '\n'+'#'*80)
+                
+        self.refreshTimer = Qt.QTimer()
+        Qt.QObject.connect(self.refreshTimer, 
+                           Qt.SIGNAL("timeout()"), self.updateAlarms)
+        self.refreshTimer.start(self.REFRESH_TIME)
+        width,height = min((800,200*self.cols)),min((800,200*self.rows))
+        self.resize(width,height)
+        self.labels[-1][-1].setPixmap(
+            px.scaled(height/self.rows,height/self.rows))
+                
+    def updateAlarms(self):
+        # Sorting will be kept at every update
+        c = 0
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if c >= len(self.tags): break
+                self.updateCell(i,j,self.alarms[self.tags[c]])
+                c += 1
+        self.setWindowTitle(self._title+': '+fd.time2str())
+        self.refreshTimer.setInterval(self.REFRESH_TIME)
+        
+    def updateCell(self,i,j,alarm):
+        changed = True
+        label = self.labels[i][j]
+        
+        if alarm.state in ('OOSRV','ERROR'):
+            color = 'white'
+            font = ['grey','red'][alarm.state=='ERROR']
+        elif alarm.active:
+            if alarm.tag in self.actives:
+                changed = False
+            else:
+                self.actives.append(alarm.tag)
+                
+            if alarm.priority in ('ALARM','ERROR'):
+                color = 'red'
+                font = 'white'
+            elif alarm.priority == 'WARNING':
+                color = 'orange'
+                font = 'white'
+            else:
+                color = 'yellow'
+                font = 'grey'
+                
+        elif str(alarm.state) == 'NORM':
+            if alarm.tag not in self.actives:
+                changed = False
+            else:
+                self.actives.remove(alarm.tag)
+            color = 'lime'
+            font = 'grey'
+        else:
+            color = 'grey'
+            font = 'black'
+            
+        ssheet = ("QLabel { background-color : %s; color : %s; "
+            "font : bold %dpx ; qproperty-alignment : AlignCenter; }"
+            %(color,font,20 if len(self.alarms)<30 else 10))
+        label.setStyleSheet(ssheet)
+        
+        try:
+            if not label.getClickHook():
+                f = lambda a=alarm,s=self:s.showPanel(a)
+                label.setClickHook(f)
+        except:
+            traceback.print_exc()
+            
+        tooltip = str(label.toolTip()).split('<pre>')[-1].split('</pre>')[0]
+        if not tooltip: changed = True
+        sep = '\n' #'<br>\n\r'
+        try:
+            if alarm.state not in ('OOSRV','ERROR'):
+                if changed:
+                    print('updateCell(%s,%s,%s,%s,%s)'%(
+                        i,j,alarm,alarm.active,alarm.state))                    
+                    dp = alarm.get_ds().get()
+                    if alarm.get_ds().get_version() < '6.2.0':
+                        r = dp.GenerateReport([alarm.tag])
+                    else:
+                        r = dp.GetAlarmInfo([alarm.tag,
+                                            'SETTINGS','STATE','VALUES'])
+                    r = [w for l in r for w in l.split('\n')]
+                    tooltip = sep.join(fd.log.shortstr(l.strip()) for l in r)
+            else:
+                tooltip = self.view.get_alarm_as_text(alarm,sep=sep)
+        except:
+            traceback.print_exc()
+            self.old_devs.add(alarm.device)
+            tooltip = self.view.get_alarm_as_text(alarm,sep=sep)
+            
+        label.setToolTip('<p style="font-size:10px; '
+            'qproperty-alignment: AlignLeft; '
+            'background-color:white; '
+            'color: grey"><pre>%s</pre></p>'%tooltip)
+        
+        text = '\n'.join(self.minsplit(alarm.tag)
+        #text += '\n%s'%alarm.priority.lower()
+        label.setText(text)
+        #"QLabel { background-color : %s; color : black; font : bold 20px ;
+        #qproperty-alignment : AlignCenter; }"%(['red','lime','lime','yellow']
+        
+    def showPanel(self,alarm):
+        import panic.gui.editor
+        app = panic.gui.editor.AlarmForm()
+        self.panels.append(app)
+        app.setAlarmData(alarm)
+        app.show()
+        
+    @staticmethod
+    def minsplit(seq,sep='_',minsplit=5):
+        o,r,i = seq,[],0
+        while 0 <= i < len(seq):
+            seq = seq[i:]
+            i = seq.find(sep,minsplit)
+            q = seq[:i]
+            if i>0 and q: 
+                r.append(q)
+                i+=1
+            else:
+                r.append(seq)
+        #print('minsplit(%s): %s'%(o,r))
+        return r        
+
+    @staticmethod
+    def main(*args):
+        import fandango.qt,sys
+        print('in PanicPanel.main(%s)'%str(args))
+        filters = args[0] if args else '*'
+        app = fandango.qt.getApplication()
+        w = PanicPanel()
+        if '-v' in args: 
+            import fandango.callbacks
+            fandango.callbacks.EventSource.thread().setLogLevel('DEBUG')
+            w.view.setLogLevel('DEBUG')
+        w.setModel(filters)
+        w.show()
+        sys.exit(app.exec_())
         
 if __name__ == '__main__':
     qapp = Qt.QApplication([])
-    devices = sys.argv[1:]
-    if any('/' in d for d in devices):
-        filters = None
-        attr_list = ['%s/%s'%(d,a) for d in devices for a in PyTango.DeviceProxy(d).get_attribute_list()]
-    else:
-        filters = devices
-        attr_list = []
-    if attr_list:
-        import taurus
-        taurus.setLogLevel('WARNING')
-        tmw = TaurusMainWindow()
-        taurusForm = TaurusForm(tmw)
-        taurusForm.setModel(attr_list)
-        tmw.setCentralWidget(taurusForm)
-        tmw.statusBar().showMessage('Ready')
-        tmw.show()
-        s=tmw.splashScreen()
-        s.finish(tmw)
-    else:
-        tmw = Qt.QMainWindow()
-        label = Qt.QLabel('Select any alarm from the toolbar')
-        tmw.setCentralWidget(label)
-        tmw.show()
-    tmw.setMinimumWidth(600)
-    print '*'*80
-    tmw.setWindowTitle('Alarm Toolbar')
-    toolbar = PanicToolbar(tmw,filters=filters)
-    tmw.addToolBar(toolbar)
+    
+    if '--panel' in sys.argv:
+        
+        PanicPanel.main(*[a for a in sys.argv[1:] if not a.startswith('-')])
+    
+    if '--toolbar' in sys.argv:
+        
+        devices = sys.argv[1:]
+        if any('/' in d for d in devices):
+            filters = None
+            attr_list = ['%s/%s'%(d,a) for d in devices for a in PyTango.DeviceProxy(d).get_attribute_list()]
+        else:
+            filters = devices
+            attr_list = []
+        if attr_list:
+            import taurus
+            taurus.setLogLevel('WARNING')
+            tmw = TaurusMainWindow()
+            taurusForm = TaurusForm(tmw)
+            taurusForm.setModel(attr_list)
+            tmw.setCentralWidget(taurusForm)
+            tmw.statusBar().showMessage('Ready')
+            tmw.show()
+            s=tmw.splashScreen()
+            s.finish(tmw)
+        else:
+            tmw = Qt.QMainWindow()
+            label = Qt.QLabel('Select any alarm from the toolbar')
+            tmw.setCentralWidget(label)
+            tmw.show()
+        tmw.setMinimumWidth(600)
+        print '*'*80
+        tmw.setWindowTitle('Alarm Toolbar')
+        toolbar = PanicToolbar(tmw,filters=filters)
+        tmw.addToolBar(toolbar)
 
-    sys.exit(qapp.exec_())
+        sys.exit(qapp.exec_())
 
 try:
     from fandango.doc import get_fn_autodoc
