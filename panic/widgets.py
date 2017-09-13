@@ -440,8 +440,8 @@ class PanicPanel(Qt.QWidget):
     REFRESH_TIME = 3000
     
     def setModel(self,model=None):
+        print('PanicPanel.setModel(%s)'%model)
         import panic,math
-        
         if isinstance(model,AlarmView):
             self.view = model
         else: #if fd.isString(model):
@@ -569,7 +569,7 @@ class PanicPanel(Qt.QWidget):
             'background-color:white; '
             'color: grey"><pre>%s</pre></p>'%tooltip)
         
-        text = '\n'.join(self.minsplit(alarm.tag)
+        text = '\n'.join(self.minsplit(alarm.tag))
         #text += '\n%s'%alarm.priority.lower()
         label.setText(text)
         #"QLabel { background-color : %s; color : black; font : bold 20px ;
