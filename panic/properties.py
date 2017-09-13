@@ -30,7 +30,7 @@ PyAlarm Device Default Properties
 """
 
 import fandango as fd
-from fandango.functional import join,djoin
+from fandango.functional import join,djoin,time2str,str2time
 from fandango.tango import PyTango,get_tango_host
 
 try:
@@ -47,6 +47,56 @@ SEVERITIES = {'DEBUG':0,
               'CONTROL':-1
               }
 DEFAULT_SEVERITY = 'WARNING'
+
+SUMMARY_FIELDS = 'tag','state','severity','time','formula','description'
+
+SORT_ORDER = ('Error','Active','Severity','Time')
+
+# Must be lists, not tuples
+DATA_FIELDS = ('tag','device','severity','formula',
+                'description','receivers')
+STATE_FIELDS = ('state','time','counter','active','disabled',
+                'acknowledged','updated','last_sent','last_error')
+
+#ALARM_ROW = ['tag','get_state','get_time','device','description']
+#DEFAULT_COLUMNS = ['tag','get_state','active','get_time','severity']
+VIEW_FIELDS = ['tag','device','state','severity','time']
+
+CSV_FIELDS = 'tag,device,description,severity,receivers,formula'.split(',')
+
+FORMATTERS = fd.defaultdict(lambda :str)
+FORMATTERS.update({
+    'tag' : lambda s,l=10: ('{0:<%d}'%(l or 4)).format(s),
+    #'time' : lambda s,l=25: ('{:^%d}'%l).format(s),
+    'device' : lambda s,l=25: ('{0:^%d}'%(l or 4)).format(s),
+
+    'description' : lambda s,l=50: ('{0:<}').format(s),
+
+    'severity' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
+    
+    'get_state' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
+    
+    'get_time' : 
+        lambda s,l=20: ('{0:^%d}'%(l or 4)).format(time2str(s,bt=0)),
+
+    'active' : lambda s,l=20: (('{0:^%d}'%(l or 4)).format(
+        'FAILED!' if s is None else (
+        'Not Active' if not s else (
+            s if s in (1,True) else (
+            time2str(s,bt=0)))))),
+            
+    'formula' : lambda s,l=100: ('{0:^%d}'%(l or 4)).format(s),
+    #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
+    })
+
+
+
+
+INFO_REQUESTS = ['SETTINGS','STATE','VALUES','SNAP']
+
+MESSAGE_TYPES = ['ALARM','ACKNOWLEDGED','RECOVERED','REMINDER',
+                    'AUTORESET','RESET','DISABLED',]
+
 
 AlarmStates = fd.Struct({
   'NORM':0, #Normal state

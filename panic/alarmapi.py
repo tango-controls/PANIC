@@ -286,6 +286,8 @@ class Alarm(object):
         if self.disabled or v < 0: return -1
         elif v > 0: return 1
         else: return 0
+    
+    # DO NOT CREATE PROPERTY DESCRIPTOR FOR SET/GET_ACTIVE!!!
 
     def set_state(self,state=None):
         """
@@ -448,6 +450,8 @@ class Alarm(object):
                 
             else:
                 self._state = AlarmStates.NORM
+
+            self.updated = time.time()
         
         return AlarmStates.get_key(self._state)
       

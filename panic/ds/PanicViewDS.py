@@ -135,7 +135,7 @@ class PanicViewDS (PyTango.Device_4Impl):
             self.attr_FailedAlarms_read = []
             al = self.attr_Summary_read = self.view.sort(as_text=True)
             self.attr_AlarmList_read = list(
-                        a.to_str(self.view.DEFAULT_COLUMNS) 
+                        a.to_str(VIEW_FIELDS) 
                         for a in reversed(self.view.ordered))
 
             for i,a in enumerate(reversed(self.view.ordered)):

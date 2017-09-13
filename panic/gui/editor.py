@@ -1,5 +1,6 @@
 import sys, re
 import panic
+import panic.alarmapi
 
 # All that is needed (Qt, SNAP_ALLOWED, fandango)
 from panic.gui.utils import *

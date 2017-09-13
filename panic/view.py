@@ -28,8 +28,7 @@ __doc__ = "panic.view will contain the AlarmView class for managing"\
 
 import fandango as fd
 import fandango.tango as ft
-import panic
-from panic import *
+
 from fandango.functional import *
 from fandango.tango import parse_tango_model, check_device_cached, \
         get_device_info
@@ -41,8 +40,12 @@ from fandango.log import Logger
 from fandango.dicts import SortedDict,CaselessDict, \
         CaselessSortedDict, CaselessDefaultDict
 
-
 import fandango.callbacks
+
+import panic
+from panic import *
+from panic.alarmapi import *
+from panic.properties import *
 
 class FilterStack(SortedDict):
     """
@@ -127,39 +130,10 @@ class AlarmView(EventListener):
     
     sources = CaselessDict() #Dictionary for Alarm sources    
     
-    PRIORITY = ('Error','Active','Severity','Time')
-    
-    #ALARM_ROW = ['tag','get_state','get_time','device','description']
-    #DEFAULT_COLUMNS = ['tag','get_state','active','get_time','severity']
-    DEFAULT_COLUMNS = ['tag','device','state','severity','time']
-    
-    ALARM_FORMATTERS = fd.defaultdict(lambda :str)
-    ALARM_FORMATTERS.update({
-        'tag' : lambda s,l=10: ('{0:<%d}'%(l or 4)).format(s),
-        #'time' : lambda s,l=25: ('{:^%d}'%l).format(s),
-        'device' : lambda s,l=25: ('{0:^%d}'%(l or 4)).format(s),
 
-        'description' : lambda s,l=50: ('{0:<}').format(s),
-
-        'severity' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
-        
-        'get_state' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
-        
-        'get_time' : 
-            lambda s,l=20: ('{0:^%d}'%(l or 4)).format(time2str(s,bt=0)),
-
-        'active' : lambda s,l=20: (('{0:^%d}'%(l or 4)).format(
-          'FAILED!' if s is None else (
-            'Not Active' if not s else (
-              s if s in (1,True) else (
-                time2str(s,bt=0)))))),
-              
-        'formula' : lambda s,l=100: ('{0:^%d}'%(l or 4)).format(s),
-        #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
-        })
   
     def __init__(self,name='AlarmView',filters={},scope='*',api=None,
-                 refresh=3.,events=True,asynch=False,verbose=False):
+                 refresh=3.,events=False,asynch=False,verbose=False):
 
         self.t_init = now()
         self.lock = Lock()
@@ -175,7 +149,7 @@ class AlarmView(EventListener):
             
         EventListener.__init__(self,name)
 
-        self.setLogLevel(self.verbose)
+        self.setLogLevel(self.verbose or 'WARNING')
         
         if isString(filters): filters = {'tag':filters}
         self.filters = FilterStack(filters)
@@ -210,16 +184,17 @@ class AlarmView(EventListener):
             self.apis = {scope[0]:api}
         else:
             self.apis = dict()
-            for k in scope:
-                if not k.split('#')[0]: continue
-                k = k.split('@')
+            for p in scope:
+                if not p.split('#')[0]: continue
+                k = p.split('@')
                 t = first(k[1:] or (None,))
+                s = k[0] if ('/' in k[0] or isRegexp(k[0])) else '*%s*'%k[0]
                 try:
-                    self.info('creating AlarmAPI(%s,%s)'%(k[0],t))
-                    self.apis[k[0]] = panic.AlarmAPI(filters=k[0],tango_host=t)
+                    self.info('creating AlarmAPI(%s,%s)'%(s,t))
+                    self.apis[p] = panic.AlarmAPI(filters=s,tango_host=t)
                 except:
                     traceback.print_exc()
-                    self.apis[k[0]] = None
+                    self.apis[p] = None
                 
         #@TODO: MULTIPLE APIS OBJECTS SHOULD BE MANAGED!!
         self.api = self.apis.values()[0]
@@ -386,7 +361,8 @@ class AlarmView(EventListener):
         This is the REVERSE order of that shown in the GUI
         """
         r = []
-        priority = priority or AlarmView.PRIORITY
+        priority = priority or SORT_ORDER
+        #print priority
         for p in priority:
             m,p = None,str(p).lower()
 
@@ -400,7 +376,7 @@ class AlarmView(EventListener):
 
                 v = m() if m else getattr(alarm,p,None)
                     
-                if p == 'severity':
+                if p in ('severity','priority'):
                     v = panic.SEVERITIES.get(str(v).upper(),'UNKNOWN')
                 
             r.append(v)
@@ -437,6 +413,8 @@ class AlarmView(EventListener):
             if not self.ordered or (now()-self.last_sort) > self.get_period():
                 #self.last_keys = keys or self.last_keys
                 sortkey = sortkey or self.sortkey
+                if isSequence(sortkey): 
+                    sortkey = lambda a,p=sortkey:self.sortkey(a,priority=p)
                 if filtered:
                     objs = [self.api[f] for f in self.filtered]
                 else:
@@ -475,8 +453,8 @@ class AlarmView(EventListener):
     def get_alarm_as_text(self,alarm=None,cols=None,
             formatters=None,lengths=[],sep=' - '):
         alarm = self.get_alarm(alarm)
-        cols = cols or self.DEFAULT_COLUMNS
-        formatters = formatters or self.ALARM_FORMATTERS
+        cols = cols or VIEW_FIELDS
+        formatters = formatters or FORMATTERS
         s = '  '
         try:
             for i,r in enumerate(cols):
@@ -576,7 +554,7 @@ class AlarmView(EventListener):
             events = self.__events and ['CHANGE_EVENT']
             self.debug('add_source(%s,events=%s)'%(alarm,events))
             ta = TangoAttribute(alarm,
-                  log_level = 'INFO',
+                  log_level = self.getLogLevel(),
                   #asynchronous attr reading is faster than event subscribing
                   use_events=events,
                   tango_asynch = self.__asynch,
