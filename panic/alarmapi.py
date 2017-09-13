@@ -347,7 +347,7 @@ class Alarm(object):
         if stamp:
             try: stamp = float(stamp)
             except: stamp = str2time(stamp)
-        elif state in ('ACTIVE','ACKED','RTNUN') and self.active:
+        elif state in ACTIVE_STATES and self.active:
             stamp = self.active
         elif state in ('ERROR','OOSRV'):
             stamp = -1
@@ -380,7 +380,7 @@ class Alarm(object):
                 self.set_active(0,stamp)
                 self.acknowledged = 0
 
-            if state in ('ACTIVE'):
+            if state in ('ACTIVE','UNACK'):
                 self.set_active(stamp,t=stamp)
                 self.recovered = 0
                 self.acknowledged = 0
@@ -509,12 +509,16 @@ class Alarm(object):
     # Methods for PANIC 6 <> 7 compatibility
     
     def get_priority(self): return self.severity
-    def set_priority(self,prio): self.severity = prio
+    def set_priority(self,val): self.severity = val
     priority = property(fget=get_priority,fset=set_priority)
     
     def get_message(self): return self.description
-    def set_message(self,prio): self.description = prio
-    message = property(fget=get_message,fset=set_message)        
+    def set_message(self,val): self.description = val
+    message = property(fget=get_message,fset=set_message)  
+    
+    def get_annunciators(self): return self.receivers
+    def set_annunciators(self,val): self.receivers = val
+    annunciators = property(fget=get_annunciators,fset=set_annunciators)     
 
     def parse_config(self):
         """ Checks the Alarm config related to this alarm """
