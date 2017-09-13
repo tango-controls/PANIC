@@ -200,7 +200,19 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     
     def emitValueChanged(self):
         #trace ('emitValueChanged()')
-        self.emit(Qt.SIGNAL("valueChanged"))
+        self.emit(Qt.SIGNAL("valueChanged"))    
+    
+    def init_timers(self):
+        #TIMERS (to reload database and refresh alarm list).
+        self.reloadTimer = Qt.QTimer()
+        self.refreshTimer = Qt.QTimer()
+        Qt.QObject.connect(self.refreshTimer, 
+                           Qt.SIGNAL("timeout()"), self.onRefresh)
+        Qt.QObject.connect(self.reloadTimer, 
+                           Qt.SIGNAL("timeout()"), self.onReload)
+        #first fast loading
+        self.reloadTimer.start(min((5000,self.REFRESH_TIME/2.))) 
+        self.refreshTimer.start(self.REFRESH_TIME)    
         
     def hurry(self):
         """
@@ -777,18 +789,6 @@ class AlarmGUI(QFilterGUI):
         self._message = Qt.QMessageBox(self)
         self._message.setWindowTitle("Empty fields")
         self._message.setIcon(Qt.QMessageBox.Critical)
-        
-    def init_timers(self):
-        #TIMERS (to reload database and refresh alarm list).
-        self.reloadTimer = Qt.QTimer()
-        self.refreshTimer = Qt.QTimer()
-        Qt.QObject.connect(self.refreshTimer, 
-                           Qt.SIGNAL("timeout()"), self.onRefresh)
-        Qt.QObject.connect(self.reloadTimer, 
-                           Qt.SIGNAL("timeout()"), self.onReload)
-        #first fast loading
-        self.reloadTimer.start(min((5000,self.REFRESH_TIME/2.))) 
-        self.refreshTimer.start(self.REFRESH_TIME)
         
     def connectAll(self):
         trace('connecting')
