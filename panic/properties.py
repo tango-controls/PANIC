@@ -48,19 +48,19 @@ SEVERITIES = {'DEBUG':0,
               }
 DEFAULT_SEVERITY = 'WARNING'
 
-SUMMARY_FIELDS = 'tag','state','severity','time','formula','description'
+SUMMARY_FIELDS = 'tag','state','priority','time','formula','message'
 
-SORT_ORDER = ('Error','Active','Severity','Time')
+SORT_ORDER = ('Error','Active','Priority','Time')
 
 # Must be lists, not tuples
-DATA_FIELDS = ('tag','device','severity','formula',
-                'description','receivers')
+DATA_FIELDS = ('tag','device','priority','formula',
+                'message','annunciators')
 STATE_FIELDS = ('state','time','counter','active','disabled',
                 'acknowledged','updated','last_sent','last_error')
 
 #ALARM_ROW = ['tag','get_state','get_time','device','description']
 #DEFAULT_COLUMNS = ['tag','get_state','active','get_time','severity']
-VIEW_FIELDS = ['tag','device','state','severity','time']
+VIEW_FIELDS = ['tag','device','state','priority','time']
 
 CSV_FIELDS = 'tag,device,description,severity,receivers,formula'.split(',')
 
@@ -71,8 +71,10 @@ FORMATTERS.update({
     'device' : lambda s,l=25: ('{0:^%d}'%(l or 4)).format(s),
 
     'description' : lambda s,l=50: ('{0:<}').format(s),
+    'message' : lambda s,l=50: ('{0:<}').format(s),
 
     'severity' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
+    'priority' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
     
     'get_state' : lambda s,l=10: ('{0:^%d}'%(l or 4)).format(s),
     
@@ -104,10 +106,13 @@ AlarmStates = fd.Struct({
   'ACKED':2, #Acknowledged by operator
   'RTNUN':3, #Active but returned to normal
   'ERROR':4, #PyAlarm not working properly, exception on formula 
+  'UNACK':5, #ACTIVE ALIAS
   'SHLVD':-1, #Silenced, hidden, ignored, (DEBUG), temporary state
   'DSUPR':-2, #Disabled by a process condition (Enabled), failed not throwed
   'OOSRV':-3, #Unconditionally disabled, Enable = False, Device is OFF
   })
+
+ACTIVE_STATES = 'ACTIVE','UNACK','ACKED','RTNUN'
 
 
 __doc__+="""
