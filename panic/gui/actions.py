@@ -12,16 +12,30 @@ from panic.gui.editor import AlarmForm
 
 #from htmlview import *
 
-class QAlarmManager(object): #QAlarm):
+class QAlarmManager(iValidatedWidget,object): #QAlarm):
+    
+    def setCurrentAlarm(self,alarm):
+        self._selected = [alarm]
+        
+    def getCurrentAlarm(self):
+        return self._selected[0]
+    
+    def getSelectedAlarms(self,extend=False):
+        return self._selected
+    
+    def connectContextMenu(self,widget):
+        self._manager = widget
+        Qt.QObject.connect(widget, 
+            Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), 
+            self.onContextMenu)        
   
     @Catched
     def onContextMenu(self, point):
         self.popMenu = QtGui.QMenu(self)
         view = getattr(self,'view')
-        items = self.getSelectedRows(extend=False)
-        print('In onContextMenu(%s)'%items)
-        row = self._ui.listWidget.currentItem()
-        alarm = self.getCurrentAlarm(row)
+        items = self.getSelectedAlarms(extend=False)
+        print('In onContextMenu(%s)'%str([a.tag for a in items]))
+        alarm = self.getCurrentAlarm()
         #self.popMenu.addAction(getThemeIcon("face-glasses"), "Preview Attr. Values",self.onSelectAll)
 
         act = self.popMenu.addAction(getThemeIcon("face-glasses"),
@@ -31,8 +45,8 @@ class QAlarmManager(object): #QAlarm):
                                      "Preview Formula/Values",
             lambda s=self:WindowManager.addWindow(s.showAlarmPreview()))
         act.setEnabled(len(items)==1)
-        self.popMenu.addAction(getThemeIcon("view-refresh"), 
-                               "Sort/Update List",self.onSevFilter)
+        #self.popMenu.addAction(getThemeIcon("view-refresh"), 
+                               #"Sort/Update List",self.onSevFilter)
 
         act = self.popMenu.addAction(getThemeIcon("office-calendar"), 
                                      "View History",self.viewHistory)
@@ -44,14 +58,14 @@ class QAlarmManager(object): #QAlarm):
             action = sevMenu.addAction(S)
             self.connect(action, QtCore.SIGNAL("triggered()"), 
                 lambda ks=items,s=S: 
-                  self.setSeverity([k.get_alarm_tag() for k in ks],s))
+                  self.setSeverity([k.tag for k in ks],s))
         
         # Reset / Acknowledge options
         act = self.popMenu.addAction(getThemeIcon("edit-undo"), 
                         "Reset Alarm(s)",lambda s=self:ResetAlarm(s))
 
-        items = [view.get_alarm_from_text(i.text(),obj=True) for i in items]
-        print('oncontextMenu(%s)'%items)
+        #items = [view.get_alarm_from_text(i.text(),obj=True) for i in items]
+        #print('oncontextMenu(%s)'%items)
             
         act.setEnabled(any(i.active for i in items))
 
@@ -66,7 +80,8 @@ class QAlarmManager(object): #QAlarm):
                 lambda s=self:ChangeDisabled(s))
             
         # Edit options
-        if self.expert:
+        if getattr(self,'expert',None):
+            
             self.popMenu.addSeparator()
             act = self.popMenu.addAction(
                 getThemeIcon("accessories-text-editor"), 
@@ -89,7 +104,11 @@ class QAlarmManager(object): #QAlarm):
             
         #self.popMenu.addSeparator()
         #self.popMenu.addAction(getThemeIcon("process-stop"), "close App",self.close)
-        self.popMenu.exec_(self._ui.listWidget.mapToGlobal(point))
+
+        if getattr(self,'_manager',None):
+            self.popMenu.exec_(self._manager.mapToGlobal(point))
+        else:
+            self.popMenu.exec_(point)
 
     def onEdit(self,edit=True):
         alarm = self.getCurrentAlarm()
@@ -119,8 +138,10 @@ class QAlarmManager(object): #QAlarm):
             if not self.api.devices:
                 v = Qt.QMessageBox.warning(self,'Warning','You should create a PyAlarm device first (using jive or config panel)!',Qt.QMessageBox.Ok)
                 return
-            if self._ui.listWidget.currentItem():
-                self._ui.listWidget.currentItem().setSelected(False)
+            try:
+                for item in self._manager.selectedItems():
+                    item.setSelected(False)
+            except: pass
             form = AlarmForm(self.parent())
             trace('form')
             #form.connect(form,Qt.SIGNAL('valueChanged'),self.hurry)
@@ -174,11 +195,14 @@ class QAlarmManager(object): #QAlarm):
                 [f.close() for f in WindowManager.WINDOWS 
                     if isinstance(f,AlarmForm) and f.getCurrentAlarm().tag==tag] 
             except: pass
+        
+    def onReload(self):
+        raise Exception('onReload():NotImplemented!')
 
     ###############################################################################
 
     def viewHistory(self):
-        alarm = self.getCurrentTag()
+        alarm = self.getCurrentAlarm().tag
 
         if SNAP_ALLOWED and not self.snapi: 
           self.snapi = get_snap_api()

@@ -27,6 +27,7 @@ except:
   from taurus.core import AttributeNameValidator
 
 #from row import AlarmRow, QAlarm, QAlarmManager
+from panic.properties import *
 from panic.gui.actions import QAlarmManager
 from panic.gui.views import ViewChooser
 from panic.gui.utils import * #< getThemeIcon, getIconForAlarm imported here
@@ -61,12 +62,12 @@ search to a default value.
 OPEN_WINDOWS = []
 
 import utils as widgets
-widgets.TRACE_LEVEL = 1 #-1
+widgets.TRACE_LEVEL = -1
 
     ###########################################################################
     
 PARENT_CLASS = Qt.QWidget
-class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
+class QAlarmList(QAlarmManager,PARENT_CLASS):
     """    
     Class for managing the self updating alarm list in AlarmGUI.
     
@@ -92,7 +93,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     
     __pyqtSignals__ = ("valueChanged",)
     
-    def __init__(self, parent=None, filters='', options=None, mainwindow=None):
+    def __init__(self, parent=None, filters='', options=None, mainwindow=None,
+                 api=None):
               
         options = options or {}
         if not fn.isDictionary(options):
@@ -124,7 +126,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             #print 'Setting RegExp filter: %s'%self.regEx
             #self._ui.regExLine.setText(str(self.regEx))
                
-        self.api = panic.AlarmAPI(self.scope)
+        self.api = api or panic.AlarmAPI(self.scope)
         trace('AlarmGUI(%s): api done'%self.scope)
 
         # @TODO: api-based views are not multi-host
@@ -292,7 +294,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
     
     def onItemSelected(self):
         try:
-            items = self.getSelectedRows(extend=False)
+            items = self.getSelectedItems(extend=False)
             if len(items)==1:
                 a = self.view.get_alarm_from_text(items[0])
                 tags = a.tag.split('_')
@@ -318,7 +320,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
         else:
             self._ui.listWidget.clearSelection()
         
-    def getSelectedRows(self,extend=False):
+    def getSelectedItems(self,extend=False):
         """
         extend=True will add children alarms, be careful
         """
@@ -330,8 +332,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                     for a in subs if a in self.AlarmRows and not any(t.tag==a for t in targets))
         return targets
     
-    def getSelectedAlarms(self):
-        rows = self.getSelectedRows()
+    def getSelectedAlarms(self,extend=False):
+        rows = self.getSelectedItems(extend)
         return [self.getCurrentAlarm(r) for r in rows]
       
     def getVisibleRows(self,margin=10):
@@ -366,7 +368,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             color = Qt.QColor("red")
             background = Qt.QColor("white")
             
-        elif state in ('ACKED','ACTIVE','RTNUN'):
+        elif state in ACTIVE_STATES:
             
             if severity in ('ERROR',):
                 color = Qt.QColor("white")
@@ -398,8 +400,8 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
             bold = True
 
         alarmicon=getThemeIcon(icon) if icon else None
-        tracer('setFontsAndColors(%s,%s,%s,%s,%s)'
-          %(alarm.tag,state,icon,background,bold))
+        #tracer('setFontsAndColors(%s,%s,%s,%s,%s)'
+          #%(alarm.tag,state,icon,background,bold))
         item.setIcon(alarmicon or Qt.QIcon())
         item.setTextColor(color)
         item.setBackgroundColor(background)
@@ -435,7 +437,7 @@ class QAlarmList(QAlarmManager,iValidatedWidget,PARENT_CLASS):
                 tracer("\tupdating %d %s forms"%(len(forms),alarm))
                 [f.valueChanged() for f in forms]
             else:
-                tracer("no forms open?")
+                pass #tracer("no forms open?")
         except:
             tracer(traceback.format_exc())
                 
@@ -803,9 +805,8 @@ class AlarmGUI(QFilterGUI):
         Qt.QObject.connect(self._ui.listWidget, 
             Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
         #Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("currentRowChanged(int)"), self.setAlarmData)
-        Qt.QObject.connect(self._ui.listWidget, 
-            Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), 
-            self.onContextMenu)
+        
+        self.connectContextMenu(self._ui.listWidget)
         
         #Qt.QObject.connect(self._ui.actionExpert,
                             #Qt.SIGNAL("changed()"),self.setExpertView)
@@ -817,6 +818,9 @@ class AlarmGUI(QFilterGUI):
                            Qt.SIGNAL("clicked()"), self.onReload) # "Refresh"        
         Qt.QObject.connect(self._ui.buttonClose,
                            Qt.SIGNAL("clicked()"), self.close)
+        
+        Qt.QObject.connect(fandango.qt.getApplication(),
+                           Qt.SIGNAL("aboutToQuit()"),self.exitThreads)
 
         trace('all connected')
         
@@ -944,7 +948,8 @@ class AlarmGUI(QFilterGUI):
         
         if '--panel' in opts:
             args = args or ['*']
-            form = panic.widgets.PanicPanel()
+            import panic.gui.panel
+            form = panic.gui.panel.PanicPanel()
             form.setModel(args)
             form.show()
             uniqueapp.exec_()
@@ -971,6 +976,16 @@ class AlarmGUI(QFilterGUI):
 
         print('AlarmGUI exits ...')    
 
+        sys.exit(n) 
+        
+    
+    def close(self):
+        print('AlarmGUI.close()')
+        Qt.QApplication.quit()        
+    
+    @staticmethod
+    def exitThreads():
+        print('In AlarmGUI.exitThreads()')
         # Unsubscribing all event sources
         # @TODO SEEMS NOT NEEDED (not at least for PanicPanel)
         import fandango.threads
@@ -978,12 +993,6 @@ class AlarmGUI(QFilterGUI):
         [s.unsubscribeEvents() for s 
             in fandango.callbacks.EventSource.get_thread().sources]
         fandango.threads.ThreadedObject.kill_all()
-        sys.exit(n) 
-        
-    
-    def close(self):
-        print('AlarmGUI.close()')
-        Qt.QApplication.quit()        
         
     ##########################################################################
     
