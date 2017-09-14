@@ -949,7 +949,7 @@ class AlarmGUI(QFilterGUI):
         if '--panel' in opts:
             args = args or ['*']
             import panic.gui.panel
-            form = panic.gui.panel.PanicPanel()
+            form = panic.gui.panel.QAlarmPanel()
             form.setModel(args)
             form.show()
             uniqueapp.exec_()
@@ -987,7 +987,7 @@ class AlarmGUI(QFilterGUI):
     def exitThreads():
         print('In AlarmGUI.exitThreads()')
         # Unsubscribing all event sources
-        # @TODO SEEMS NOT NEEDED (not at least for PanicPanel)
+        # @TODO SEEMS NOT NEEDED (not at least for QAlarmPanel)
         import fandango.threads
         import fandango.callbacks
         [s.unsubscribeEvents() for s 
