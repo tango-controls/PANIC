@@ -38,7 +38,7 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
     
     REFRESH_TIME = 3000
     
-    def setModel(self,model=None,rows=0,cols=0,side=0,**kwargs):
+    def setModel(self,model=None,rows=0,cols=0,side=0,fontsize=0,**kwargs):
         print('QAlarmPanel.setModel(%s)'%model)
         import panic,math
         
@@ -55,6 +55,8 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
         self.actives = []
         self.panels = []
         self.setCurrentAlarm(None)
+        
+        self.fontsize = fontsize
         
         if rows and not cols:
             self.rows = int(rows)
@@ -162,7 +164,7 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
             font = 'black'
             
         minfont = 7 #6
-        size = max(minfont,int(140/self.cols))
+        size = self.fontsize or max(minfont,int(140/self.cols))
         ssheet = ("QLabel { background-color : %s; color : %s; "
             "font : bold %dpx ; qproperty-alignment : AlignCenter; }"
             %(color,font,size))

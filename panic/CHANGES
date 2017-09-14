@@ -1,3 +1,25 @@
+PANIC 6.2.1
+-----------
+
+IEC & Elettra compatibility, QAlarmPanel widget, new GUI usable
+
+AlarmSummary/GetAlarmInfo added to PyAlarm for GUI connection; format agreed with Elettra for cross-compatibility
+Requires Fandango > 13.2
+Alarm States and Fields renamed to match IEC terminology
+New GUI using AlarmView to query attribute values as arrays,
+AlarmView backwards compatibility with Panic <6
+Performance improvement using latest Fandango (cached DB/DeviceProxy searches)
+Split and refactor gui module in gui/actions/views
+New Alarm object state machine based on json-like arrays (AlarmSummary)
+Increase ERROR alarms visibility
+Allow '~' for negated regexp searches
+New QAlarmPanel widget
+New methods for .json exporting / web browsing
+Many GUI bugs solved
+Add ArchivingBrowser launcher to toolbar
+Solve validation issues on AlarmForm editor
+API refactoring, solved internal imports problem
+
 PANIC 6.0
 ---------
 
