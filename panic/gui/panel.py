@@ -47,7 +47,7 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
             self.api = self.view.api
         else: #if fd.isString(model):
             self.api = panic.AlarmAPI(model,extended=True)
-            self.view = AlarmView(api=self.api)
+            self.view = AlarmView(api=self.api,verbose=False)
             
         self.alarms = self.view.alarms
         self.tags = self.view.sort(sortkey=('priority','tag'))
@@ -56,10 +56,18 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
         self.panels = []
         self.setCurrentAlarm(None)
         
-        self.cols = cols or int(math.ceil(math.sqrt(1+len(self.alarms))))
-        self.rows = rows or ((self.cols-1) 
+        if rows and not cols:
+            self.rows = int(rows)
+            self.cols = int(math.ceil((1+len(self.alarms))/self.rows))
+        elif cols and not rows:
+            self.rows = int(math.ceil((1+len(self.alarms))/cols))
+            self.cols = int(cols)
+        else:
+            self.cols = int(cols or math.ceil(math.sqrt(1+len(self.alarms))))
+            self.rows = int(rows or ((self.cols-1) 
                      if self.cols*(self.cols-1)>=1+len(self.alarms)
-                     else self.cols)
+                     else self.cols))
+        
         self.setLayout(Qt.QGridLayout())
         self.labels = []
         for i in range(self.rows):
@@ -86,13 +94,13 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
                            Qt.SIGNAL("timeout()"), self.updateAlarms)
 
         self.refreshTimer.start(self.REFRESH_TIME)
-        side = side or 200
+        side = side or (min((self.rows,self.cols))==1 and 50) or 50#70#120
         if all((cols,rows,side)):
             width,height = side*cols,side*rows
             self.logo.setPixmap(px.scaled(side,side))
         else:
             width,height = min((800,side*self.cols)),min((800,side*self.rows))
-            self.logo.setPixmap(px.scaled(70,70))
+            self.logo.setPixmap(px.scaled(side,side)) #70,70))
             #px.scaled(height/self.rows,height/self.rows))
         #if (width/self.rows)>=50: 
         self.resize(width,height)
@@ -153,7 +161,8 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
             color = 'grey'
             font = 'black'
             
-        size = max(6,int(80/self.cols))
+        minfont = 7 #6
+        size = max(minfont,int(140/self.cols))
         ssheet = ("QLabel { background-color : %s; color : %s; "
             "font : bold %dpx ; qproperty-alignment : AlignCenter; }"
             %(color,font,size))
@@ -221,24 +230,27 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
                 i+=1
             else:
                 r.append(seq)
+        if len(r)==1 and len(r[0])>minsplit: r = r[0].rsplit(sep,1)
         #print('minsplit(%s): %s'%(o,r))
         return r        
 
     @staticmethod
     def main(*args):
-        import fandango.qt,sys
-        print('in QAlarmPanel.main(%s)'%str(args))
-        filters = args[0] if args else '*'
+        import fandango,fandango.qt,sys
+        opts = fandango.linos.sysargs_to_dict(split=True) #(args,opts)
+        print('in QAlarmPanel.main(%s,%s)'%(args,opts))
+        filters = fandango.first(args or opts[0] or ['*'])
         app = fandango.qt.getApplication()
         w = QAlarmPanel()
         if '-v' in args: 
             import fandango.callbacks
             fandango.callbacks.EventSource.thread().setLogLevel('DEBUG')
             w.view.setLogLevel('DEBUG')
-        w.setModel(filters)
+        w.setModel(filters,**opts[1])
         w.show()
-        if app.thread() is None:
-            print('Starting Up ...')
+        t = (app.activeWindow())
+        if not t: 
+            print('No Active Window, launch QApplication.exec()')
             sys.exit(app.exec_())
         
 if __name__ == '__main__':       
