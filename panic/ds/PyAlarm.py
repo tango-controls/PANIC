@@ -31,7 +31,7 @@
 #         (c) - Software Engineering Group - ESRF
 #=============================================================================
 
-import sys,os,time,threading,traceback,re,collections
+import sys,os,time,threading,traceback,re,collections,json
 
 import PyTango
 import fandango
@@ -2028,7 +2028,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #------------------------------------------------------------------
     def GetAlarmInfo(self,argin):
         tag = argin[0]
-        request = (argin[1:] or ('SETTINGS','STATE'))
+        request = (argin[1:] or ('SETTINGS','STATE','VALUES'))
         
         assert tag in self.Panic,'UnknownAlarm:%s!'%tag
         alarm = self.Alarms[tag]
@@ -2036,36 +2036,43 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if len(request)==1 and str(request[0]).upper() in MESSAGE_TYPES:
                 return self.GenerateReport(tag,request)
             
-        if all(r in DATA_FIELDS+STATE_FIELDS for r in request):
-            return [str(alarm.get_any(r)) for r in request]
-        
-        else:
-            assert all(r in INFO_REQUESTS for r in request),\
-                        'UnknownRequest:%s!'%request
-        
-        result = []   
-        
-        if 'SETTINGS' in request:
-            for l in DATA_FIELDS:
-                result.append('%s=%s'%(l,alarm.get_any(l)))
-
-        if 'STATE' in request:
-            for l in STATE_FIELDS:
-                v = alarm.get_any(l)
-                v = time2str(float(v)) if isNumber(v) and float(v)>1e9 else v
-                result.append('%s=%s'%(l,v))                
-
-        def vals_to_str(vs):
-            for k,v in vs.items():
-                try: s = str(v)
-                except Exception,e: s = str(e)
-                if not isNumber(s): s = "'%s'"%s
-                result.append('%s:%s'%(k,s))
-                        
+        result = []
         for r in request:
+            
+            if r in DATA_FIELDS+STATE_FIELDS:
+                v = alarm.get_any(r)
+                result.append('%s=%s'%(r,v))
+                
+            elif not r.upper() in INFO_REQUESTS:
+                raise Exception('UnknownRequest:%s!'%request)
+            
+            else:
+                r = r.upper()
+                
+            if r == 'SETTINGS':
+                for l in DATA_FIELDS:
+                    v = alarm.get_any(l)
+                    if l=='message': v=json.dumps(v)
+                    result.append('%s=%s'%(l,v))
+
+            if r == 'STATE':
+                for l in STATE_FIELDS:
+                    v = alarm.get_any(l)
+                    if isNumber(v) and float(v)>1e9:
+                        v = time2str(float(v))
+                    result.append('%s=%s'%(l,v))                
+
+            def vals_to_str(vs):
+                return ['values=%s'%json.dumps(vs)]
+                #for k,v in vs.items():
+                    #try: s = str(v)
+                    #except Exception,e: s = str(e)
+                    #if not isNumber(s): s = "'%s'"%s
+                    #result.append('%s:%s'%(k,s))
+                            
             if r in ('VALUES','SNAP'):
                 cache = {'VALUES':self.LastValues,'SNAP':self.PastValues}[r]
-                vals_to_str(cache.get(tag,{}))
+                result.extend(vals_to_str(cache.get(tag,{})))
 
         return result
 
