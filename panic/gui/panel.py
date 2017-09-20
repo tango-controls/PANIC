@@ -1,10 +1,7 @@
 """
-This file belongs to the PANIC Alarm Suite, developed by ALBA Synchrotron for Tango Control System
+This file belongs to the PANIC Alarm Suite, 
+developed by ALBA Synchrotron for Tango Control System
 GPL Licensed 
-
-Enjoy,
-
-Sergi Rubio, 2010
 """
 
 import sys, os, traceback, time
@@ -27,12 +24,13 @@ class QAlarmPanelLabel(Qt.QLabel):
         '''reimplemented to provide drag events'''
         #QtKlass.mousePressEvent(self, event)
         Qt.QLabel.mousePressEvent(self,event)
-        print('mouse over %s'%(self._alarm.tag))
-        self.parent().setCurrentAlarm(self._alarm)
-        self.parent()._manager = self
-        if event.button() == Qt.Qt.RightButton: 
-            #self.dragStartPosition = event.pos()        
-            self.parent().onContextMenu(event.pos())
+        if self._alarm:
+            print('mouse over %s'%(self._alarm.tag))
+            self.parent().setCurrentAlarm(self._alarm)
+            self.parent()._manager = self            
+            if event.button() == Qt.Qt.RightButton: 
+                #self.dragStartPosition = event.pos()        
+                self.parent().onContextMenu(event.pos())
     
 class QAlarmPanel(QAlarmManager,Qt.QWidget):
     
@@ -80,7 +78,8 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
         self.logo = self.labels[-1][-1]
         self.logo.setClickHook(self.showGUI)
                 
-        self._title = 'PANIC Alarm Panel (%s)'%str(model or fd.get_tango_host())
+        self._title = 'PANIC Alarm Panel (%s)'%str(
+                                                model or fd.get_tango_host())
         self.setWindowTitle(self._title)
         url = os.path.dirname(panic.__file__)+'/gui/icon/panic-6-big.png'
         px = Qt.QPixmap(url)

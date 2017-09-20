@@ -1,3 +1,9 @@
+"""
+This file belongs to the PANIC Alarm Suite, 
+developed by ALBA Synchrotron for Tango Control System
+GPL Licensed 
+"""
+
 from utils import Qt, QtCore, QtGui
 import taurus
 from taurus.qt.qtgui.panel import TaurusForm

@@ -1,3 +1,9 @@
+"""
+This file belongs to the PANIC Alarm Suite, 
+developed by ALBA Synchrotron for Tango Control System
+GPL Licensed 
+"""
+
 import time,traceback,os,sys
 import taurus,fandango,fandango.qt
 from fandango.qt import Qt, QtCore, QtGui

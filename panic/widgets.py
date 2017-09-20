@@ -1,10 +1,7 @@
 """
-This file belongs to the PANIC Alarm Suite, developed by ALBA Synchrotron for Tango Control System
+This file belongs to the PANIC Alarm Suite, 
+developed by ALBA Synchrotron for Tango Control System
 GPL Licensed 
-
-Enjoy,
-
-Sergi Rubio, 2010
 """
 
 import sys, os, taurus, fandango, PyTango, getpass, traceback, time
