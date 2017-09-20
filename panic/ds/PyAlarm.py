@@ -246,8 +246,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         if _locals is None: _locals = {}
         try:
-            _locals.update(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
-            _locals.update({'DEVICE':self.get_name(),'ALARMS':self.Alarms.keys(),'PANIC':self.Panic,'SELF':self})
+            _locals.update(dict(zip('DOMAIN FAMILY MEMBER'.split(),
+                                    self.get_name().split('/'))))
+            _locals.update({'DEVICE':self.get_name(),
+                            'ALARMS':self.Alarms.keys(),
+                            'PANIC':self.Panic,
+                            'SELF':self})
             _locals['t'] = time.time() - (self.TStarted + self.StartupDelay)
             if not check: update = True #If check is True locals will be updated only if necessary or forced
             if check:
@@ -2028,7 +2032,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #------------------------------------------------------------------
     def GetAlarmInfo(self,argin):
         tag = argin[0]
-        request = (argin[1:] or ('SETTINGS','STATE','VALUES'))
+        request = (argin[1:] or ('SETTINGS','STATUS','VALUES'))
         
         assert tag in self.Panic,'UnknownAlarm:%s!'%tag
         alarm = self.Alarms[tag]
@@ -2055,7 +2059,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     if l=='message': v=json.dumps(v)
                     result.append('%s=%s'%(l,v))
 
-            if r == 'STATE':
+            if r == 'STATUS':
                 for l in STATE_FIELDS:
                     v = alarm.get_any(l)
                     if isNumber(v) and float(v)>1e9:
