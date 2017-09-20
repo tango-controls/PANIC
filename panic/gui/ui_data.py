@@ -222,7 +222,7 @@ class Ui_Data(object):
         self.receiversLabel.setText("Receivers:")
         self.formulaLabel.setText("Formula:")
         self.editButton.setText("Edit")
-        self.previewButton.setText("Preview")
+        self.previewButton.setText("Show Values")
         self.cancelButton.setText("Cancel")
         self.saveButton.setText("Save")
 
