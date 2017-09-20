@@ -39,26 +39,42 @@ class devattrchangeForm(iValidatedWidget,object):
         self.refreshButton = QtGui.QPushButton(Form)
         self.refreshButton.setObjectName("refreshButton")
         self.GridLayout.addWidget(self.refreshButton, 2, 0, 1, 1)
+        self.testButton = QtGui.QPushButton(Form)
+        self.testButton.setObjectName("testButton")
+        self.GridLayout.addWidget(self.testButton, 3, 0, 1, 1)        
         self.newDevice = QtGui.QPushButton(Form)
         self.newDevice.setObjectName("newDevice")
-        self.GridLayout.addWidget(self.newDevice, 3, 0, 1, 1)
+        self.GridLayout.addWidget(self.newDevice, 4, 0, 1, 1)
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QtGui.QApplication.translate("Form", "PyAlarm Device Configuration", None, QtGui.QApplication.UnicodeUTF8))
-        self.refreshButton.setText(QtGui.QApplication.translate("Form", "Refresh", None, QtGui.QApplication.UnicodeUTF8))
+        Form.setWindowTitle(QtGui.QApplication.translate("Form", 
+            "PyAlarm Device Configuration", None, 
+            QtGui.QApplication.UnicodeUTF8))
+        self.refreshButton.setText(QtGui.QApplication.translate("Form", 
+            "Refresh", None, QtGui.QApplication.UnicodeUTF8))
         self.refreshButton.setIcon(getThemeIcon("view-refresh"))
         self.refreshButton.setToolTip("Refresh list")
-        self.newDevice.setText(QtGui.QApplication.translate("Form", "Create New", None, QtGui.QApplication.UnicodeUTF8))
+        self.testButton.setText(QtGui.QApplication.translate("Form", 
+            "Test", None, QtGui.QApplication.UnicodeUTF8))
+        self.testButton.setIcon(getThemeIcon("view-refresh"))
+        self.testButton.setToolTip("Test")        
+        self.newDevice.setText(QtGui.QApplication.translate("Form", 
+            "Create New", None, QtGui.QApplication.UnicodeUTF8))
         self.newDevice.setIcon(getThemeIcon("new"))
         self.newDevice.setToolTip("Add a new PyAlarm device")        
-        
 
-        QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("itemChanged(QTableWidgetItem *)"), self.onEdit)
-        QtCore.QObject.connect(self.deviceCombo, QtCore.SIGNAL("currentIndexChanged(QString)"), self.buildList)
-        QtCore.QObject.connect(self.refreshButton, QtCore.SIGNAL("clicked()"), self.buildList)
-        QtCore.QObject.connect(self.newDevice, QtCore.SIGNAL("clicked()"), self.onNew)
+        QtCore.QObject.connect(self.tableWidget, 
+            QtCore.SIGNAL("itemChanged(QTableWidgetItem *)"), self.onEdit)
+        QtCore.QObject.connect(self.deviceCombo, 
+            QtCore.SIGNAL("currentIndexChanged(QString)"), self.buildList)
+        QtCore.QObject.connect(self.refreshButton, 
+            QtCore.SIGNAL("clicked()"), self.buildList)
+        QtCore.QObject.connect(self.testButton, 
+            QtCore.SIGNAL("clicked()"), self.testDevice)
+        QtCore.QObject.connect(self.newDevice, 
+            QtCore.SIGNAL("clicked()"), self.onNew)
         Form.resize(430, 600)
 
     def setDevCombo(self,device=None):
@@ -83,14 +99,17 @@ class devattrchangeForm(iValidatedWidget,object):
             self.deviceCombo.setCurrentIndex(index)
         device = str(device)
         if self.api.devices:
-            data=self.api.devices[device].get_config(True) #get_config() already manages extraction and default values replacement
+            data=self.api.devices[device].get_config(True) 
+            #get_config() already manages extraction and 
+            # default values replacement
         else:
             data = {}
         print '%s properties: %s' % (device,data)
         rows=len(data)
         self.tableWidget.setColumnCount(2)
         self.tableWidget.setRowCount(rows)
-        self.tableWidget.setHorizontalHeaderLabels(["Attribute Name", "Attribute Value"])
+        self.tableWidget.setHorizontalHeaderLabels(
+            ["Attribute Name", "Attribute Value"])
         for row,prop in enumerate(sorted(panic.ALARM_CONFIG)):
             for col in (0,1):
                 if not col:
@@ -141,7 +160,8 @@ class devattrchangeForm(iValidatedWidget,object):
             prop=str(self.tableWidget.item(row,0).text())
             value=str(self.tableWidget.item(row,1).text())
             print 'DeviceAttributeChanger.onEdit(%s,%s = %s)'%(dev,prop,value)
-            ptype=fandango.device.cast_tango_type(panic.PyAlarmDefaultProperties[prop][0]).__name__
+            ptype=fandango.device.cast_tango_type(
+                panic.PyAlarmDefaultProperties[prop][0]).__name__
             if(value):
                 dev.put_property(prop, value)
                 dev.init()
@@ -151,6 +171,11 @@ class devattrchangeForm(iValidatedWidget,object):
             Qt.QMessageBox.warning(self.Form,"Warning",'Exception: %s'%e)
         finally:
             self.buildList()
+            
+    def testDevice(self):
+        import panic.gui.actions
+        device = str(self.deviceCombo.currentText())
+        panic.gui.actions.testDevice(device)
 
 if __name__ == "__main__":
     import sys

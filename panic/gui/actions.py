@@ -98,7 +98,7 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
             self.popMenu.addSeparator()
             act = self.popMenu.addAction(
                 getThemeIcon("accessories-text-editor"), "TestDevice",
-                lambda d=alarm.device:os.system('tg_devtest %s &'%d))
+                lambda d=alarm.device:testDevice(d))
             
             act.setEnabled(len(items)==1)
             
@@ -238,6 +238,10 @@ def getTargetAlarms(obj,alarms=None,active=False):
     elif not isSequence(alarms):
         alarms = [alarms]
     return alarms
+
+def testDevice(device):
+    import os
+    os.system('tg_devtest %s &'%device)
 
 def emitValueChanged(self):
     if hasattr(self,'emitValueChanged'):
