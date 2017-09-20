@@ -745,10 +745,13 @@ class FormulaEditor(QtGui.QWidget):
 
 ############################################################################################
 
-if __name__ == "__main__":
+def main():
     app = QtGui.QApplication(sys.argv)
     myapp = AlarmForm()
     if sys.argv[1:]: myapp.setAlarmData(*sys.argv[1:])
     else: myapp.onNew()
     myapp.show()
     sys.exit(app.exec_())
+    
+if __name__ == "__main__": 
+    main()

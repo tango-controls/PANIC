@@ -452,7 +452,7 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
             l.setFont(get_bold_font())
 
             self.tf = fandango.qt.QDropTextEdit() #Qt.QTextBrowser()
-            self.tf.setMinimumHeight(100)
+            self.tf.setMinimumHeight(80)
             if self.obj is not None:
                 self.tf.setClickHook(self.onEdit)
                 #@todo setClickHook stop working for unknown reasons !?!?!
@@ -472,24 +472,25 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
                 self.connect(self.savebt,Qt.SIGNAL('pressed()'),self.onSave)
 
             upperPanel.layout().addWidget(l,0,0,1,1)
-            upperPanel.layout().addWidget(self.tf,1,0,1,7)            
+            u = 2
+            upperPanel.layout().addWidget(self.tf,1,0,u,7)    
             ###################################################################
-            lowerPanel,row = Qt.QFrame(),0 #self,2
-            lowerPanel.setLayout(Qt.QGridLayout())
-            self.insertWidget(1,lowerPanel)
-            l = Qt.QLabel('Result:')
-            l.setFont(get_bold_font())
-            lowerPanel.layout().addWidget(l,row,0,1,1)
+            #lowerPanel,row = Qt.QFrame(),0 #self,2
+            #lowerPanel.setLayout(Qt.QGridLayout())
+            #self.insertWidget(1,lowerPanel)
+            #l = Qt.QLabel('Result:')
+            #l.setFont(get_bold_font())
+            #lowerPanel.layout().addWidget(l,row,0,1,1)
             self.tb = Qt.QTextEdit()
-            
             self.tb.setMinimumHeight(50)
             self.tb.setReadOnly(True)
-            self.redobt = Qt.QPushButton()
+            self.redobt = Qt.QPushButton("Evaluate")
             self.redobt.setIcon(getThemeIcon('view-refresh'))
             self.redobt.setToolTip('Update result')
             self.connect(self.redobt,Qt.SIGNAL('pressed()'),self.updateResult)
-            lowerPanel.layout().addWidget(self.redobt,row,6,1,1)
-            lowerPanel.layout().addWidget(self.tb,row+1,0,1,7)
+            #lowerPanel.layout().addWidget(self.redobt,row,6,1,1)
+            #lowerPanel.layout().addWidget(self.tb,row+1,0,1,7)
+            upperPanel.layout().addWidget(self.redobt,u+1,5,1,2)
             ###################################################################
             #Refresh from formula:
             if self.formula: self.updateFormula(self.formula)
@@ -593,6 +594,9 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
             result = traceback.format_exc()
             print result
         self.tb.setPlainText('%s'%result)
+        self.tb.setParent(self,Qt.Qt.Dialog)
+        self.tb.setWindowModality(Qt.Qt.WindowModal)
+        self.tb.show()
         vals = self.api.parse_attributes(self.test.formula)
         models=[]
         
@@ -698,6 +702,7 @@ class AlarmPreview(Qt.QDialog):
             self.upperPanel = AlarmFormula(self.tag or formula)
             self.lowerPanel = AttributesPreview(
                                         source=self.upperPanel.updateFormula)
+            self.lowerPanel.setMinimumHeight(250)
             self.frame.insertWidget(0,self.upperPanel)
             self.frame.insertWidget(1,self.lowerPanel)
             self.setWindowTitle("%s Alarm Formula Preview"%(tag or ''))
