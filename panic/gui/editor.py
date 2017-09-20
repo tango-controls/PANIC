@@ -104,7 +104,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.enableEditForm(False)
         
     def onDeviceConfig(self):
-        from utils import dacWidget
+        from panic.gui.devattrchange import dacWidget
         self.dac = dacWidget(device=self.getCurrentAlarm().device)
         self.dac.show()
         

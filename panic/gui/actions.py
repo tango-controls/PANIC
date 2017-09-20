@@ -15,6 +15,8 @@ import panic
 from panic.gui.utils import *
 from panic.gui.utils import WindowManager #Order of imports matters!
 from panic.gui.editor import AlarmForm
+from panic.gui.alarmhistory import ahWidget
+from panic.gui.devattrchange import dacWidget
 
 #from htmlview import *
 
@@ -42,7 +44,8 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         items = self.getSelectedAlarms(extend=False)
         print('In onContextMenu(%s)'%str([a.tag for a in items]))
         alarm = self.getCurrentAlarm()
-        #self.popMenu.addAction(getThemeIcon("face-glasses"), "Preview Attr. Values",self.onSelectAll)
+        #self.popMenu.addAction(getThemeIcon("face-glasses"), 
+        # "Preview Attr. Values",self.onSelectAll)
 
         act = self.popMenu.addAction(getThemeIcon("face-glasses"),
                                      "See Alarm Details",self.onView) 
@@ -142,7 +145,9 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         try:
             trace('onNew()')
             if not self.api.devices:
-                v = Qt.QMessageBox.warning(self,'Warning','You should create a PyAlarm device first (using jive or config panel)!',Qt.QMessageBox.Ok)
+                v = Qt.QMessageBox.warning(self,'Warning',
+                        'You should create a PyAlarm device first '\
+                            '(using jive or config panel)!',Qt.QMessageBox.Ok)
                 return
             try:
                 for item in self._manager.selectedItems():
@@ -164,14 +169,20 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
     def onClone(self):
         alarm = self.getCurrentAlarm().tag
         trace("onClone(%s)"%alarm)
-        new_tag,ok = Qt.QInputDialog.getText(self,'Input dialog','Please provide tag name for cloned alarm.',Qt.QLineEdit.Normal,alarm)
+        new_tag,ok = Qt.QInputDialog.getText(self,'Input dialog',
+                'Please provide tag name for cloned alarm.',
+                Qt.QLineEdit.Normal,alarm)
         if (ok and len(str(new_tag)) > 3):
             try:
                 obj = self.api[alarm]
-                self.api.add(str(new_tag), obj.device, formula=obj.formula, description=obj.description, receivers=obj.receivers, severity=obj.severity)
+                self.api.add(str(new_tag), obj.device, formula=obj.formula, 
+                             description=obj.description, 
+                             receivers=obj.receivers, severity=obj.severity)
                 self.onReload()
             except Exception,e:
-                Qt.QMessageBox.critical(self,"Error!",str(e), QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
+                Qt.QMessageBox.critical(self,"Error!",str(e), 
+                                                QtGui.QMessageBox.AcceptRole, 
+                                                QtGui.QMessageBox.AcceptRole)
                 trace(traceback.format_exc())
 
     def onDelete(self,tag=None,ask=True):
@@ -199,13 +210,14 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
             self.onReload()
             try:
                 [f.close() for f in WindowManager.WINDOWS 
-                    if isinstance(f,AlarmForm) and f.getCurrentAlarm().tag==tag] 
+                    if isinstance(f,AlarmForm) 
+                            and f.getCurrentAlarm().tag==tag] 
             except: pass
         
     def onReload(self):
         raise Exception('onReload():NotImplemented!')
 
-    ###############################################################################
+    ###########################################################################
 
     def viewHistory(self):
         alarm = self.getCurrentAlarm().tag
@@ -219,7 +231,8 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         if alarm in self.ctx_names: 
           self.ahApp = ahWidget()
           self.ahApp.show()
-          #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.currentItem().text().split('|')[0]).strip(' '))
+          #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.\
+          #currentItem().text().split('|')[0]).strip(' '))
           self.ahApp.setAlarmCombo(alarm=alarm)
         else:
           v = QtGui.QMessageBox.warning(None,'Not Archived', \

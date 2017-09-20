@@ -279,6 +279,7 @@ class ToolbarActionButton(TaurusBaseComponent, Qt.QPushButton):
 
     def onHistory(self):
         print('onHistory')
+        from panic.gui.alarmhistory import ahWidget
         self.name=str(self.getModel().split('/')[-1]).strip(' ')
         self.ahApp = ahWidget()
         self.ahApp.setAlarmCombo(alarm=self.name)

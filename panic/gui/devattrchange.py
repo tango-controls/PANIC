@@ -1,5 +1,11 @@
+"""
+This file belongs to the PANIC Alarm Suite, 
+developed by ALBA Synchrotron for Tango Control System
+GPL Licensed 
+"""
+
 import panic, fandango
-from utils import Qt,QtCore,QtGui
+from fandango.qt import Qt, QtCore, QtGui
 from utils import iValidatedWidget,getThemeIcon
 
 

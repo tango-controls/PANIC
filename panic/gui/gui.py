@@ -40,7 +40,8 @@ from panic.gui.utils import * #< getThemeIcon, getIconForAlarm imported here
 from panic.gui.utils import WindowManager #Order of imports matters!
 from panic.gui.editor import FormulaEditor,AlarmForm
 from panic.gui.core import Ui_AlarmList
-from panic.gui.alarmhistory import *
+from panic.gui.alarmhistory import ahWidget
+from panic.gui.devattrchange import dacWidget
 
 PANIC_URL = 'http://www.pythonhosted.org/panic'    
 
@@ -883,7 +884,7 @@ class AlarmGUI(QFilterGUI):
         toolbar.addAction(*trend_action)
         
         alarmApp.tools['config'] = WindowManager.addWindow(
-            widgets.dacWidget(container=tmw))
+            dacWidget(container=tmw))
         tmw.toolsMenu.addAction(getThemeIcon("applications-system"),
             "Advanced Configuration", alarmApp.tools['config'].show)
         toolbar.addAction(getThemeIcon("applications-system") ,
@@ -895,7 +896,7 @@ class AlarmGUI(QFilterGUI):
         
         if SNAP_ALLOWED:
             alarmApp.tools['history'] = WindowManager.addWindow(
-                widgets.ahWidget(container=tmw))
+                ahWidget(container=tmw))
             tmw.toolsMenu.addAction(getThemeIcon("office-calendar"),
                 "Alarm History Viewer",alarmApp.tools['history'].show)
             toolbar.addAction(getThemeIcon("office-calendar") ,
