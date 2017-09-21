@@ -39,7 +39,7 @@ from panic.gui.views import ViewChooser
 from panic.gui.utils import * #< getThemeIcon, getIconForAlarm imported here
 from panic.gui.utils import WindowManager #Order of imports matters!
 from panic.gui.editor import FormulaEditor,AlarmForm
-from panic.gui.core import Ui_AlarmList
+from panic.gui.ui_gui import Ui_AlarmList
 from panic.gui.alarmhistory import ahWidget
 from panic.gui.devattrchange import dacWidget
 
