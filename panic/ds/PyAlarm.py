@@ -535,9 +535,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 finally: 
                     self.lock.release()
                 self.debug('\n'+
-                    'Enabled alarms to process in next %d s cycle (UseProcess=%s): %s ' % (self.PollingPeriod,self.UseProcess,[a[0] for a in myAlarms])
+                    'Enabled alarms to process in next %d s cycle (UseProcess=%s): %s ' 
+                    % (self.PollingPeriod,self.UseProcess,[a[0] for a in myAlarms])
                     +'\n'+'#'*80)
-                if not self.get_enabled(force=True): self.info( 'ALARM SENDING IS DISABLED!!')
+                if not self.get_enabled(force=True): 
+                    self.info( 'ALARM SENDING IS DISABLED!!')
 
                 ###############################################################
                 # NOT using a subProcess and Using Taurus to update the variables
@@ -1473,7 +1475,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         for k,v in self.Alarms.items() if v.active]))
             tlimit = time.time()-2*self.PollingPeriod
             
-            if self.Alarms and 0<self.last_attribute_check<tlimit:
+            if [a for a in self.Alarms if a not in self.DisabledAlarms] \
+                    and 0<self.last_attribute_check<tlimit:
                 
                 self.set_state(PyTango.DevState.FAULT)
                 msg = 'Alarm Values not being updated!!!\n\n'
@@ -1664,7 +1667,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
         attr_AlarmSummary_read = sorted(
             sep.join('%s=%s'
-            %(s,(str if s!='time' else time2str)(getattr(alarm,s)))
+            %(s,(str if s!='time' else time2str)
+              (getattr(alarm,s) if s!='state' or self.get_enabled() 
+                else 'DSUPR'))
             for s in setup)
           for alarm in self.Alarms.values())
         
@@ -1906,6 +1911,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if argin in self.Alarms:
             #self.Alarms[argin].active = True
             self.DisabledAlarms.pop(argin)
+            self.Alarms[argin].disabled = 0
             return 'DONE'
         else: return '%s_NotFound'%argin
 
@@ -1923,7 +1929,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         """
         self.info( "In "+self.get_name()+"::Disable(%s)"%argin)
         #    Add your own code here
-        args = [(re.match(RAW_TIME,y),y) for x in map(str,argin) for y in map(str.strip,x.split(','))]
+        args = [(re.match(RAW_TIME,y),y) for x in map(str,argin) 
+                for y in map(str.strip,x.split(','))]
         argin = [x[1] for x in args if not x[0]]
         tag,userMessage = argin[0],','.join(argin[1:])
         if tag in self.Alarms:
@@ -1931,9 +1938,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.Alarms[str(argin[0])].active = 0
             try: 
                 #Setting Disable Timeout
-                self.DisabledAlarms[tag] = time.time()+[str2time(x[1]) for x in args if x[0]][0]
+                self.DisabledAlarms[tag] = time.time()+\
+                    [str2time(x[1]) for x in args if x[0]][0]
             except:
-                self.DisabledAlarms[tag] = 0
+                self.DisabledAlarms[tag] = END_OF_TIME
+                
+            self.Alarms[str(argin[0])].disabled = self.DisabledAlarms[tag]                
             return 'DONE'
         else: 
             raise Exception('%s_NotFound'%argin)
