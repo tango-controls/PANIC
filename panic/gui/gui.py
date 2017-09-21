@@ -175,7 +175,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
     ###########################################################################
         
     @Cached(expire=0.2)
-    def getAlarms(self):
+    def getAlarms(self,filtered=True):
         """
         It returns a list with all alarms matching the default View filter
         @TODO: it should ignore the current filters set by user.
@@ -456,7 +456,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         trace('buildList(%s)'%self.changed,level=2)
 
         try:
-            self.view.apply_filters(**self.getFilters())     
+            self.view.apply_filters(self.getFilters())     
         except:
             trace('AlarmGUI.buildList(): Failed!\n%s'%traceback.format_exc())
             
@@ -589,12 +589,17 @@ class QFilterGUI(QAlarmList):
                            Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)  
         
     def getFilters(self):
-        #@TODO: Only regexp filter implemented
+        """
+        Returns a list of dictionaries
+        Each key in a dictionary is applied as OR
+        Each row in the list is applied as AND
+        """
         trace("%s -> AlarmGUI.getFilters(%s)"%(time.ctime(), ['%s=%s'%(
             s,getattr(self,s,None)) for s in 
             ('regEx','severities','timeSortingEnabled','changed',)]),level=2)
         
-        tag = device = receiver = formula = ''
+        filters = []
+        tag = device = receiver = formula = state = priority = ''
         regexp = str(self.regEx).lower().strip().replace(' ','*')
         
         active = self._ui.activeCheckBox.isChecked() \
@@ -602,39 +607,55 @@ class QFilterGUI(QAlarmList):
                     
         combo1 = str(self._ui.contextComboBox.currentText())
         combo2 = str(self._ui.comboBoxx.currentText()).strip()
-        if combo1 == 'Alarm': 
-            #@TODO: To be replaced by state: ANY/NORM/ALARM/....
-            pass        
-        elif combo1 == 'Time':
+
+        if combo1 == 'Time':
             time_sorting = True
+        elif combo1 == 'State':
+            state = combo2
         elif combo1 == 'Devices': 
             device = combo2
+        elif combo1 == 'Domain': 
+            device = '^' + combo2 + '/*'
+        elif combo1 == 'Family': 
+            device = '*/' + combo2 + '/*'         
         elif combo1 == 'Hierarchy': 
             pass
-        elif combo1 == 'Receiver':
-            receiver = combo2
+        elif combo1 in ('Annunciator','Receiver'):
+            receiver = '*' + combo2 + '*'
+        elif combo1 == 'Priority':
+            priority = combo2            
         #elif combo1 == 'Severity': 
             #pass
-        
+            
         if regexp and not clmatch('^[~\!\*].*',regexp): 
             regexp = '*'+regexp+'*'
             
         regexp = regexp or self.default_regEx
-        dct = {'tag':regexp or self.default_regEx}
+        #dct = {'tag':regexp or self.default_regEx}
         #if not any(device,r
-        dct = {'tag':tag or regexp,
-                'device':device or regexp,
-                'receiver':receiver or regexp,
-                'formula':regexp,
-                'active':active,
-                }
-        return dct
+        if regexp.strip():
+            filters.append({'tag':regexp,
+                            'device':regexp,
+                            'receiver':regexp,
+                            'formula':regexp,
+                            'state': regexp,
+                            #'priority': regexp,
+                            })
+        
+        if state: filters.append({'state':state})
+        if receiver: filters.append({'receivers':receiver})
+        if active: filters.append({'active':active})
+        if device: filters.append({'device':device})
+        if priority: filters.append({'priority':priority})
+        
+        return filters
         
     
     def setFirstCombo(self):
         self.setComboBox(self._ui.contextComboBox,
-                         ['Alarm','Time','Devices',
-                        'Hierarchy','Receiver','Severity'],sort=False)
+            #['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],
+            ['State','Devices','Annunciator','Priority','Domain','Family'],
+            sort=False)
 
     def setSecondCombo(self):
         source = str(self._ui.contextComboBox.currentText())
@@ -647,19 +668,42 @@ class QFilterGUI(QAlarmList):
         self._ui.comboBoxx.setEnabled(True)
         if source =='Devices':
             r,sort,values = 1,True,sorted(set(a.device 
-                                              for a in self.getAlarms()))
-        elif source =='Receiver':
+                                              for a in self.api.values()))
+            print(values)
+        elif source =='Domain':
+            r,sort,values = 1,True,sorted(set(a.device.split('/')[-3]
+                                              for a in self.api.values()))
+        elif source =='Family':
+            devs = sorted(set(a.device for a in self.getAlarms()))
+            values = sorted(set(a.device.split('/')[-2]
+                                              for a in self.api.values()))
+            print(devs,values)
+            r,sort,values = 1,True,values
+            
+        elif source =='Annunciator':
             #r,sort,values = 2,True,list(set(a for a in self.api.phonebook.keys() for l in self.api.values() if a in l.receivers))
-            r,sort,values = 2,True,list(set(s for a in self.getAlarms() for s in ['SNAP','SMS']+[r.strip() for r in a.receivers.split(',')]))
-        elif source =='Severity':
-            r,sort,values = 3,False,['DEBUG', 'WARNING', 'ALARM', 'ERROR']
-        elif source =='Hierarchy':
-            r,sort,values = 4,False,['ALL', 'TOP', 'BOTTOM']
-        elif source =='Time':
-            r,sort,values = 5,False,['DESC', 'ASC']
-        else: #"Alarm Status"
-            r,sort,values = 0,False,['ALL', 'AVAILABLE', 'FAILED','HISTORY']
+            r,sort,values = 2,True,list(set(s for a in self.api.values() 
+                    for s in ['SNAP','SMS']+
+                    [r.strip() for r in a.receivers.split(',')]))
+            
+        elif source =='Priority':
+            r,sort,values = 3,False,SEVERITIES.keys()
+        #@TODO
+        #elif source =='Hierarchy':
+            #r,sort,values = 4,False,['ALL', 'TOP', 'BOTTOM']
+        #elif source =='Time':
+            #r,sort,values = 5,False,['DESC', 'ASC']
+        #else: #"Alarm Status"
+            #r,sort,values = 0,False,['ALL', 'AVAILABLE', 'FAILED','HISTORY']
+        elif source =='State':
+            ss = ['*']
+            ss.append('|'.join(ACTIVE_STATES))
+            ss.append('|'.join(DISABLED_STATES))
+            ss.extend(AlarmStates.keys())
+            r,sort,values = 0,False,ss
+            
         self.setComboBox(self._ui.comboBoxx,values=values,sort=sort)
+        
         return r
 
     def setComboBox(self, comboBox, values, sort=False):
@@ -696,7 +740,8 @@ class QFilterGUI(QAlarmList):
     def onFilter(self,*args):
         """Forces an update of alarm list order and applies filters 
         (do not reload database)."""
-        trace('onFilter()')
+        print('onFilter() '+'*'*60)
+        print(self.getFilters())
         self.buildList(changed=True)
         self.showList()
         self.refreshTimer.setInterval(self.REFRESH_TIME)

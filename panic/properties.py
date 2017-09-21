@@ -54,6 +54,7 @@ AlarmStates = fd.Struct({
   })
 
 ACTIVE_STATES = 'ACTIVE','UNACK','ACKED','RTNUN'
+DISABLED_STATES = 'ERROR','SHLVD','OOSRV','DSUPR'
 
 SORT_ORDER = ('Error','Active','_State','Priority','Time')
 

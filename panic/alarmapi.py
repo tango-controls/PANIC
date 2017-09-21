@@ -1302,6 +1302,7 @@ class AlarmAPI(fandango.SingletonMap):
         print '%s devices exported to %s'%(len(lines),filename)
         
     def has_tag(self,tag,raise_=False):
+        """ check for tags is case independent """
         nt = first((k for k in self.keys() if k.lower()==tag.lower()),None)
         if raise_ and nt is None: raise('TagDoesntExist:%s'%tag)
         return nt
