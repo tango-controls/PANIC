@@ -47,6 +47,14 @@ from panic import *
 from panic.alarmapi import *
 from panic.properties import *
 
+def check_multi_host(model,host=None,raise_=False):
+    """ returns True if tango_host in model does not match host """
+    h0 = (host or fandango.get_tango_host().split(':')[0]).split('.')[0]
+    h1 = parse_tango_model(model).host.split('.')[0] 
+    r = h0 != h1
+    assert not r or not raise_,'%s!=%s'%(h1,h0)
+    return r
+
 class FilterStack(SortedDict):
     """
     It is an ordered dictionary of filters
@@ -601,15 +609,16 @@ class AlarmView(EventListener):
             
             self.info('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
             ## eventReceived already log that
+            check_multi_host(src.full_name,raise_=True)
             
-            #if locked is True: self.lock.acquire()
+            if locked is True: self.lock.acquire()
             if src.simple_name in self.api.alarms:
                 av = self.get_alarm(src.full_name)
                 alarms = [av.tag]
             else:
-                #if anyendswith(src.simple_name,dev.get_model()):
-                dev = self.api.get_device(src.device)
-                assert dev,'UnknownDevice:%s'%src.device
+                dev = parse_tango_model(src.device)['devicename']
+                dev = self.api.get_device(dev)
+                assert dev,'UnknownDevice: %s'%src.device
                 alarms = dev.alarms.keys()
                 
             check =  check_device_cached(src.device)
@@ -626,7 +635,6 @@ class AlarmView(EventListener):
                 self.debug('%s.rvalue = %s'%(src,fd.log.pformat(array)))
             else:
                 l = self.info #(self.info('ERROR','OOSRV') else self.info)
-                #devup = check_device_cached(src.device)
                 devup = get_device_info(src.device).exported
                 s = ('OOSRV','ERROR')[bool(devup)]    
                 if s=='ERROR': 
@@ -701,7 +709,7 @@ class AlarmView(EventListener):
             self.error(traceback.format_exc())
             self.error(array)
         finally:
-            #if locked is True: self.lock.release()
+            if locked is True: self.lock.release()
             self.__dead += now() - tt0
             pass
     
