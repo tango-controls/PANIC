@@ -296,6 +296,7 @@ def ResetAlarm(parent=None,alarm=None):
             raise Exception('comment was too short')
         comment = get_user()+': '+str(comment)
         for alarm in alarms:
+            print('ResetAlarm(%s):%s'%(alarm.tag,comment))
             alarm.reset(comment)
             
         emitValueChanged(self)
@@ -306,7 +307,9 @@ def ResetAlarm(parent=None,alarm=None):
 def AcknowledgeAlarm(parent,alarm=None):
     try:        
         self = parent
+        min_comment,comment_error = 4,'Comment too short!'
         prompt,cmt=QtGui.QInputDialog,''
+        
         alarms = getTargetAlarms(parent,alarm,active=True)
         acks = len([a for a in alarms if a.acknowledged])
         action = 'ACKNOWLEDGED' if acks!=len(alarms) else 'RENOUNCED'
@@ -324,8 +327,8 @@ def AcknowledgeAlarm(parent,alarm=None):
         comment, ok = QtGui.QInputDialog.getText(self,'Input dialog',text)
         if not ok:
             return
-        elif ok and len(str(comment)) < 4:
-            raise Exception('comment was too short')
+        elif ok and len(str(comment)) < min_comment:
+            raise Exception(comment_error)
         
         comment = str(get_user()+': '+str(comment))
 
@@ -336,9 +339,11 @@ def AcknowledgeAlarm(parent,alarm=None):
                 alarm.renounce(comment)
                 
         emitValueChanged(self)
-    except:
+    except Exception,e:
         msg = traceback.format_exc()
         v = QtGui.QMessageBox.warning(self,'Warning',msg,QtGui.QMessageBox.Ok)
+        if e.message == comment_error:
+            AcknowledgeAlarm(parent,alarm)
     
 def ChangeDisabled(parent,alarm=None):
     try:        

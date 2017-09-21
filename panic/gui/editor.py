@@ -20,7 +20,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     
     __pyqtSignals__ = ("valueChanged",)
     
-    def __init__(self,parent=None):
+    def __init__(self,parent=None,refresh=0):
         FormParentClass.__init__(self,parent)
         self._message = QtGui.QMessageBox(self)
         self._wi = Ui_Data()
@@ -32,6 +32,13 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.setCurrentAlarm(None)
         self.enableEditForm(False)
         self._parent = parent
+        if refresh:
+            self._timer = Qt.QTimer()
+            self.connect(self._timer,Qt.SIGNAL("timeout()"), self.valueChanged)
+            self._timer.start(refresh)
+            print('AlarmForm._timer(%s)'%refresh)
+            
+        
             
     def setCurrentAlarm(self,alarm=None):
         if isinstance(alarm,panic.Alarm):
@@ -47,6 +54,9 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         
     def getCurrentAlarm(self,update=False):
         return self._currentAlarm
+    
+    def getSelectedAlarms(self):
+        return [self._currentAlarm]
     
     def fromAlarmGUI(self):
         self.formulaeditor=FormulaEditor(self._dataWidget)#self._dataWidget._wi.frame)
@@ -160,8 +170,18 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         import panic.gui.actions
         panic.gui.actions.ResetAlarm(self,alarm)
             
-    def valueChanged(self):
-        print('AlarmForm.valueChanged()')
+    def valueChanged(self,forced=False):
+        timed = hasattr(self,'_timer')
+        alarm = self.getCurrentAlarm()
+        print('AlarmForm(%s).valueChanged(%s,%s)'%(alarm.tag,forced,timed))
+        if timed or forced:
+            dis = not alarm.get_enabled(force=True)
+            ack = alarm.get_acknowledged(force=True)
+            print(dis,ack)
+        if timed:
+            alarm.set_active(alarm.get_time(True))
+            alarm.set_state()            
+
         self.emit(Qt.SIGNAL('valueChanged'))
         
     ###########################################################################
@@ -237,7 +257,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     
     def update_button_states(self,alarm=None):
         alarm = alarm or self.getCurrentAlarm()
-        print('update_button_states(%s)'%alarm.tag)
+        #print('update_button_states(%s)'%alarm.tag)
         if alarm.active:
             self._detailsButton.setEnabled(True)
             self._resetButton.setEnabled(True)
@@ -396,31 +416,11 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
 
     @Catched
     def onAckStateChanged(self,checked=False):
-        if not self.validate('onAcknowledge(%s)'%checked,self._currentAlarm.tag):
-            setCheckBox(self._dataWidget._wi.AcknowledgedCheckBox,int(not self._dataWidget._wi.AcknowledgedCheckBox.isChecked()))
-            return
-        print 'onAckStateChanged(%s,%s)'%(self.getCurrentAlarm().tag,checked)
-        if checked:
-            prompt=QtGui.QInputDialog
-            cmt, reply=prompt.getText(self,'Input dialog','This will prevent reminders from being sent..\nType a comment to continue:')
-            comment=get_user()+': '+str(cmt)
-            #reply=Qt.QMessageBox.question(self,"Warning!","Alarm will be Acknowledged.\nDo you want to continue?\n"+
-                    #self.getCurrentAlarm().tag,QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.Yes)
-            if reply == QtGui.QMessageBox.Yes:
-                try:
-                    print('\tacknowledge '+self.getCurrentAlarm().tag)
-                    taurus.Device(self.getCurrentAlarm().device).command_inout('Acknowledge',[str(self.getCurrentAlarm().tag), str(comment)])
-                except: print traceback.format_exc()
-                setCheckBox(self._dataWidget._wi.ackCheckBox,True)
-            else: #Clean up the checkbox
-                setCheckBox(self._dataWidget._wi.ackCheckBox,not self.getCurrentAlarm().get_enabled())
-        else:
-            try:
-                print('\trenounce '+self.getCurrentAlarm().tag)
-                taurus.Device(self.getCurrentAlarm().device).command_inout('Renounce',str(self.getCurrentAlarm().tag))
-            except: print traceback.format_exc()
-            setCheckBox(self._dataWidget._wi.ackCheckBox,False)
-        self.valueChanged()
+        
+        import panic.gui.actions
+        panic.gui.actions.AcknowledgeAlarm(self,self.getCurrentAlarm())
+
+        self.valueChanged(forced=True)
         
     #def onAckStateChanged(self,checked=False):
         #items = self.getSelectedRows(extend=True)
@@ -747,7 +747,7 @@ class FormulaEditor(QtGui.QWidget):
 
 def main():
     app = QtGui.QApplication(sys.argv)
-    myapp = AlarmForm()
+    myapp = AlarmForm(refresh=5000)
     if sys.argv[1:]: myapp.setAlarmData(*sys.argv[1:])
     else: myapp.onNew()
     myapp.show()
