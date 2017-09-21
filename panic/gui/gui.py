@@ -921,12 +921,18 @@ class AlarmGUI(QFilterGUI):
             #traceback.print_exc()        
             
         import panic.gui.panel
-        alarmApp.tools['panel'] = WindowManager.addWindow(
+        def showNewAlarmPanel(s=self,a=alarmApp):
+            i = len([w for w in WindowManager.getWindowsNames() 
+                 if w.startswith('panel')])
+            name = 'panel%d'%i
+            a.tools[name] = WindowManager.addWindow(
                 panic.gui.panel.QAlarmPanel())
+            a.tools[name].setModel(s.view)
+            a.tools[name].show()
+            
         url = os.path.dirname(panic.__file__)+'/gui/icon/panel-view.png'
         panel_icon = Qt.QIcon(Qt.QPixmap(url))
-        alarm_panel_action = (panel_icon,
-            "Alarm Panel",alarmApp.tools['panel'].setModel)
+        alarm_panel_action = (panel_icon,"Alarm Panel",showNewAlarmPanel)
         [o.addAction(*alarm_panel_action) for o in (tmw.toolsMenu,toolbar)]
         
         import panic.gui.views

@@ -66,8 +66,8 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
             self.api = panic.AlarmAPI(model,extended=True)
             self.view = AlarmView(api=self.api,verbose=False)
             
+        self.tags = self.view.sort(sortkey=('priority','tag'),keep=False)
         self.alarms = self.view.alarms
-        self.tags = self.view.sort(sortkey=('priority','tag'))
         self.old_devs = set()
         self.actives = []
         self.panels = []
@@ -77,14 +77,14 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
         
         if rows and not cols:
             self.rows = int(rows)
-            self.cols = int(math.ceil((1+len(self.alarms))/self.rows))
+            self.cols = int(math.ceil((1+len(self.tags))/self.rows))
         elif cols and not rows:
-            self.rows = int(math.ceil((1+len(self.alarms))/cols))
+            self.rows = int(math.ceil((1+len(self.tags))/cols))
             self.cols = int(cols)
         else:
-            self.cols = int(cols or math.ceil(math.sqrt(1+len(self.alarms))))
+            self.cols = int(cols or math.ceil(math.sqrt(1+len(self.tags))))
             self.rows = int(rows or ((self.cols-1) 
-                     if self.cols*(self.cols-1)>=1+len(self.alarms)
+                     if self.cols*(self.cols-1)>=1+len(self.tags)
                      else self.cols))
         
         self.setLayout(Qt.QGridLayout())
@@ -106,8 +106,8 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
         #self.labels[self.rows-1][self.cols-1].resize(50,50)        
 
         print('QAlarmPanel(%s): %d alarms , %d cols, %d rows: %s'
-              %(model,len(self.alarms),self.cols, self.rows, 
-                fd.log.shortstr(self.alarms.keys())) + '\n'+'#'*80)
+              %(model,len(self.tags),self.cols, self.rows, 
+                fd.log.shortstr(self.tags)) + '\n'+'#'*80)
                 
         self.refreshTimer = Qt.QTimer()
         Qt.QObject.connect(self.refreshTimer, 
@@ -125,6 +125,13 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
         #if (width/self.rows)>=50: 
         self.resize(width,height)
         self.show()
+        
+    def closeEvent(self,event):
+        self.stop()
+        Qt.QWidget.closeEvent(self,event)
+        
+    def stop(self):
+        self.refreshTimer.stop()
         
     def updateAlarms(self):
         # Sorting will be kept at every update

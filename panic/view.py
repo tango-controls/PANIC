@@ -384,7 +384,7 @@ class AlarmView(EventListener):
         setattr(alarm,'sortkey',str(r))
         return r
     
-    def sort(self,sortkey = None, as_text=False, filtered=True):
+    def sort(self,sortkey = None, as_text=False, filtered=True, keep=True):
         """
         Returns a sorted list of alarm models
         
@@ -410,7 +410,9 @@ class AlarmView(EventListener):
                        %tuple(map(len,(self.alarms,updated,self.filtered))))
                 
             #self.lock.acquire()
-            if not self.ordered or (now()-self.last_sort) > self.get_period():
+            ordered = self.ordered
+            if not keep or not ordered \
+                    or (now()-self.last_sort) > self.get_period():
                 #self.last_keys = keys or self.last_keys
                 sortkey = sortkey or self.sortkey
                 if isSequence(sortkey): 
@@ -420,15 +422,16 @@ class AlarmView(EventListener):
                 else:
                     objs = self.alarms.values()
 
-                self.ordered = sorted(objs,key=sortkey)
-                self.debug('sort([%d])'%(len(self.ordered)))
+                ordered = sorted(objs,key=sortkey)
+                if keep: self.ordered = ordered
+                self.debug('sort([%d])'%(len(ordered)))
                 
             if as_text:
                 kw = fd.isMapping(as_text) and as_text or {}
                 r = list(reversed([self.get_alarm_as_text(a,**kw) 
-                                   for a in self.ordered]))
+                                   for a in ordered]))
             else:
-                r = list(reversed([a.get_model() for a in self.ordered]))
+                r = list(reversed([a.get_model() for a in ordered]))
 
             self.last_sort = now()
             return r
