@@ -28,6 +28,26 @@ import fandango as fd
 import fandango.tango as ft
 
 from fandango.qt import Qt,getApplication
+from panic.properties import SORT_ORDER
+
+class ViewRawBrowser(Qt.QTextBrowser):
+    
+    def setModel(self,model,refresh=5000):
+        model = getattr(model,'view',model)
+        self.model = model
+        if not hasattr(self,'_timer'):
+            self._timer = Qt.QTimer()
+            self.connect(self._timer,Qt.SIGNAL("timeout()"),
+                         self.valueChanged)
+            self._timer.start(refresh)
+            print('AlarmForm._timer(%s)'%refresh)
+        self.show()
+        
+    def valueChanged(self):
+        txt = ['tag : '+str(SORT_ORDER)]
+        for o in reversed(self.model.ordered):
+            txt.append(o.tag+' : '+str(o.sortkey))
+        self.setPlainText('\n'.join(txt))
 
 class ViewChooser(Qt.QDialog):
     """
