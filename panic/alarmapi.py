@@ -50,7 +50,7 @@ import fandango
 import fandango as fn
 
 from fandango import first,searchCl,matchCl,isString,isSequence,isNumber
-from fandango import isFalse,xor,now,str2time,time2str,END_OF_TIME
+from fandango import isFalse,xor,now,str2time,time2str,END_OF_TIME,isCallable
 from fandango.dicts import defaultdict
 from fandango.tango import CachedAttributeProxy, AttrDataFormat
 from fandango.tango import PyTango,get_tango_host, check_device_cached
@@ -94,6 +94,13 @@ def getAttrValue(obj,default=Exception):
     If default = True, obj is returned
     If default = Exception, only exception objects are returned (else None)
     """
+    rm = getattr(obj,'read',None)
+    if isCallable(rm):
+        try:
+            obj = rm()
+        except Exception,e:
+            obj = e
+            
     if default is Exception:
         if isinstance(obj,(PyTango.DevError,Exception)):
             return obj
@@ -173,7 +180,7 @@ class Alarm(object):
               ('formula',formula),('description',description),
               ('receivers',receivers),('config',config),
               ('severity',severity or DEFAULT_SEVERITY))]
-        
+        self.name = self.tag
         if write: self.write()
         
     def trace(self,msg):
@@ -319,7 +326,7 @@ class Alarm(object):
             
         elif isNumber(state):
             # equals to set_active(timestamp)
-            state = 'state=ACTIVE;stamp=%s'%state
+            state = 'state=ACTIVE;time=%s'%state
             
         elif not str(state).strip(): 
             state = 'NORM'
@@ -328,11 +335,13 @@ class Alarm(object):
         #######################################################################
         # Up to this point, state should be string
         if ':' in state and state.split(':')[0]==tag:
-            #ActiveAlarms row
-            state = 'ACTIVE'
-            stamp = 0 # To be read from DS cache
+            #Parsing an ActiveAlarms row (Panic <6)
+            state,stamp = 'ACTIVE',0 # To be read from DS cache
+            try: state = 'ACKED' if self.get_acknowledged() else 'ACTIVE'
+            except: traceback.print_exc()
+
         elif '=' in state:
-            #Dictionary-like (Elettra)
+            #Dictionary-like (Panic >6.1, Elettra)
             dct = dict(t.split('=',1) for t in state.split(';'))
             stamp = dct.pop('time',stamp)
             description = dct.get('description',self.description)
@@ -340,10 +349,15 @@ class Alarm(object):
             severity = dct.get('severity',self.severity)
             tag = dct.get(tag,self.tag)
             #locals().update(dct)
-        elif ';' in state:
-            #Default sorting order
-            tag,state,severity,stamp,desc = state.split(';')
 
+        #Default sorting order (@DEPRECATED?)
+        elif ';' in state:
+            err = '%s.state=%s DEPRECATED!'%(self.tag,state)
+            state,self.last_error = 'ERROR',err
+            tracer(err)
+            #tag,state,severity,stamp,desc = state.split(';')
+
+        # Get Timestamp
         if stamp:
             try: stamp = float(stamp)
             except: stamp = str2time(stamp)
@@ -352,18 +366,22 @@ class Alarm(object):
         elif state in ('ERROR','OOSRV'):
             stamp = -1
         else:
-            #array cache reading from ds
-            stamp = self.get_time(True) #may return time.time()?
-            
+            # reading activealarms array from ds
+            stamp = self.get_time(attr_value=True)   
+        
         if state not in AlarmStates and stamp<=0:
             tracer('%s: Setting state from timestamp: %s'%(self.tag,stamp))
             if self.disabled:
                 state = 'DSUPR'
             elif stamp:
-                state = 'NORM'
-            elif check_device_cached(self.device):
+                # Negative stamp and unknown state?
+                tracer('%s.state=%s (%s)?, setting to ERROR'%(state,stamp))
                 state = 'ERROR'
-            else:
+            elif check_device_cached(self.device):
+                # Device available and no stamp?
+                state = 'ERROR'
+            else: 
+                # Device is Off
                 state = 'OOSRV'
         
         self._state = AlarmStates[state]
@@ -381,29 +399,31 @@ class Alarm(object):
                 self.acknowledged = 0
 
             if state in ('ACTIVE','UNACK'):
-                self.set_active(stamp,t=stamp)
+                self.set_active(stamp or t0,t=stamp)
                 self.recovered = 0
                 self.acknowledged = 0
 
             if state in ('ACKED'):
                 self.acknowledged = stamp
-                self.set_active(self.active or stamp,t=stamp)
+                self.set_active(self.active or stamp or t0,t=stamp)
 
             if state in ('RTNUN'): 
                 self.recovered = stamp
-                self.set_active(self.active or stamp,t=stamp)
+                self.set_active(self.active or stamp or t0,t=stamp)
                 self.counter = 0
 
             if state in ('DSUPR,SHLVD'):
-                self.disabled = stamp
+                self.disabled = stamp or -1
                 self.set_active(0,t=stamp)
-                
-            if state in ('OOSRV'):
+            elif state in ('OOSRV'):
                 self.disabled = -1
                 self.set_active(-1,t=stamp)
+            else:
+                self.disabled = 0
 
             if state in ('ERROR'):
                 self.set_active(-1,t=stamp)
+                self.last_error = self.last_error or time2str(stamp)
             else:
                 self.last_error = ''
             
@@ -414,7 +434,7 @@ class Alarm(object):
         """
         This method will return the state of the alarm
         
-        If force is True or the state is Unknown, then the state will be
+        If force is True or _state is None, then the state will be
         initialized from the flags values.
         
         Thus, flags must be updated prior to calling this method
@@ -424,9 +444,7 @@ class Alarm(object):
             #tracer('%s.get_state(f=%s,d=%s,a=%s,r=%s,s=%s'%(self.tag,force,
                 #self.disabled,self.active,self.recovered,self._state))
             
-            #if (not self.check_device_cached(self.device):
-                #self._state = AlarmStates.OOSRV
-            #elif
+            #self.get_acknowledged(),self.get_disabled()
             
             if self.disabled:
                 #NOTE: disabled<time() will be ignored
@@ -448,7 +466,7 @@ class Alarm(object):
                 else:
                     self._state = AlarmStates.ACTIVE
                 
-            else:
+            else: # no active
                 self._state = AlarmStates.NORM
 
             self.updated = time.time()
@@ -544,12 +562,15 @@ class Alarm(object):
     def get_enabled(self,force=True):
         if force:
             try: 
-                self.disabled = self.get_ds().get().CheckDisabled(self.tag)
+                self.disabled = self.get_ds().get_disabled(self.tag)
             except: return None
         return not self.disabled
 
-    def enable(self):
-        """ Enables alarm evaluation """
+    def enable(self,comment=''):
+        """ 
+        Enables alarm evaluation 
+        comment argumente needed by API (ignored by device)
+        """
         return self.get_ds().get().Enable(self.tag)
 
     def disable(self, comment='',timeout=''):
@@ -561,7 +582,7 @@ class Alarm(object):
         
     def get_acknowledged(self,force=False):
         if force:
-            self.acknowledged = self.get_engine().CheckAcknowledged(self.tag)
+            self.acknowledged = self.get_ds().get_acknowledged(self.tag)
         return self.acknowledged
     
     def reset(self, comment):
@@ -575,16 +596,19 @@ class Alarm(object):
         result = self.get_ds().acknowledge(self.tag, comment)
         return self.get_acknowledged(force=True)
     
-    def renounce(self,comment):
-        """ Acknowledges the Alarm in its PyAlarm device """
+    def renounce(self,comment=''):
+        """ 
+        Acknowledges the Alarm in its PyAlarm device 
+        Comment is ignored by device
+        """
         result = self.get_engine().Renounce(self.tag)
         return not self.get_acknowledged(force=True)    
 
     def write(self,device='',exclude='',update=True):
         """
         Updates the Alarm config for the given device in the database
-        :param: update controls whether the device.init() will be called or not,
-        if not the alarm will not be applied yet
+        :param: update controls whether the device.init() will be called 
+            or not, if not the alarm will not be applied yet
         """
         self.device = device or self.device
         if not self.device: 
@@ -699,6 +723,8 @@ class AlarmDS(object):
         self.api = api
         self.alarms = {}
         self._actives = None
+        self._acknowledged = None
+        self._disabled = None
         self.proxy = None
         self.version = None        
         self.get_config(True)
@@ -849,9 +875,11 @@ class AlarmDS(object):
         """ Returns device status """
         return self.get().Status()
     
-    def enable(self,tag=None):
-        """ If Tag is None, this method will enable the whole device,
+    def enable(self,tag=None,comment=None):
+        """ 
+        If Tag is None, this method will enable the whole device,
         but individual disables will be kept 
+        Comment is ignored by device
         """
         if tag is None:
             self.api.put_db_property(self.name,'Enabled',True)
@@ -912,6 +940,26 @@ class AlarmDS(object):
                         #'failed to parse date from %s'%line)
                     r[tag] = r[tag] or END_OF_TIME
         return r    
+    
+    def get_acknowledged(self,alarm=None):
+        if self._acknowledged is None:
+            self._acknowledged = CachedAttributeProxy(
+                            self.name+'/AcknowledgedAlarms',keeptime=3000.)
+        value = getAttrValue(self._acknowledged)
+        if alarm is not None:
+            return getattr(alarm,'tag',alarm) in value
+        else:
+            return value
+        
+    def get_disabled(self,alarm=None):
+        if self._disabled is None:
+            self._disabled = CachedAttributeProxy(
+                            self.name+'/DisabledAlarms',keeptime=3000.)
+        value = getAttrValue(self._disabled)
+        if alarm is not None:
+            return getattr(alarm,'tag',alarm) in value
+        else:
+            return value        
 
     def reset(self,alarm,comment):
         """
