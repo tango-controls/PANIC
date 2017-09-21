@@ -49,8 +49,8 @@ import traceback,re,time,os,sys
 import fandango
 import fandango as fn
 
-from fandango import first,searchCl,matchCl,isString,isSequence,isNumber
-from fandango import isFalse,xor,now,str2time,time2str,END_OF_TIME,isCallable
+from fandango import first,searchCl,matchCl,isString,isSequence,isNumber,\
+    isFalse,xor,now,str2time,time2str,END_OF_TIME,isCallable,isMapping,Cached
 from fandango.dicts import defaultdict
 from fandango.tango import CachedAttributeProxy, AttrDataFormat
 from fandango.tango import PyTango,get_tango_host, check_device_cached
@@ -84,6 +84,16 @@ def anyendswith(a,b):
     if '/' not in a: a = '/'+a
     if '/' not in b: b = '/'+b
     return a.endswith(b) or b.endswith(a)
+
+def unicode2str(obj):
+    if isMapping(obj,strict=True):
+        n = dict(unicode2str(t) for t in obj.items())
+    elif isSequence(obj):
+        n = list(unicode2str(t) for t in obj)
+    elif isString(obj): n = str(obj)
+    else: n = obj
+    return n    
+    
 
 ###############################################################################
 #@todo: Tango access methods
@@ -1426,6 +1436,31 @@ class AlarmAPI(fandango.SingletonMap):
         self.put_class_property('PyAlarm','Phonebook',new_prop)
         self.phonebook = None #Force to reload
         return new_prop
+    
+    @Cached(expire=10.)
+    def get_user_filters(self):
+        """
+        returns a name:filter dictionary
+        """        
+        import json
+        prop = self.get_db_property('PANIC','UserFilters')
+        prop = [t.split(':',1) for t in prop]
+        return dict((t[0],unicode2str(json.loads(t[1]))) for t in prop)
+        
+    def set_user_filters(self,filters,overwrite=True):
+        """
+        filters should be a name:filter dictionary
+        """
+        import json
+        assert isMapping(filters),'Should be a dictionary!'
+        if not overwrite:
+            prevs = self.get_user_filters()
+            prevs.update(filters)
+            filters = prevs
+        value = []
+        for name,f in filters.items():
+            value.append('%s:%s'%(name,f if isString(f) else json.dumps(f)))
+        self.put_db_property('PANIC','UserFilters',value)
       
     def get_global_receivers(self,tag='',renew=False):
         try:

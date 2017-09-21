@@ -4,7 +4,7 @@ developed by ALBA Synchrotron for Tango Control System
 GPL Licensed 
 """
 
-import sys, re, os, traceback, time
+import sys, re, os, traceback, time, json
 import threading, Queue
 
 import fandango as fn
@@ -34,6 +34,7 @@ except:
 
 #from row import AlarmRow, QAlarm, QAlarmManager
 from panic.properties import *
+from panic.alarmapi import unicode2str
 from panic.gui.actions import QAlarmManager
 from panic.gui.views import ViewChooser
 from panic.gui.utils import * #< getThemeIcon, getIconForAlarm imported here
@@ -245,6 +246,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
               now,now-self.last_reload))
             self.last_reload=now
             self.api.load()
+            self.setSecondCombo()
             #self.checkAlarmRows()
                     
             #Updating the alarm list
@@ -575,6 +577,8 @@ class QFilterGUI(QAlarmList):
         
         Qt.QObject.connect(self._ui.regExUpdate, 
                            Qt.SIGNAL("clicked(bool)"), self.onRegExUpdate)
+        Qt.QObject.connect(self._ui.regExSave, 
+                           Qt.SIGNAL("clicked(bool)"), self.onRegExSave)        
         Qt.QObject.connect(self._ui.selectCheckBox, 
                            Qt.SIGNAL('stateChanged(int)'), self.onSelectAllNone)
         Qt.QObject.connect(self._ui.activeCheckBox, 
@@ -594,12 +598,13 @@ class QFilterGUI(QAlarmList):
         Each key in a dictionary is applied as OR
         Each row in the list is applied as AND
         """
+        #TRACE_LEVEL=4
         trace("%s -> AlarmGUI.getFilters(%s)"%(time.ctime(), ['%s=%s'%(
             s,getattr(self,s,None)) for s in 
-            ('regEx','severities','timeSortingEnabled','changed',)]),level=2)
+            ('regEx','severities','timeSortingEnabled','changed',)]),level=0)
         
         filters = []
-        tag = device = receiver = formula = state = priority = ''
+        device = receiver = formula = state = priority = userfilter = ''
         regexp = str(self.regEx).lower().strip().replace(' ','*')
         
         active = self._ui.activeCheckBox.isChecked() \
@@ -621,9 +626,11 @@ class QFilterGUI(QAlarmList):
         elif combo1 == 'Hierarchy': 
             pass
         elif combo1 in ('Annunciator','Receiver'):
-            receiver = '*' + combo2 + '*'
+            receiver = '*' + re.escape(combo2) + '*'
         elif combo1 == 'Priority':
             priority = combo2            
+        elif combo1 == 'UserFilters':
+            userfilter = combo2
         #elif combo1 == 'Severity': 
             #pass
             
@@ -633,6 +640,12 @@ class QFilterGUI(QAlarmList):
         regexp = regexp or self.default_regEx
         #dct = {'tag':regexp or self.default_regEx}
         #if not any(device,r
+        if userfilter:
+            print('getFilters(%s)'%str(userfilter))
+            ff = self.api.get_user_filters()[userfilter]
+            filters.extend(ff)
+            print(filters)
+        
         if regexp.strip():
             filters.append({'tag':regexp,
                             'device':regexp,
@@ -654,7 +667,8 @@ class QFilterGUI(QAlarmList):
     def setFirstCombo(self):
         self.setComboBox(self._ui.contextComboBox,
             #['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],
-            ['State','Devices','Annunciator','Priority','Domain','Family'],
+            ['State','Devices','Annunciator',
+             'UserFilters','Domain','Family','Priority',],
             sort=False)
 
     def setSecondCombo(self):
@@ -688,6 +702,10 @@ class QFilterGUI(QAlarmList):
             
         elif source =='Priority':
             r,sort,values = 3,False,SEVERITIES.keys()
+            
+        elif source =='UserFilters':
+            r,sort,values = 3,False,['']+self.api.get_user_filters().keys()
+            
         #@TODO
         #elif source =='Hierarchy':
             #r,sort,values = 4,False,['ALL', 'TOP', 'BOTTOM']
@@ -757,6 +775,32 @@ class QFilterGUI(QAlarmList):
             or self.default_regEx)
         #self._ui.activeCheckBox.setChecked(False)
         self.onFilter()
+        
+    def onRegExSave(self):
+        min_comment,comment_error = 4,'Name too short!'
+        try:
+            self.onRegExUpdate()
+            text = 'Enter a name to save your filter in Tango Database'
+            name, ok = QtGui.QInputDialog.getText(self,'Save Filter As',
+                                                     text)
+            if not ok: return
+            if ok and len(str(name)) < min_comment:
+                raise Exception(comment_error)
+            filters = self.api.get_user_filters()
+            if name in filters:
+                v = QtGui.QMessageBox.warning(None,'Save Filter As',\
+                    'Filter %s already exists,\ndo you want to overwrite it?'
+                    %name)
+                if v == QtGui.QMessageBox.Cancel: 
+                    self.onRegexSave()
+            filters.update({name:self.getFilters()})
+            self.api.set_user_filters(filters,overwrite=True)
+            self.onReload()
+        except Exception,e:
+            #msg = traceback.format_exc()
+            v = QtGui.QMessageBox.warning(self,'Warning',
+                                        e.message,QtGui.QMessageBox.Ok)
+            if e.message == comment_error: self.onRegexSave()
 
     @Catched
     def regExFiltering(self, source):

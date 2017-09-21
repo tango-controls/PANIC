@@ -14,7 +14,8 @@ class Ui_AlarmList(object):
         self.Form=Form
         Form.setObjectName("Form")
         #Form.resize(QtCore.QSize(900, 900))
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, 
+                                       QtGui.QSizePolicy.Expanding)
         #sizePolicy.setHorizontalStretch(100)
         #sizePolicy.setVerticalStretch(100)
         sizePolicy.setHeightForWidth(Form.sizePolicy().hasHeightForWidth())
@@ -40,7 +41,7 @@ class Ui_AlarmList(object):
         self.frame.setFrameShadow(QtGui.QFrame.Raised)
         self.frame.setObjectName("frame")
         self.frame.setMinimumSize(QtCore.QSize(300, 200))
-#---------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
         self.leftGridLayout = QtGui.QGridLayout(self.frame)
         self.leftGridLayout.setObjectName("leftGridLayout")
         self.comboLabel = QtGui.QLabel(self.frame)
@@ -50,7 +51,7 @@ class Ui_AlarmList(object):
         self.leftGridLayout.addWidget(self.comboLabel, 0,0,1,1) #<-------------
         self.contextComboBox = QtGui.QComboBox(self.frame)
         self.contextComboBox.setObjectName("contextComboBox")
-        self.leftGridLayout.addWidget(self.contextComboBox,0,1,1,5) #<-------------
+        self.leftGridLayout.addWidget(self.contextComboBox,0,1,1,5) #<---------
         #self.comboButton = QtGui.QPushButton(self.frame)
         #self.comboButton.setObjectName("comboButton")
         #self.leftGridLayout.addWidget(self.comboButton,0,5,1,1)
@@ -76,19 +77,24 @@ class Ui_AlarmList(object):
         self.leftGridLayout.addWidget(self.infoLabel1_2, 2,1,1,5) #<-------------
         self.infoLabel1_2.hide()
 
-        self.regExGridLayout = QtGui.QGridLayout()
+        #self.regExGridLayout = QtGui.QGridLayout()
         self.regExLabel = QtGui.QLabel(self.frame)
         self.regExLabel.setObjectName("regExLabel")
-        self.regExLabel.setText('Type a string to filter alarms')
-        self.regExGridLayout.addWidget(self.regExLabel, 0,0,1,1)
+        self.regExLabel.setText('Filter:')
+        self.leftGridLayout.addWidget(self.regExLabel, 3,0,1,1)
         self.regExLine = QtGui.QLineEdit(self.frame)
         self.regExLine.setObjectName("regExLine")
-        self.regExGridLayout.addWidget(self.regExLine, 0,1,1,3)
+        self.regExLine.setToolTip('Type a string to filter alarms')
+        self.leftGridLayout.addWidget(self.regExLine, 3,1,1,3)
         self.regExUpdate = QtGui.QPushButton(self.frame)
         self.regExUpdate.setObjectName("regExUpdate")
         self.regExUpdate.setText("Update")
-        self.regExGridLayout.addWidget(self.regExUpdate, 0,4,1,1)
-        self.leftGridLayout.addLayout(self.regExGridLayout, 3,0,1,6) #<-------------
+        self.regExSave = QtGui.QPushButton(self.frame)
+        self.regExSave.setObjectName("regExSave")
+        self.regExSave.setText("Save As")        
+        self.leftGridLayout.addWidget(self.regExUpdate, 3,4,1,1)
+        self.leftGridLayout.addWidget(self.regExSave, 3,5,1,1)
+        #self.leftGridLayout.addLayout(self.regExGridLayout, 3,0,1,6) #<-------------
 
         self.gridFilterLayout = QtGui.QGridLayout()
         self.gridFilterLayout.addWidget(Qt.QLabel('Severities:'), 2,0,1,1)
