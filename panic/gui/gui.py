@@ -5,6 +5,7 @@ GPL Licensed
 """
 
 import sys, re, os, traceback, time, json
+from pprint import pformat
 import threading, Queue
 
 import fandango as fn
@@ -150,12 +151,12 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         
         N = len(self.getAlarms())
         trace('AlarmGUI(): %d alarms'%N)
-        if N<150: 
+        if 1: #N<150: 
             self._ui.sevDebugCheckBox.setChecked(True)
             self._ui.activeCheckBox.setChecked(False)
-        else:
-            self._ui.sevDebugCheckBox.setChecked(False)
-            self._ui.activeCheckBox.setChecked(True)
+        #else:
+            #self._ui.sevDebugCheckBox.setChecked(False)
+            #self._ui.activeCheckBox.setChecked(True)
             
         if N<=self.MAX_ALARMS: self.USE_EVENT_REFRESH = True
         
@@ -458,7 +459,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         trace('buildList(%s)'%self.changed,level=2)
 
         try:
-            self.view.apply_filters(self.getFilters())     
+            self.view.apply_filters(self.getFilters())
         except:
             trace('AlarmGUI.buildList(): Failed!\n%s'%traceback.format_exc())
             
@@ -601,11 +602,10 @@ class QFilterGUI(QAlarmList):
         #TRACE_LEVEL=4
         trace("%s -> AlarmGUI.getFilters(%s)"%(time.ctime(), ['%s=%s'%(
             s,getattr(self,s,None)) for s in 
-            ('regEx','severities','timeSortingEnabled','changed',)]),level=0)
+            ('regEx','severities','timeSortingEnabled','changed',)]),level=2)
         
         filters = []
         device = receiver = formula = state = priority = userfilter = ''
-        regexp = str(self.regEx).lower().strip().replace(' ','*')
         
         active = self._ui.activeCheckBox.isChecked() \
                         or self.timeSortingEnabled
@@ -634,22 +634,44 @@ class QFilterGUI(QAlarmList):
         #elif combo1 == 'Severity': 
             #pass
             
-        if regexp and not clmatch('^[~\!\*].*',regexp): 
-            regexp = '*'+regexp+'*'
+        regexp = str(self.regEx).lower().strip()#.replace(' ','*')
+            
+        if regexp:
+            regexps = regexp.split('&')
+            for i,regexp in enumerate(regexps):
+                regexp = regexp.strip()
+                neg = regexp.startswith('~')
+                if neg: regexp = regexp[1:].strip()
+                #if regexp and not clmatch('^[~\!\*].*',regexp): 
+                print(regexp)
+                print(fandango.isRegexp(regexp))
+                print('*' in regexp)
+                if not fandango.isRegexp(regexp):
+                    regexp = '*'+regexp.replace(' ','*')+'*'
+                elif not '*' in regexp:
+                    regexp = '.*'+regexp.replace(' ','.*')+'.*'
+                if neg: regexp = '~'+regexp
+                print(regexp)
+                regexps[i] = regexp
+                
+            regexp = ' & '.join(regexps)
             
         regexp = regexp or self.default_regEx
+        print(regexp)
+        
         #dct = {'tag':regexp or self.default_regEx}
         #if not any(device,r
         if userfilter:
             print('getFilters(%s)'%str(userfilter))
             ff = self.api.get_user_filters()[userfilter]
             filters.extend(ff)
+            self._ui.comboBoxx.setToolTip(pformat(ff))
             print(filters)
         
-        if regexp.strip():
+        if regexp.strip(' \n\r\t'):
             filters.append({'tag':regexp,
                             'device':regexp,
-                            'receiver':regexp,
+                            'receivers':regexp,
                             'formula':regexp,
                             'state': regexp,
                             #'priority': regexp,
@@ -698,7 +720,7 @@ class QFilterGUI(QAlarmList):
             #r,sort,values = 2,True,list(set(a for a in self.api.phonebook.keys() for l in self.api.values() if a in l.receivers))
             r,sort,values = 2,True,list(set(s for a in self.api.values() 
                     for s in ['SNAP','SMS']+
-                    [r.strip() for r in a.receivers.split(',')]))
+                    [r.strip() for r in a.receivers.split(',') if r.strip()]))
             
         elif source =='Priority':
             r,sort,values = 3,False,SEVERITIES.keys()
@@ -773,7 +795,7 @@ class QFilterGUI(QAlarmList):
         # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
         self.regEx = (str(self._ui.regExLine.text()).strip() 
             or self.default_regEx)
-        #self._ui.activeCheckBox.setChecked(False)
+        self._ui.activeCheckBox.setChecked(False)
         self.onFilter()
         
     def onRegExSave(self):
@@ -781,12 +803,14 @@ class QFilterGUI(QAlarmList):
         try:
             self.onRegExUpdate()
             text = 'Enter a name to save your filter in Tango Database'
-            name, ok = QtGui.QInputDialog.getText(self,'Save Filter As',
-                                                     text)
+            filters = self.api.get_user_filters()
+            name, ok = QtGui.QInputDialog.getItem(self,'Save Filter As',
+                                        text,['']+filters.keys(),True)
             if not ok: return
             if ok and len(str(name)) < min_comment:
                 raise Exception(comment_error)
-            filters = self.api.get_user_filters()
+
+            name = str(name)
             if name in filters:
                 v = QtGui.QMessageBox.warning(None,'Save Filter As',\
                     'Filter %s already exists,\ndo you want to overwrite it?'
