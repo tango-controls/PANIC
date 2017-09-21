@@ -955,7 +955,8 @@ class AlarmDS(object):
         if self._disabled is None:
             self._disabled = CachedAttributeProxy(
                             self.name+'/DisabledAlarms',keeptime=3000.)
-        value = getAttrValue(self._disabled)
+        sep = ':' if self.get_version()>='6.3.0' else ' '
+        value = [t.split(sep)[0] for t in getAttrValue(self._disabled)]
         if alarm is not None:
             return getattr(alarm,'tag',alarm) in value
         else:

@@ -1610,7 +1610,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
         #    Add your own code here
         [self.CheckDisabled(t) for t in self.DisabledAlarms]
-        attr_DisabledAlarms_read = sorted('%s until %s'%(a,time.ctime(t)) 
+        attr_DisabledAlarms_read = sorted('%s:%s'%(a,time2str(t)) 
                         for a,t in self.DisabledAlarms.items())[-512:]
         attr.set_value(attr_DisabledAlarms_read, len(attr_DisabledAlarms_read))
 

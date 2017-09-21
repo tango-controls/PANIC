@@ -177,7 +177,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         if timed or forced:
             dis = not alarm.get_enabled(force=True)
             ack = alarm.get_acknowledged(force=True)
-            print(dis,ack)
+            print('\tdis,ack = ',(dis,ack))
         if timed:
             alarm.set_active(alarm.get_time(True))
             alarm.set_state()            
@@ -252,7 +252,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._tvl.setModel(alarm) #.device+'/'+alarm.get_attribute())
         self._dataWidget._wi.previewButton.setEnabled(True)
         self._dataWidget._wi.editButton.setEnabled(True)
-        self.valueChanged()
+        self.valueChanged(forced=True)
         return
     
     def update_button_states(self,alarm=None):
