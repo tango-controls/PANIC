@@ -38,6 +38,25 @@ try:
 except:
     tango_host = 'PyAlarm'
     
+#@TODO: ERROR as a positive value causes problems to Eval
+#(but it must be positive to appear first on lists?)
+#The higher the value, the higher it will appear on View lists
+AlarmStates = fd.Struct({
+  'NORM':0, #Normal state
+  'RTNUN':1, #Active but returned to normal  
+  'ACKED':2, #Acknowledged by operator
+  'ACTIVE':3, #UNACK alias
+  'UNACK':4, #Active and unacknowledged  
+  'ERROR':-1, #PyAlarm not working properly, exception on formula     
+  'SHLVD':-2, #Silenced, hidden, ignored, (DEBUG), temporary state
+  'DSUPR':-3, #Disabled by a process condition (Enabled), failed not throwed
+  'OOSRV':-4, #Unconditionally disabled, Enable = False, Device is OFF
+  })
+
+ACTIVE_STATES = 'ACTIVE','UNACK','ACKED','RTNUN'
+
+SORT_ORDER = ('Error','Active','_State','Priority','Time')
+
 #@TODO: Rename to PRIORITIES, adapt to IEC Document    
 SEVERITIES = {'DEBUG':0,
               'INFO':1,
@@ -50,7 +69,6 @@ DEFAULT_SEVERITY = 'WARNING'
 
 SUMMARY_FIELDS = 'tag','state','priority','time','formula','message'
 
-SORT_ORDER = ('Error','Active','Priority','Time')
 
 # Must be lists, not tuples
 DATA_FIELDS = ('tag','device','priority','formula',
@@ -91,30 +109,10 @@ FORMATTERS.update({
     #'tag' : lambda s,l: ('{:^%d}'%l).format(s),
     })
 
-
-
-
 INFO_REQUESTS = ['SETTINGS','STATE','VALUES','SNAP']
 
 MESSAGE_TYPES = ['ALARM','ACKNOWLEDGED','RECOVERED','REMINDER',
                     'AUTORESET','RESET','DISABLED',]
-
-#@TODO: ERROR as a positive value causes problems to Eval
-#(but it must be positive to appear first on lists?)
-AlarmStates = fd.Struct({
-  'NORM':0, #Normal state
-  'ACTIVE':1, #Active and unacknowledged
-  'ACKED':2, #Acknowledged by operator
-  'RTNUN':3, #Active but returned to normal
-  'UNACK':4, #ACTIVE ALIAS
-  'SHLVD':-1, #Silenced, hidden, ignored, (DEBUG), temporary state
-  'DSUPR':-2, #Disabled by a process condition (Enabled), failed not throwed
-  'OOSRV':-3, #Unconditionally disabled, Enable = False, Device is OFF
-  'ERROR':-4, #PyAlarm not working properly, exception on formula   
-  })
-
-ACTIVE_STATES = 'ACTIVE','UNACK','ACKED','RTNUN'
-
 
 __doc__+="""
 PANIC_PROPERTIES: This properties will be shared by the whole TANGO_HOST

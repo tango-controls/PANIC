@@ -651,8 +651,9 @@ class AlarmView(EventListener):
                         row = array.get(av.tag,EMPTY)
                         #self.debug('[%s]:\t"%s"'%(av.tag,row or EMPTY))
                         if not row: 
+                            # Compatibility with PyAlarm < 6.2
                             if clsearch('activealarms',src.full_name):
-                                row = 'NORM'
+                                row = 'NORM' if av.get_enabled() else 'SHLVD'
                             else:
                                 self.warning('%s Not found in %s(%s)'%(
                                     av.tag,src.full_name,splitter))
@@ -664,7 +665,10 @@ class AlarmView(EventListener):
                             #self.info('%s active since %s'
                               #%(av.tag,fd.time2str(av.active or 0)))
                     except:
-                        self.warning(traceback.format_exc())
+                        error = traceback.format_exc()
+                        av.last_error = error
+                        av.set_state('ERROR')
+                        self.warning(error)
                 else:
                     # Not parsing an array value
                     av.set_active((rvalue and av.active) or rvalue)
