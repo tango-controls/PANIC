@@ -416,72 +416,16 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
 
     @Catched
     def onAckStateChanged(self,checked=False):
-        
         import panic.gui.actions
         panic.gui.actions.AcknowledgeAlarm(self,self.getCurrentAlarm())
-
         self.valueChanged(forced=True)
         
-    #def onAckStateChanged(self,checked=False):
-        #items = self.getSelectedRows(extend=True)
-        #if not len([i.alarmAcknowledged for i in items]) in (len(items),0):
-            ##if not target: 
-            #print 'onAckStateChanged(%s): nothing to do ...'%len([i.alarmAcknowledged for i in items])
-            #return
-        #print 'onAckStateChanged(%s)'%[r.get_alarm_tag() for r in items]
-        #waiting=threading.Event()
-        #checked = not all([i.alarmAcknowledged for i in items])
-        #if checked:
-            #prompt=QtGui.QInputDialog
-            #cmt, ok=prompt.getText(self,'Input dialog','This will prevent reminders from sending.\nType a comment to continue:')
-            #comment=get_user()+': '+cmt
-            #if ok and len(str(cmt)) != 0:
-                #for a in items:
-                    #try:
-                        #print('\tacknowledging '+a.get_alarm_tag())
-                        #taurus.Device(a.get_alarm_object().device).command_inout('Acknowledge',[str(a.get_alarm_tag()), str(comment)])
-                        #waiting.wait(0.2)
-                    #except: print traceback.format_exc()
-                #setCheckBox(self._dataWidget._wi.ackCheckBox,True)
-            #elif ok and len(str(cmt)) < 3: self.onAckStateChanged()
-            #else: #Clean up the checkbox
-                #setCheckBox(self._dataWidget._wi.ackCheckBox,items[0].alarmAcknowledged)
-        #else:
-            #for a in items:
-                #try:
-                    #print('\trenouncing '+a.get_alarm_tag())
-                    #taurus.Device(a.get_alarm_object().device).command_inout('Renounce',str(a.get_alarm_tag()))
-                    #waiting.wait(0.2)
-                #except: print traceback.format_exc()
-            #setCheckBox(self._dataWidget._wi.ackCheckBox,False)
-        #[o.get_acknowledged(force=True) for o in items]
-        #self.valueChanged()
-
     @Catched
     def onDisStateChanged(self,checked=False):
-        if not self.validate('onDisable(%s)'%checked,self._currentAlarm.tag):
-            setCheckBox(self._dataWidget._wi.disabledCheckBox,int(not self._dataWidget._wi.disabledCheckBox.isChecked()))
-            return
-        print 'onDisStateChanged(%s,%s)'%(self.getCurrentAlarm().tag,checked)
-        if checked:
-            reply=Qt.QMessageBox.question(self,"Warning!","Alarm will be disabled.\nDo you want to continue?\n"+self.getCurrentAlarm().tag,
-                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.Yes)
-            if reply == QtGui.QMessageBox.Yes:
-                comment='DISABLED by '+get_user()
-                try:
-                    print('\tdisabling '+self.getCurrentAlarm().tag)
-                    taurus.Device(self.getCurrentAlarm().device).command_inout('Disable',[str(self.getCurrentAlarm().tag), str(comment)])
-                except: print traceback.format_exc()
-                setCheckBox(self._dataWidget._wi.disabledCheckBox,True)
-            else: #Clean up the checkbox
-                setCheckBox(self._dataWidget._wi.disabledCheckBox,not self.getCurrentAlarm().get_enabled())
-        else:
-            try:
-                print('\tenabling '+self.getCurrentAlarm().tag)
-                taurus.Device(self.getCurrentAlarm().device).command_inout('Enable',str(self.getCurrentAlarm().tag))
-            except: print traceback.format_exc()
-            setCheckBox(self._dataWidget._wi.disabledCheckBox,False)
-        self.valueChanged()
+        import panic.gui.actions
+        panic.gui.actions.ChangeDisabled(self,self.getCurrentAlarm())
+        self.valueChanged(forced=True)
+        
 
 class ReceiversForm(QtGui.QWidget):
     def __init__(self, parent=None):

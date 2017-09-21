@@ -340,14 +340,15 @@ def AcknowledgeAlarm(parent,alarm=None):
                 
         emitValueChanged(self)
     except Exception,e:
-        msg = traceback.format_exc()
-        v = QtGui.QMessageBox.warning(self,'Warning',msg,QtGui.QMessageBox.Ok)
-        if e.message == comment_error:
-            AcknowledgeAlarm(parent,alarm)
+        #msg = traceback.format_exc()
+        v = QtGui.QMessageBox.warning(self,'Warning',
+                                      e.message,QtGui.QMessageBox.Ok)
+        if e.message == comment_error: AcknowledgeAlarm(parent,alarm)
     
 def ChangeDisabled(parent,alarm=None):
     try:        
         self = parent
+        min_comment,comment_error = 4,'Comment too short!'
         prompt,cmt=QtGui.QInputDialog,''
         alarms = getTargetAlarms(parent,alarm,active=False)
         check = len([a for a in alarms if not a.disabled])
@@ -365,8 +366,8 @@ def ChangeDisabled(parent,alarm=None):
         comment, ok = QtGui.QInputDialog.getText(self,'Input dialog',text)
         if not ok:
             return
-        elif ok and len(str(comment)) < 4:
-            raise Exception('comment was too short')
+        elif ok and len(str(comment)) < min_comment:
+            raise Exception(comment_error)
         comment = get_user()+': '+str(comment)
         
         for alarm in alarms:
@@ -378,9 +379,11 @@ def ChangeDisabled(parent,alarm=None):
                 alarm.enable(comment)
 
         emitValueChanged(self)
-    except:
-        msg = traceback.format_exc()
-        v = QtGui.QMessageBox.warning(self,'Warning',msg,QtGui.QMessageBox.Ok)
+    except Exception,e:
+        #msg = traceback.format_exc()
+        v = QtGui.QMessageBox.warning(self,'Warning',
+                                      e.message,QtGui.QMessageBox.Ok)
+        if e.message == comment_error: ChangeDisabled(parent,alarm)        
 
   
 
