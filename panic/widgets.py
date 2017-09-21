@@ -52,9 +52,11 @@ def getIconForAlarm(alarm):
     elif state == 'OOSRV':
         return "stop" #"media_stop"
     elif state == 'DSUPR':
-        return "stop" #"media_stop"
+        #return "stop" #"media_stop"
+        return "actions:player_pause.svg"
     elif state == 'SHLVD':
-        return "media_pause" #"media_playback_stop"
+        #return "media_pause" #"media_playback_stop"
+        return "actions:appointment.svg"
       
     elif state == 'ACKED': 
         return "applications-development" #"media_playback_pause"
@@ -108,10 +110,9 @@ class AlarmValueLabel(Qt.QLabel):#TaurusValueLabel):
         #TaurusValueLabel.setModel(self,model)
             
     def updateStyle(self,extra=''):
-        print('<'*80)
         self.setAlignment(QtCore.Qt.AlignCenter)
         obj = self.alarm #obj = self.getModelValueObj()
-        print('AlarmValueLabel.updateStyle(%s,%s)'%(type(obj),obj))
+        #print('AlarmValueLabel.updateStyle(%s,%s)'%(type(obj),obj))
         if hasattr(obj,'active'):
             value = obj.active
         elif hasattr(obj,'rvalue'):
@@ -125,14 +126,20 @@ class AlarmValueLabel(Qt.QLabel):#TaurusValueLabel):
             self.ss = "background-color:grey; color:black;"
             self.setText(getattr(obj,'state',"UNKNOWN"))
         else:
-            self.ss = "background-color:lightgreen; color:black;"
-            self.setText(getattr(obj,'state',"OK"))
+            state = getattr(obj,'state',"OK")
+            if state in ('DSUPR','SHLVD'):
+                self.ss = "background-color:white; color:black;"
+            elif state in ('OOSRV','ERROR',):
+                self.ss = "background-color:white; color:red;"                
+            else:
+                self.ss = "background-color:lightgreen; color:black;"
+            self.setText(state)
         self.setStyleSheet(self.ss)
         self.alarmUpdated()
         #TaurusBaseWidget.updateStyle(self)
 
     def alarmUpdated(self):
-        print('AlarmValueLabel.alarmUpdated()')
+        #print('AlarmValueLabel.alarmUpdated()')
         self.emit(Qt.SIGNAL('alarmUpdated'))        
         
         
