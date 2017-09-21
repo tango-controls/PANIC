@@ -31,6 +31,25 @@ class QAlarmPanelLabel(Qt.QLabel):
             if event.button() == Qt.Qt.RightButton: 
                 #self.dragStartPosition = event.pos()        
                 self.parent().onContextMenu(event.pos())
+                
+class QAlarmPanelWidget(Qt.QWidget):
+    
+    def __init__(self,parent=None):
+        Qt.QWidget.__init__(self,parent)
+        self.setLayout(Qt.QVBoxLayout())
+        self.bar = Qt.QWidget()
+        self.bar.setLayout(Qt.QHBoxLayout())
+        self.bar.setMaximumHeight(50)
+        self.modelline = Qt.QLineEdit()
+        self.modelbt = Qt.QPushButton('Apply')
+        map(self.bar.layout().addWidget,(self.modelline,self.modelbt))
+        self.main = QAlarmPanel(self)
+        map(self.layout().addWidget,(self.bar,self.main))    
+        
+    def setModel(self,model=None):
+        if model is None: model = str(self.modelline.text())
+        else: self.modelline.setText(str(model))
+        self.bar.hide()        
     
 class QAlarmPanel(QAlarmManager,Qt.QWidget):
     
@@ -105,7 +124,7 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
             #px.scaled(height/self.rows,height/self.rows))
         #if (width/self.rows)>=50: 
         self.resize(width,height)
-        
+        self.show()
         
     def updateAlarms(self):
         # Sorting will be kept at every update
