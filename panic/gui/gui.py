@@ -439,10 +439,8 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
                         forms.append(f)
             if forms:
                 #@TODO: these checks will be not needed after full update
-                alarm.get_enabled(force=True)
-                alarm.get_acknowledged(force=True)
                 tracer("\tupdating %d %s forms"%(len(forms),alarm))
-                [f.valueChanged() for f in forms]
+                [f.valueChanged(forced=True) for f in forms]
             else:
                 pass #tracer("no forms open?")
         except:
@@ -679,7 +677,8 @@ class QFilterGUI(QAlarmList):
             severity = str(severity).upper().strip()
             if severity not in panic.SEVERITIES: raise Exception(severity)
             self.AlarmRows[tag].get_alarm_object().setup(severity=severity.upper(),write=True)
-        [f.setAlarmData() for f in WindowManager.WINDOWS if isinstance(f,AlarmForm)]
+        [f.setAlarmData() for f in WindowManager.WINDOWS 
+                if isinstance(f,AlarmForm)]
         
     def getSeverities(self):
         self.severities=[]
@@ -907,7 +906,6 @@ class AlarmGUI(QFilterGUI):
         alarm_preview_action = (getThemeIcon("accessories-calculator"),
             "Alarm Calculator",lambda g=alarmApp:WindowManager.addWindow(
                 AlarmPreview.showEmptyAlarmPreview(g)))
-            
         [o.addAction(*alarm_preview_action) for o in (tmw.toolsMenu,toolbar)]
         
         try:
@@ -921,6 +919,24 @@ class AlarmGUI(QFilterGUI):
         except:
             print('PyTangoArchiving not available')
             #traceback.print_exc()        
+            
+        import panic.gui.panel
+        alarmApp.tools['panel'] = WindowManager.addWindow(
+                panic.gui.panel.QAlarmPanel())
+        url = os.path.dirname(panic.__file__)+'/gui/icon/panel-view.png'
+        panel_icon = Qt.QIcon(Qt.QPixmap(url))
+        alarm_panel_action = (panel_icon,
+            "Alarm Panel",alarmApp.tools['panel'].setModel)
+        [o.addAction(*alarm_panel_action) for o in (tmw.toolsMenu,toolbar)]
+        
+        import panic.gui.views
+        alarmApp.tools['rawview'] = WindowManager.addWindow(
+                panic.gui.views.ViewRawBrowser())
+        #url = os.path.dirname(panic.__file__)+'/gui/icon/panel-view.png'
+        #panel_icon = Qt.QIcon(Qt.QPixmap(url))
+        alarm_panel_action = (getThemeIcon('actions:leftjust.svg'),
+            "View Raw",lambda s=self:alarmApp.tools['rawview'].setModel(self))
+        [o.addAction(*alarm_panel_action) for o in (tmw.toolsMenu,toolbar)]          
             
         print('Toolbars created after %s seconds'%(time.time()-t0))
         tmw.setCentralWidget(alarmApp)
