@@ -16,7 +16,7 @@ from fandango.functional import *
 from fandango.qt import Qt
 from fandango.excepts import Catched
 from fandango.objects import Cached
-from fandango.log import tracer,shortstr
+from fandango.log import tracer,shortstr,pprint,pformat
 
 import panic
 import panic.view
@@ -591,7 +591,21 @@ class QFilterGUI(QAlarmList):
         Qt.QObject.connect(self._ui.sevWarningCheckBox, 
                            Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
         Qt.QObject.connect(self._ui.sevDebugCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)  
+                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter) 
+        
+        self.regExToolTip = '\n'.join(s.strip() for s in """
+        Type a string to filter alarms:
+        
+          rf : all alarms matching 'rf'
+          rf & plc : all alarms matching 'rf' and 'plc'
+          rf | eps : all alarms matching 'rf' or 'eps'
+          tag=li_* : tag starting with li_
+          device=~li/ : device NOT starting with li_
+          sr[0-9] : any text matching sr and a digit
+          
+        """.split('\n'))
+        self._ui.regExLine.setToolTip(self.regExToolTip)
+        
         
     def getFilters(self):
         """
@@ -625,7 +639,7 @@ class QFilterGUI(QAlarmList):
             device = '*/' + combo2 + '/*'         
         elif combo1 == 'Hierarchy': 
             pass
-        elif combo1 in ('Annunciator','Receiver'):
+        elif combo1 in ('Annunciator','Receivers'):
             receiver = '*' + re.escape(combo2) + '*'
         elif combo1 == 'Priority':
             priority = combo2            
@@ -633,32 +647,7 @@ class QFilterGUI(QAlarmList):
             userfilter = combo2
         #elif combo1 == 'Severity': 
             #pass
-            
-        regexp = str(self.regEx).lower().strip()#.replace(' ','*')
-            
-        if regexp:
-            regexps = regexp.split('&')
-            for i,regexp in enumerate(regexps):
-                regexp = regexp.strip()
-                neg = regexp.startswith('~')
-                if neg: regexp = regexp[1:].strip()
-                #if regexp and not clmatch('^[~\!\*].*',regexp): 
-                print(regexp)
-                print(fandango.isRegexp(regexp))
-                print('*' in regexp)
-                if not fandango.isRegexp(regexp):
-                    regexp = '*'+regexp.replace(' ','*')+'*'
-                elif not '*' in regexp:
-                    regexp = '.*'+regexp.replace(' ','.*')+'.*'
-                if neg: regexp = '~'+regexp
-                print(regexp)
-                regexps[i] = regexp
-                
-            regexp = ' & '.join(regexps)
-            
-        regexp = regexp or self.default_regEx
-        print(regexp)
-        
+
         #dct = {'tag':regexp or self.default_regEx}
         #if not any(device,r
         if userfilter:
@@ -667,15 +656,34 @@ class QFilterGUI(QAlarmList):
             filters.extend(ff)
             self._ui.comboBoxx.setToolTip(pformat(ff))
             print(filters)
-        
-        if regexp.strip(' \n\r\t'):
-            filters.append({'tag':regexp,
-                            'device':regexp,
-                            'receivers':regexp,
-                            'formula':regexp,
-                            'state': regexp,
-                            #'priority': regexp,
-                            })
+            
+            
+        reg_dict = {}
+        def parse_regexp(regexp):
+            regexp = regexp.strip()
+            k,regexp = regexp.split('=') if '=' in regexp else ('',regexp)
+            neg = regexp.startswith('~')
+            if neg: regexp = regexp[1:].strip()
+            #if regexp and not clmatch('^[~\!\*].*',regexp): 
+            if not clmatch('.*[\^\$\*].*',regexp):
+                s = '.*' if fandango.isRegexp(regexp) else '*'
+                regexp = s+regexp.replace(' ',s)+s
+            if neg: regexp = '~'+regexp
+            if k: reg_dict[k] = regexp
+            else: return regexp            
+            
+        if not any((state,receiver,active,device,priority,
+                    self.regEx,userfilter)):
+            print('Overriding regexp!')
+            self.regEx = self.default_regEx
+        if self.regEx:
+            #reg_dict updated in parse_regexp
+            regexps = [parse_regexp(r) for r in self.regEx.split('&')]
+            regexp = ' & '.join(filter(bool,regexps))
+            reg_tags = ('tag','device','receivers','formula','state')
+            reg_dict.update((k,regexp) for k in reg_tags 
+                    if regexp and k not in reg_dict) #keys filtered out!
+            filters.append(reg_dict)
         
         if state: filters.append({'state':state})
         if receiver: filters.append({'receivers':receiver})
@@ -683,14 +691,16 @@ class QFilterGUI(QAlarmList):
         if device: filters.append({'device':device})
         if priority: filters.append({'priority':priority})
         
+        self._ui.regExUpdate.setToolTip(pformat(filters))
+        
         return filters
         
     
     def setFirstCombo(self):
         self.setComboBox(self._ui.contextComboBox,
             #['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],
-            ['State','Devices','Annunciator',
-             'UserFilters','Domain','Family','Priority',],
+            ['State','UserFilters','Priority','Devices','Annunciator',
+             'Receivers','Domain','Family',],
             sort=False)
 
     def setSecondCombo(self):
@@ -716,7 +726,7 @@ class QFilterGUI(QAlarmList):
             print(devs,values)
             r,sort,values = 1,True,values
             
-        elif source =='Annunciator':
+        elif source in ('Annunciator','Receivers'):
             #r,sort,values = 2,True,list(set(a for a in self.api.phonebook.keys() for l in self.api.values() if a in l.receivers))
             r,sort,values = 2,True,list(set(s for a in self.api.values() 
                     for s in ['SNAP','SMS']+
@@ -735,8 +745,9 @@ class QFilterGUI(QAlarmList):
             #r,sort,values = 5,False,['DESC', 'ASC']
         #else: #"Alarm Status"
             #r,sort,values = 0,False,['ALL', 'AVAILABLE', 'FAILED','HISTORY']
+            
         elif source =='State':
-            ss = ['*']
+            ss = [''] #empty filter to use default_regEx instead
             ss.append('|'.join(ACTIVE_STATES))
             ss.append('|'.join(DISABLED_STATES))
             ss.extend(AlarmStates.keys())
@@ -793,8 +804,8 @@ class QFilterGUI(QAlarmList):
 
     def onRegExUpdate(self):
         # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
-        self.regEx = (str(self._ui.regExLine.text()).strip() 
-            or self.default_regEx)
+        # self.regEx to be updated ONLY if Update is pushed
+        self.regEx = str(self._ui.regExLine.text()).lower().strip()
         self._ui.activeCheckBox.setChecked(False)
         self.onFilter()
         
