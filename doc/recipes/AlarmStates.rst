@@ -6,12 +6,27 @@ AlarmStates
 State transitions
 -----------------
 
-events will be received from the device or from the poll->read->read_hw chain
+Alarm States and Severities are defined in panic.properties module.
+
+With PyAlarm > 6.1; GUI will read the current Alarm state from the AlarmList attribute.
 
 
-* ActiveAlarms doesn't cotain tag, alarm.active will be 0, state = NORM
+
+For compatibility with older versions, the events of ActiveAlarms will be used instead:
+
+* If ActiveAlarms doesn't cotain tag, alarm.active will be 0, state = NORM
 * Activealarms contains tag, alarm.active = activealarms timestamp, state = ACTIVE
 * ActiveAlarms is None or Exception, alarm.active will be set to -1. state = ERROR
+
+Disabled States
+---------------
+
+Their meanings are:
+
+* OOSRV = Device server is Off (not exported), no process running
+* DSUPR = Enabled property is False
+* SHLVD = Alarm is listed in DisabledAlarms attribute (temporary disabled)
+* ERROR = Device is alive but the alarm is not being evaluated (exported=1 and thread dead or exception).
 
 IEC 62682: AlarmStates Definition and related  Actions
 ------------------------------------------------------
@@ -41,3 +56,6 @@ OOSRV is permanent (device disabled).
 All of them are controlled by the Enable/Disable states/commands of PyAlarm.
 
 In addition, PANIC adds ERROR State to raise problems with Tango devices.
+
+
+
