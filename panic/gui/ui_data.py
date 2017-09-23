@@ -77,7 +77,8 @@ class Ui_Data(object):
         self.severityStackedLayout.setObjectName("severityStackedLayout")
         self.severityCombo=QtGui.QComboBox(Data)
         self.severityCombo.setObjectName("severityCombo")
-        #self.severityCombo.connect(self.severityCombo,Q.textChanged,self.severityLineEdit.setText)
+        #self.severityCombo.connect(self.severityCombo,
+        #Q.textChanged,self.severityLineEdit.setText)
         self.severityStackedLayout.addWidget(self.severityCombo)
         self.severityLineEdit=clickableQLineEdit(Data)
         self.severityLineEdit.setReadOnly(True)
@@ -207,19 +208,15 @@ class Ui_Data(object):
 
     def retranslateUi(self, Data):
         Data.setWindowTitle("Data")
-        self.nameLabel.setText("Name:")
-        self.statusLabel.setText('Status:')
+        self.nameLabel.setText("Tag:")
+        self.statusLabel.setText('State:')
         self.disableLabel.setText('Disabled:')
         self.ackLabel.setText('Acknowledged:')
         self.deviceLabel.setText("Device:")
-        self.severityLabel.setText("Severity:")
-        self.severityCombo.addItem('DEBUG')
-        self.severityCombo.addItem('WARNING')
-        self.severityCombo.addItem('ALARM')
-        self.severityCombo.addItem('ERROR')
+        self.severityLabel.setText("Priority:")
 
         self.descriptionLabel.setText("Description:")
-        self.receiversLabel.setText("Receivers:")
+        self.receiversLabel.setText("Annunciators:")
         self.formulaLabel.setText("Formula:")
         self.editButton.setText("Edit")
         self.previewButton.setText("Show Values")
