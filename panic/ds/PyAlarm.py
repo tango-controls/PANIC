@@ -185,6 +185,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         to each Alarm attributes
         """
         tag_name = attr.get_name()
+        assert tag_name in self.Alarms,'Alarm Removed!'
         value = any(re.match(tag_name.replace('_','.')+'$',a) 
                     for a in self.get_active_alarms())
         self.debug('PyAlarm(%s).read_alarm_attribute(%s) is %s;'\
@@ -1022,13 +1023,17 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 except: 
                     arg = [s.strip("' ") for s in cmd[1:]]
 
-                if arg and len(arg)==1:
-                  if action[0] == 'command':
-                    t = str(dp.command_query(cmd[0]).in_type)
-                  else:
-                    t = str(dp.attribute_query(cmd[0]).data_format)
-                  if not clsearch('array|spectrum|image',t):
-                    arg = arg[0]
+                if arg:
+                    if len(arg)==1:
+                        if action[0] == 'command':
+                            t = str(dp.command_query(cmd[0]).in_type)
+                        else:
+                            t = str(dp.attribute_query(cmd[0]).data_format)
+                        if not clsearch('array|spectrum|image',t):
+                            arg = arg[0]
+                    
+                    elif len(arg)>1 and clmatch('[\[\(].*',str(arg[0])):
+                        arg = eval(','.join(arg))
                     
                 if action[0] == 'command':
                     self.info(('\tlaunching: %s / %s (%s)' % (dev,cmd[0],cmd[1:]))[:120])
