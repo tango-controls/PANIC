@@ -43,9 +43,9 @@ from fandango.dicts import SortedDict,CaselessDict, \
 import fandango.callbacks
 
 import panic
-from panic import *
-from panic.alarmapi import *
-from panic.properties import *
+
+from .alarmapi import *
+from .properties import *
 
 def check_multi_host(model,host=None,raise_=False):
     """ returns True if tango_host in model does not match host """
