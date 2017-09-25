@@ -547,7 +547,10 @@ class Alarm(object):
     
     def get_annunciators(self): return self.receivers
     def set_annunciators(self,val): self.receivers = val
-    annunciators = property(fget=get_annunciators,fset=set_annunciators)     
+    annunciators = property(fget=get_annunciators,fset=set_annunciators)    
+    
+    def get_condition(self): return self.get_ds().condition
+    condition = property(get_condition)
 
     def parse_config(self):
         """ Checks the Alarm config related to this alarm """
@@ -792,6 +795,7 @@ class AlarmDS(object):
                 print('Unparsable Alarm!: %s' % line)
         #print('%s device manages %d alarms: %s'
         #   %(self.name,len(self.alarms),self.alarms.keys()))
+        
         return self.alarms        
         
     def get(self,alarm=None):
@@ -857,6 +861,12 @@ class AlarmDS(object):
                 
             self.version = fandango.objects.ReleaseNumber(v)
         return self.version 
+    
+    def get_condition(self):
+        # Operation Mode (Enabled formula)
+        return self.config['Enabled']
+
+    condition = property(get_condition)
     
     def get_model(self):
         """ 

@@ -612,7 +612,8 @@ class QFilterGUI(QAlarmList):
             ('regEx','severities','timeSortingEnabled','changed',)]),level=2)
         
         filters = []
-        device = receiver = formula = state = priority = userfilter = ''
+        device = receiver = formula = state = priority = \
+            condition = userfilter = ''
         
         active = self._ui.activeCheckBox.isChecked() \
                         or self.timeSortingEnabled
@@ -635,7 +636,9 @@ class QFilterGUI(QAlarmList):
         elif combo1 in ('Annunciator','Receivers'):
             receiver = '*' + re.escape(combo2) + '*'
         elif combo1 == 'Priority':
-            priority = combo2            
+            priority = combo2     
+        elif combo1 == 'PreCondition':
+            condition = combo2           
         elif combo1 == 'UserFilters':
             userfilter = combo2
         #elif combo1 == 'Severity': 
@@ -683,6 +686,7 @@ class QFilterGUI(QAlarmList):
         if active: filters.append({'active':active})
         if device: filters.append({'device':device})
         if priority: filters.append({'priority':priority})
+        if condition: filters.append({'condition':condition})
         
         self._ui.regExUpdate.setToolTip(pformat(filters))
         
@@ -692,8 +696,8 @@ class QFilterGUI(QAlarmList):
     def setFirstCombo(self):
         self.setComboBox(self._ui.contextComboBox,
             #['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],
-            ['State','UserFilters','Priority','Devices','Annunciator',
-             'Receivers','Domain','Family',],
+            ['State','UserFilters','Priority','Devices','PreCondition',
+             'Annunciator','Receivers','Domain','Family',],
             sort=False)
 
     def setSecondCombo(self):
@@ -705,18 +709,18 @@ class QFilterGUI(QAlarmList):
         self._ui.comboBoxx.show()
         self._ui.infoLabel0_1.show()
         self._ui.comboBoxx.setEnabled(True)
+        devs = sorted(set(a.device for a in self.api.values()))
         if source =='Devices':
-            r,sort,values = 1,True,sorted(set(a.device 
-                                              for a in self.api.values()))
-            print(values)
+            r,sort,values = 1,True,devs
+            
+        elif source =='PreCondition':
+            r,sort,values = 1,True,sorted(set(self.api.devices[d].condition 
+                                        for d in devs))
+            
         elif source =='Domain':
-            r,sort,values = 1,True,sorted(set(a.device.split('/')[-3]
-                                              for a in self.api.values()))
+            r,sort,values = 1,True,sorted(set(d.split('/')[-3] for d in devs))
         elif source =='Family':
-            devs = sorted(set(a.device for a in self.getAlarms()))
-            values = sorted(set(a.device.split('/')[-2]
-                                              for a in self.api.values()))
-            print(devs,values)
+            values = sorted(set(d.split('/')[-2] for d in devs if '/' in d))
             r,sort,values = 1,True,values
             
         elif source in ('Annunciator','Receivers'):
@@ -1048,8 +1052,8 @@ class AlarmGUI(QFilterGUI):
         #url = os.path.dirname(panic.__file__)+'/gui/icon/panel-view.png'
         #panel_icon = Qt.QIcon(Qt.QPixmap(url))
         alarm_panel_action = (getThemeIcon('actions:leftjust.svg'),
-            "View Raw",lambda s=self:alarmApp.tools['rawview'].setModel(self))
-        [o.addAction(*alarm_panel_action) for o in (tmw.toolsMenu,toolbar)]          
+            "RawView",lambda s=self:alarmApp.tools['rawview'].setModel(self))
+        [o.addAction(*alarm_panel_action) for o in (tmw.toolsMenu,)]          
             
         print('Toolbars created after %s seconds'%(time.time()-t0))
         tmw.setCentralWidget(alarmApp)
