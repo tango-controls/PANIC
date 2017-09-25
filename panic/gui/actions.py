@@ -72,19 +72,17 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         
         # Reset / Acknowledge options
         act = self.popMenu.addAction(getThemeIcon("edit-undo"), 
-                        "Reset Alarm(s)",lambda s=self:ResetAlarm(s))
-
-        #items = [view.get_alarm_from_text(i.text(),obj=True) for i in items]
-        #print('oncontextMenu(%s)'%items)
-            
+                        "Reset Alarm(s)",lambda s=self:ResetAlarm(s))    
         act.setEnabled(any(i.active for i in items))
 
-        if len([i.acknowledged for i in items]) in (len(items),0):
+        #if len([i.acknowledged for i in items]) in (len(items),0):
+        if len(items)==1:
             self.popMenu.addAction(getThemeIcon("media-playback-pause"), 
                 "Acknowledge/Renounce Alarm(s)",
                 lambda s=self:AcknowledgeAlarm(s))
 
-        if len([i.disabled for i in items]) in (len(items),0):
+        #if len([i.disabled for i in items]) in (len(items),0):
+        if len(items)==1:
             self.popMenu.addAction(getThemeIcon("dialog-error"), 
                 "Disable/Enable Alarm(s)",
                 lambda s=self:ChangeDisabled(s))
