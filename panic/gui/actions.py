@@ -287,6 +287,21 @@ def ResetAlarm(parent=None,alarm=None):
         trace('In ResetAlarm(): %s'%text)
         text += '\n\n'+'Must type a comment to continue:'
         
+        for a in alarms:
+            try:
+                r = parent.api.evaluate(a.formula)
+                if r:
+                    v = QtGui.QMessageBox.warning(self,'Warning',
+                        '%s condition is still active'%a.tag
+                        +'. Do you want to reset it anyway?',
+                        QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel)
+                    if v == QtGui.QMessageBox.Cancel:
+                        return
+                    else:
+                        break
+            except:
+                traceback.print_exc()        
+        
         self.setAllowedUsers(self.api.get_admins_for_alarm(len(alarms)==1 
                     and alarms[0].tag))
         if not self.validate('%s(%s)'%(action,[a.tag for a in alarms])):
