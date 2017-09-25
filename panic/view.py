@@ -289,6 +289,7 @@ class AlarmView(EventListener):
         #self.info('get_alarm(%s)'%alarm)
         alarm = getattr(alarm,'tag',alarm)
         alarm = alarm.split('tango://')[-1]
+        if not alarm: return None
         a = self.alarms.get(alarm,None)
         if a is None:
             alarm = alarm.split('/')[-1]

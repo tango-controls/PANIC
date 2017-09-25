@@ -318,11 +318,13 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             
     def getCurrentAlarm(self,item=None):
         tag = self.getCurrentTag(item)
-        return self.api[tag]
+        if tag:
+            return self.api[tag]
     
     def getCurrentTag(self,item=None):
         row = item or self._ui.listWidget.currentItem()
-        return self.view.get_alarm_from_text(row.text())
+        if row.text():
+            return self.view.get_alarm_from_text(row.text())
       
     def onSelectAllNone(self):
         if self._ui.selectCheckBox.isChecked():
@@ -344,7 +346,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
     
     def getSelectedAlarms(self,extend=False):
         rows = self.getSelectedItems(extend)
-        return [self.getCurrentAlarm(r) for r in rows]
+        return filter(bool,(self.getCurrentAlarm(r) for r in rows))
       
     def getVisibleRows(self,margin=10):
         ql = self._ui.listWidget
@@ -762,18 +764,6 @@ class QFilterGUI(QAlarmList):
         comboBox.clear()
         [comboBox.addItem(Qt.QString(i)) for i in values]
         if sort: comboBox.model().sort(0, Qt.Qt.AscendingOrder)
-        
-    def setSeverity(self,tag,severity):
-        tags = tag if fn.isSequence(tag) else [tag]
-        self.setAllowedUsers(self.api.get_admins_for_alarm(len(tags)==1 and tags[0]))
-        if not self.validate('setSeverity(%s,%s)'%(tags,severity)):
-            return
-        for tag in tags:
-            severity = str(severity).upper().strip()
-            if severity not in panic.SEVERITIES: raise Exception(severity)
-            self.AlarmRows[tag].get_alarm_object().setup(severity=severity.upper(),write=True)
-        [f.setAlarmData() for f in WindowManager.WINDOWS 
-                if isinstance(f,AlarmForm)]
         
     def getSeverities(self):
         self.severities=[]

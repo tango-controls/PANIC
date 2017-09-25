@@ -12,6 +12,7 @@ import taurus, taurus.qt.qtgui.base
 from taurus.core import TaurusEventType
 from taurus.qt.qtgui.base import TaurusBaseComponent
 import panic
+from panic.properties import SEVERITIES
 from panic.gui.utils import *
 from panic.gui.utils import WindowManager #Order of imports matters!
 from panic.gui.editor import AlarmForm
@@ -62,12 +63,12 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         act.setEnabled(SNAP_ALLOWED and len(items)==1) 
             # and row.get_alarm_tag() in self.ctx_names)
             
-        sevMenu = self.popMenu.addMenu('Change Severity')
-        for S in ('ERROR','ALARM','WARNING','DEBUG'):
+        sevMenu = self.popMenu.addMenu('Change Priority')
+        for S in SEVERITIES:
             action = sevMenu.addAction(S)
             self.connect(action, QtCore.SIGNAL("triggered()"), 
-                lambda ks=items,s=S: 
-                  self.setSeverity([k.tag for k in ks],s))
+                lambda ks=items,sev=S,o=self:
+                  ChangeSeverity(parent=o,severity=sev))
         
         # Reset / Acknowledge options
         act = self.popMenu.addAction(getThemeIcon("edit-undo"), 
@@ -173,7 +174,8 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
                 obj = self.api[alarm]
                 self.api.add(str(new_tag), obj.device, formula=obj.formula, 
                              description=obj.description, 
-                             receivers=obj.receivers, severity=obj.severity)
+                             receivers=obj.receivers, 
+                             severity=obj.severity)
                 self.onReload()
             except Exception,e:
                 Qt.QMessageBox.critical(self,"Error!",str(e), 
@@ -285,7 +287,6 @@ def ResetAlarm(parent=None,alarm=None):
         trace('In ResetAlarm(): %s'%text)
         text += '\n\n'+'Must type a comment to continue:'
         
-        
         self.setAllowedUsers(self.api.get_admins_for_alarm(len(alarms)==1 
                     and alarms[0].tag))
         if not self.validate('%s(%s)'%(action,[a.tag for a in alarms])):
@@ -342,9 +343,9 @@ def AcknowledgeAlarm(parent,alarm=None):
                 
         emitValueChanged(self)
     except Exception,e:
-        #msg = traceback.format_exc()
+        msg = traceback.format_exc() if e.message!=comment_error else e.message
         v = QtGui.QMessageBox.warning(self,'Warning',
-                                      e.message,QtGui.QMessageBox.Ok)
+                                      msg,QtGui.QMessageBox.Ok)
         if e.message == comment_error: AcknowledgeAlarm(parent,alarm)
     
 def ChangeDisabled(parent,alarm=None):
@@ -382,11 +383,31 @@ def ChangeDisabled(parent,alarm=None):
 
         emitValueChanged(self)
     except Exception,e:
-        #msg = traceback.format_exc()
+        msg = traceback.format_exc() if e.message!=comment_error else e.message
         v = QtGui.QMessageBox.warning(self,'Warning',
-                                      e.message,QtGui.QMessageBox.Ok)
+                                      msg,QtGui.QMessageBox.Ok)
         if e.message == comment_error: ChangeDisabled(parent,alarm)        
 
-  
+def ChangeSeverity(parent,severity,alarm=None):
+    try:        
+        alarms = getTargetAlarms(parent,alarm,active=False)
+        assert severity in SEVERITIES
+        parent.setAllowedUsers(parent.api.get_admins_for_alarm(len(alarms)==1 
+                    and alarms[0].tag))
+        if not parent.validate('%s(%s)'%(
+                'ChangePriority',[a.tag for a in alarms])):
+            raise Exception('Invalid login or password!')
+            
+        for alarm in alarms:
+            alarm.setup(severity=severity.upper(),write=True)
+            [f.setAlarmData() for f in WindowManager.WINDOWS 
+                    if isinstance(f,AlarmForm)]
+        emitValueChanged(parent)
+        
+    except Exception,e:
+        msg = traceback.format_exc()
+        v = QtGui.QMessageBox.warning(parent,'Warning',
+                                      msg,QtGui.QMessageBox.Ok)
+        
 
 

@@ -208,13 +208,15 @@ class iValidatedWidget(object):
     def init(self,tag=''):
       
         if not hasattr(self,'validator'):
+          print('>#'*40)
           self.UserValidator,self.validator = '',None
           log,p = '',str(sys.path)
           try:
               props = self.api.servers.db.get_class_property(
                   'PyAlarm',['UserValidator','PanicAdminUsers'])
               self.UserValidator = fandango.first(props['UserValidator'],'')
-              self.AdminUsers = list(props['PanicAdminUsers'])
+              self.AdminUsers = filter(bool,
+                                       map(str.strip,props['PanicAdminUsers']))
               if self.UserValidator:
                 mod,klass = self.UserValidator.rsplit('.',1)
                 mod = fandango.objects.loadModule(mod)
@@ -235,7 +237,10 @@ class iValidatedWidget(object):
               return -1
 
         if self.AdminUsers and not self.UserValidator:
-            print('iValidateWidget: wrong properties definition')
+            print(self.AdminUsers,self.UserValidator)
+            raise Exception,\
+                'iValidateWidget(PanicAdminUsers):'\
+                    ' UserValidator property not defined'
             return -1
         if not self.AdminUsers and not self.UserValidator:
             #passwords not available

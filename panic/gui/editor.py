@@ -32,6 +32,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._message = QtGui.QMessageBox(self)
         self._wi = Ui_Data()
         self._wi.setupUi(self)
+        [self._wi.severityCombo.addItem(s) for s in panic.SEVERITIES]
+        
         self.setMinimumWidth(500)
         self._dataWidget = self
         self.fromAlarmGUI()
@@ -44,8 +46,6 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             self.connect(self._timer,Qt.SIGNAL("timeout()"), self.valueChanged)
             self._timer.start(refresh)
             print('AlarmForm._timer(%s)'%refresh)
-            
-        
             
     def setCurrentAlarm(self,alarm=None):
         if isinstance(alarm,panic.Alarm):
@@ -427,6 +427,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
                 except: print 'Renaming context: Failed!\n%s'%traceback.format_exc()
         
         self.setAlarmData(tag)
+        self.valueChanged()
         print 'Out of saveNewData()'
     
     ###########################################################################
