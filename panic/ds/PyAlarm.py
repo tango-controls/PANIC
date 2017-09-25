@@ -853,72 +853,36 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 return r
               
               return _rcatched
+          
+            ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
+            if action_receivers:
+                self.info('-'*80)
+                for ac in action_receivers:
+                    rcatched(self.trigger_action)(
+                        tag_name,ac,message=message)          
               
             if alarm and self.Alarms[tag_name].severity=='DEBUG':
                 self.warning('%s Alarm with severity==DEBUG do not trigger '
-                    'actions, messages or snapshot'%tag_name)
+                    'messages'%tag_name)
 
             #NOTIFICATION OF ALARMS
             else:
-              
-              ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
-              if action_receivers:
-                  self.info('-'*80)
-                  for ac in action_receivers:
-                      rcatched(self.trigger_action)(
-                          tag_name,ac,message=message)
-
               #Disabling sms message for messages not related to new alarms
               if sms_receivers and message in ('ALARM',) \
                     or 'sms' in str(self.AlertOnRecovery).lower(): 
                   rcatched(self.SendSMS)(
                     tag_name,sms_receivers,message=message,values=values)
                   
-              # SNAP ARCHIVING
-              if (self.snap and SNAP_ALLOWED
-                  and (message in ('ALARM','ACKNOWLEDGED','RESET') 
-                       or self.AlertOnRecovery and message=='RECOVERED')
-                  and (self.UseSnap 
-                       or self.parse_receivers(tag_name,'SNAP',
-                                               receivers,message=message))):
-                  if (self.Alarms[tag_name].severity!='DEBUG'): 
-                      rcatched(self.trigger_snapshot)(tag_name,message)
-                  
-              ### ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
-              #if action_receivers:
-                #self.info('-'*80)
-                #for ac in action_receivers:
-                  #try:
-                    #self.trigger_action(tag_name,ac,message=message)
-                  #except:
-                    #msg = 'PyAlarm.trigger_action crashed with exception:\n%s' % traceback.format_exc()
-                    #self.warning(msg)
-                    #report[0] += '\n'+'-'*80+'\n'+msg
+            # SNAP ARCHIVING
+            if (self.snap and SNAP_ALLOWED
+                and (message in ('ALARM','ACKNOWLEDGED','RESET') 
+                    or self.AlertOnRecovery and message=='RECOVERED')
+                and (self.UseSnap 
+                    or self.parse_receivers(tag_name,'SNAP',
+                                            receivers,message=message))):
+                if (self.Alarms[tag_name].severity!='DEBUG'): 
+                    rcatched(self.trigger_snapshot)(tag_name,message)
 
-              ##Disabling sms message for messages not related to new alarms
-              #if sms_receivers and message in ('ALARM',) \
-                    #or 'sms' in str(self.AlertOnRecovery).lower(): 
-                #try:
-                  #self.info('-'*80)
-                  #self.SendSMS(tag_name,sms_receivers,
-                               #message=message,values=values)
-                #except:
-                  #msg = 'Exception sending sms!: %s' % traceback.format_exc()
-                  #self.warning(msg)
-                  #report[0] += '\n'+'-'*80+'\n'+msg
-
-              ## SNAP ARCHIVING
-              #if (self.snap and SNAP_ALLOWED
-                  #and (message in ('ALARM','ACKNOWLEDGED','RESET') or self.AlertOnRecovery and message=='RECOVERED')
-                  #and (self.UseSnap or self.parse_receivers(tag_name,'SNAP',receivers,message=message))):
-                #try:
-                  #self.info('-'*80),self.info('triggering snapshot for alarm:'+tag_name)
-                  #if (self.Alarms[tag_name].severity!='DEBUG'): self.trigger_snapshot(tag_name,message)
-                #except Exception, e:
-                  #msg = 'PyAlarm.trigger_snapshot crashed with exception:\n%s' % traceback.format_exc()
-                  #self.warning(msg)
-                  #report[0] += '\n'+'-'*80+'\n'+msg
-                  
             #LOGGING (by file or email)
             
             # html logs
@@ -930,25 +894,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             ## emails
             if mail_receivers: 
                 r = rcatched(self.SendMail)(report)
-            
-            ## html logs
-            #if self.parse_receivers(tag_name,'HTML',receivers,message=message):
-              #try:
-                #self.info('-'*80),self.info('saving html report for alarm:'+tag_name)
-                #self.SaveHtml(self.GenerateReport(tag_name,message=message,values=values, html=True))
-              #except Exception, e:
-                #msg = 'PyAlarm.saveHtml crashed with exception:\n%s' % traceback.format_exc()
-                #self.warning(msg)
-                #report[0] += '\n'+'-'*80+'\n'+msg
-              
-            ## emails
-            #if mail_receivers: 
-              #self.info('-'*80)
-              #try:
-                #self.SendMail(report)
-              #except:
-                #self.warning('Exception sending email!: %s' % traceback.format_exc())
-                
+                          
             self.info('-'*80),self.update_flag_file()
 
           else:
