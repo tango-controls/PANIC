@@ -152,7 +152,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         N = len(self.getAlarms())
         trace('AlarmGUI(): %d alarms'%N)
         if 1: #N<150: 
-            self._ui.sevDebugCheckBox.setChecked(True)
+            #self._ui.sevDebugCheckBox.setChecked(True)
             self._ui.activeCheckBox.setChecked(False)
         #else:
             #self._ui.sevDebugCheckBox.setChecked(False)
@@ -586,14 +586,16 @@ class QFilterGUI(QAlarmList):
                            Qt.SIGNAL('stateChanged(int)'), self.onSelectAllNone)
         Qt.QObject.connect(self._ui.activeCheckBox, 
                            Qt.SIGNAL('stateChanged(int)'), self.onFilter)
-        Qt.QObject.connect(self._ui.sevAlarmCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevErrorCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevWarningCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevDebugCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter) 
+        
+        #@DEPRECATED
+        #Qt.QObject.connect(self._ui.sevAlarmCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        #Qt.QObject.connect(self._ui.sevErrorCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        #Qt.QObject.connect(self._ui.sevWarningCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        #Qt.QObject.connect(self._ui.sevDebugCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter) 
         
         self.regExToolTip = '\n'.join(s.strip() for s in """
         Type a string to filter alarms:
@@ -765,15 +767,16 @@ class QFilterGUI(QAlarmList):
         [comboBox.addItem(Qt.QString(i)) for i in values]
         if sort: comboBox.model().sort(0, Qt.Qt.AscendingOrder)
         
-    def getSeverities(self):
-        self.severities=[]
-        if self._ui.sevAlarmCheckBox.isChecked(): self.severities.append('alarm')
-        if self._ui.sevErrorCheckBox.isChecked(): self.severities.append('error')
-        if self._ui.sevWarningCheckBox.isChecked():
-            self.severities.append('warning')
-            self.severities.append('')
-        if self._ui.sevDebugCheckBox.isChecked(): self.severities.append('debug')
-        return self.severities
+    #@DEPRECATED
+    #def getSeverities(self):
+        #self.severities=[]
+        #if self._ui.sevAlarmCheckBox.isChecked(): self.severities.append('alarm')
+        #if self._ui.sevErrorCheckBox.isChecked(): self.severities.append('error')
+        #if self._ui.sevWarningCheckBox.isChecked():
+            #self.severities.append('warning')
+            #self.severities.append('')
+        #if self._ui.sevDebugCheckBox.isChecked(): self.severities.append('debug')
+        #return self.severities
       
     ###########################################################################
     
@@ -787,10 +790,11 @@ class QFilterGUI(QAlarmList):
         self.showList()
         self.refreshTimer.setInterval(self.REFRESH_TIME)
 
-    def onSevFilter(self):
-        # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
-        self.getSeverities()
-        self.onFilter()
+    #@DEPRECATED
+    #def onSevFilter(self):
+        ## THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
+        #self.getSeverities()
+        #self.onFilter()
 
     def onRegExUpdate(self):
         # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
@@ -897,8 +901,8 @@ class AlarmGUI(QFilterGUI):
             
         if self.mainwindow:
             
-            self.mainwindow.setWindowTitle('PANIC (%s[%s]@%s)'%(
-                self.scope,self.default_regEx,
+            self.mainwindow.setWindowTitle('PANIC %s (%s[%s]@%s)'%(
+                panic.__RELEASE__,self.scope,self.default_regEx,
                 fn.get_tango_host().split(':')[0]))
             
             icon = '/gui/icon/panic-6-big.png' #'.svg'
