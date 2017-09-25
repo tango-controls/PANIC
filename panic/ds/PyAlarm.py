@@ -250,6 +250,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                                     self.get_name().split('/'))))
             _locals.update({'DEVICE':self.get_name(),
                             'ALARMS':self.Alarms.keys(),
+                            'PHONEBOOK':self.Alarms.phonebook,
                             'PANIC':self.Panic,
                             'SELF':self})
             _locals['t'] = time.time() - (self.TStarted + self.StartupDelay)
@@ -364,7 +365,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     
     def parse_receivers(self,tag_name='',filtre=False,receivers=None,message=''):
         '''
-        Filters the Alarm receivers matching tag_name; also replaces addresses entered in the PhoneBook 
+        Filters the Alarm receivers matching tag_name; also replaces addresses 
+        entered in the PhoneBook 
         This method is called from free_alarm and send_alarm.
         '''
         if not receivers:
@@ -1423,7 +1425,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.info('Configured WorkerProcess, waiting %s seconds'
                       ' in background ...'%self.StartupDelay)
 
-                self.PhoneBook = self.Alarms.phonebook
+                self.PhoneBook = self.Alarms.phonebook #done at Alarms.load()
 
             self.AddressList = dict(self.PhoneBook)
 

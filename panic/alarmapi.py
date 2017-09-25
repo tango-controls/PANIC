@@ -1420,8 +1420,9 @@ class AlarmAPI(fandango.SingletonMap):
         prop = self.get_class_property('PyAlarm','Phonebook')
         if tag not in str(prop): raise Exception('NotFound:%s'%tag)
         self.save_phonebook([p for p in prop if not p.split(':',1)[0]==tag])
+        self.on_phonebook_changed(tag)
 
-    def edit_phonebook(self, tag, value, section=''):
+    def edit_phonebook(self, tag, value, section='',notify=True):
         """ Adds a person to the phonebook """
         prop = self.get_class_property('PyAlarm','Phonebook')
         name = tag.upper()
@@ -1441,6 +1442,18 @@ class AlarmAPI(fandango.SingletonMap):
             prop = prop[:index]+[value]+prop[index:]
             
         self.save_phonebook(prop)
+        if notify: self.on_phonebook_changed(name)
+
+    def on_phonebook_changed(self,tag):
+        devs = set()
+        for a in self.alarms.values():
+            recs = a.receivers
+            if not isSequence(recs): 
+                recs = [r.strip() for r in recs.split(',')]
+            if tag in recs:
+                devs.add(a.device.lower())
+        print('on_phonebook_changed(%s): updating %s'%(tag,devs))
+        [self.devices[d].init() for d in devs]
 
     def save_phonebook(self, new_prop):
         """ Saves a new phonebook in the database """
