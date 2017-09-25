@@ -103,7 +103,7 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
                                          "Delete Alarm",self.onDelete)
             act.setEnabled(len(items)==1)
             self.popMenu.addAction(getThemeIcon("applications-system"), 
-                                   "Advanced Config",self.onConfig)
+                            "Advanced Config",lambda s=self:ShowConfig(s))
             self.popMenu.addSeparator()
             act = self.popMenu.addAction(
                 getThemeIcon("accessories-text-editor"), "TestDevice",
@@ -161,10 +161,6 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
             return form
         except:
             traceback.print_exc()
-        
-    def onConfig(self):
-        self.dac = dacWidget(device=self.getCurrentAlarm().device)
-        self.dac.show()
         
     def onClone(self):
         alarm = self.getCurrentAlarm().tag
@@ -271,6 +267,12 @@ def emitValueChanged(self):
     #[f.setAlarmData() for f in WindowManager.WINDOWS 
             #if isinstance(f,AlarmForm)]
     #self.onFilter()        
+    
+        
+def ShowConfig(parent=None):
+    dac = dacWidget(device=parent.getCurrentAlarm().device)
+    WindowManager.addWindow(dac)
+    dac.show()    
                 
 def ResetAlarm(parent=None,alarm=None):
     try:
