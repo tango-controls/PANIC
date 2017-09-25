@@ -53,7 +53,7 @@ from fandango import first,searchCl,matchCl,clmatch,clsearch,\
     isString,isSequence,isNumber,isFalse,isCallable,isMapping,\
     xor,now,str2time,time2str,END_OF_TIME,Cached
 from fandango.dicts import defaultdict
-from fandango.tango import CachedAttributeProxy, AttrDataFormat
+from fandango.tango import CachedAttributeProxy, AttrDataFormat, retango
 from fandango.tango import PyTango,get_tango_host, check_device_cached
 from fandango.tango import parse_tango_model
 from fandango.log import tracer,shortstr
@@ -1053,10 +1053,11 @@ class AlarmAPI(fandango.SingletonMap):
     def __get_tag(self,k):
         if isinstance(k,Alarm):
             return self.__get_tag(k.tag)
-        elif '/' in str(k): 
+        elif clmatch(retango,k): 
             if ':' in k:
                 self.warning('[%s]: AlarmAPI does not support multi-host!'%k)
-            k = k.split('/')[-1]
+            else:
+                k = k.split('/')[-1]
         return k
     def __getitem__(self,k): #*a,**k): 
         return self.alarms.__getitem__(self.__get_tag(k)) #*a,**k)
