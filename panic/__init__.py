@@ -1,23 +1,24 @@
+"""
+This file belongs to the PANIC Alarm Suite, 
+developed by ALBA Synchrotron for Tango Control System
+GPL Licensed 
+"""
+
 import os,sys,traceback
 
-import properties
-import alarmapi as _panic
-from view import AlarmView
-from properties import *
-from alarmapi import *
-from alarmapi import Alarm,AlarmAPI,AlarmDS,api,getAttrValue
-#from utils import *
-
-try: __RELEASE__ = open(os.path.dirname(os.path.abspath(__file__))+'/VERSION').read().strip()
+try: __RELEASE__ = open(os.path.dirname(os.path.abspath(__file__)
+                                        )+'/VERSION').read().strip()
 except Exception,e: __RELEASE__ = '6.X+'
 
 #CLEAN DEPRECATED FILES
+#print('panic.__init__, deprecated files checking ...')
 p = __file__.rsplit(os.path.sep,1)[0]
 deprecated = [p+os.path.sep+'panic.pyc',p+os.path.sep+'panic.pyo',
               p+os.path.sep+'panic.py',p+os.path.sep+'/gui/widgets.pyo',
               p+os.path.sep+'/gui/widgets.pyc',p+os.path.sep+'/gui/widgets.py',
             ]
 for p in deprecated:
+    #print('checking %s ...'%p)
     if os.path.exists(p):
         try:
             os.remove(p)
@@ -30,6 +31,16 @@ for p in deprecated:
             print('')
             sys.exit(-1)
 
+import properties
+import alarmapi as _panic
+import alarmapi
+import view
 
-_proxies = _panic._proxies
+from .view import AlarmView
+from .properties import *
+from .alarmapi import *
+from .alarmapi import Alarm,AlarmAPI,AlarmDS,api,getAttrValue
+#from utils import *
+
+_proxies = alarmapi._proxies
 

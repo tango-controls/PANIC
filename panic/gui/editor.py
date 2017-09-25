@@ -1,9 +1,16 @@
+"""
+This file belongs to the PANIC Alarm Suite, 
+developed by ALBA Synchrotron for Tango Control System
+GPL Licensed 
+"""
+
 import sys, re
 import panic
 import panic.alarmapi
 
 # All that is needed (Qt, SNAP_ALLOWED, fandango)
 from panic.gui.utils import *
+import panic.gui.actions
 
 #AlarmFormula widget is added in the ui_data.py file
 from ui_data import Ui_Data,Ui_ReceiversLine
@@ -11,7 +18,7 @@ from ui_data import uiBodyForm,uiRowForm
 
 #get_next_index = lambda d: max([0]+list(d))+1
 
-###########################################################################################
+###############################################################################
 # AlarmEditor forms
 
 FormParentClass = Qt.QDialog
@@ -59,7 +66,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         return [self._currentAlarm]
     
     def fromAlarmGUI(self):
-        self.formulaeditor=FormulaEditor(self._dataWidget)#self._dataWidget._wi.frame)
+        self.formulaeditor=FormulaEditor(self._dataWidget)
+        #self._dataWidget._wi.frame)
         self._receiversLine=ReceiversForm()
         self.prepareLineWidget()
         #self._ui.gridLayout.addWidget(self._dataWidget)
@@ -95,7 +103,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._dataWidget._wi.formulaTextEdit.setClickHook(self.onEdit)
         
     def showAlarmPreview(self):
-        self.preview = AlarmPreview(tag=self.getCurrentAlarm().tag,formula=self._wi.formulaTextEdit.toPlainText(),parent=self.parent())
+        self.preview = AlarmPreview(tag=self.getCurrentAlarm().tag,
+            formula=self._wi.formulaTextEdit.toPlainText(),parent=self.parent())
         self.preview.connect(self.preview.upperPanel,Qt.SIGNAL('onSave'),
             lambda obj,s=self:(s.enableEditForm(False),s.setAlarmData(obj)))
         from utils import WindowManager
@@ -104,7 +113,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         
     def showAlarmReport(self):
         #qd = Qt.QDialog(self.parent())
-        self.report = getAlarmReport(alarm=self.getCurrentAlarm(),parent=self.parent())
+        self.report = getAlarmReport(alarm=self.getCurrentAlarm(),
+                                     parent=self.parent())
         self.report.setModal(True)
         #form.setParent(qd)
         self.report.exec_()
@@ -114,9 +124,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.enableEditForm(False)
         
     def onDeviceConfig(self):
-        from panic.gui.devattrchange import dacWidget
-        self.dac = dacWidget(device=self.getCurrentAlarm().device)
-        self.dac.show()
+        panic.gui.actions.ShowConfig(self)
         
     ###########################################################################
     # AlarmEditor
@@ -151,7 +159,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         print'onCancel()'
         self.formulaeditor.Clr()
         self.setAlarmData()
-        self.enableEditForm(not(self.getCurrentAlarm() and self.getCurrentAlarm().tag))
+        self.enableEditForm(not(self.getCurrentAlarm() 
+                                and self.getCurrentAlarm().tag))
     
     def onPlus(self):
         self._receiversLine.show()
@@ -167,7 +176,6 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._dataWidget._wi.receiversLineEdit.setText(newText)
         
     def onReset(self,alarm=None):
-        import panic.gui.actions
         panic.gui.actions.ResetAlarm(self,alarm)
             
     def valueChanged(self,forced=False):
@@ -238,7 +246,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.setWindowTitle('ALARM: %s'%self.getCurrentAlarm().tag)
 
         #print 'PanicGUI.setAlarmData(%d,%s@%s): %s-%s since %s,dis:%s,ack:%s'%(
-            #i,self.alarm.tag,self.alarm.device,row.value,row.quality,time.ctime(self.alarm.active),row.alarmDisabled,row.alarmAcknowledged)
+            #i,self.alarm.tag,self.alarm.device,row.value,row.quality,
+            #time.ctime(self.alarm.active),row.alarmDisabled,row.alarmAcknowledged)
             
         alarm = self.getCurrentAlarm()
 
@@ -302,21 +311,26 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             print 'In prepareDataWidget(%s)'%alarm.tag
             
             for i in range(self._dataWidget._wi.severityCombo.count()):
-                if str(self._dataWidget._wi.severityCombo.itemText(i)).lower()==(self.getCurrentAlarm().severity or 'WARNING').lower():
+                if str(self._dataWidget._wi.severityCombo.itemText(i)).lower()\
+                    ==(self.getCurrentAlarm().severity or 'WARNING').lower():
                     self._dataWidget._wi.severityCombo.setCurrentIndex(i)
                     break
-            self.setComboBox(self._dataWidget._wi.deviceCombo,values=['']+self.api.devices.keys(),sort=True)
+            self.setComboBox(self._dataWidget._wi.deviceCombo,
+                             values=['']+self.api.devices.keys(),sort=True)
             if self.getCurrentAlarm().device:
                 for i in range(self._dataWidget._wi.deviceCombo.count()):
-                    if str(self._dataWidget._wi.deviceCombo.itemText(i)).lower()==self.getCurrentAlarm().device.lower():
+                    if str(self._dataWidget._wi.deviceCombo.itemText(i)
+                           ).lower()==self.getCurrentAlarm().device.lower():
                         self._dataWidget._wi.deviceCombo.setCurrentIndex(i)
                         break
                     
-            self.setComboBox(self._receiversLine._wi.receiversCombo,self.api.phonebook.keys(),sort=True)
+            self.setComboBox(self._receiversLine._wi.receiversCombo,
+                             self.api.phonebook.keys(),sort=True)
             self._tvl.updateStyle()
             #End of prepareDataWidget(self)
             
-            #self.formulaeditor._ui.formulaLineEdit.setText(alarm.formula) #self._dataWidget._wi.formulaTextEdit.toPlainText())
+            #self.formulaeditor._ui.formulaLineEdit.setText(alarm.formula) 
+            #self._dataWidget._wi.formulaTextEdit.toPlainText())
             #self.formulaeditor.expand_expression()
             #self.formulaeditor._ui.formulaLineEdit.setEnabled(True)
         else:
@@ -335,7 +349,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             ('description',widget._wi.descriptionTextEdit.toPlainText()),
             ('device',widget._wi.deviceCombo.currentText()),
             ('receivers',widget._wi.receiversLineEdit.text()),
-            #('formula',str(alarm._ui.formulaLineEdit.text()).strip() or str(widget._wi.formulaTextEdit.toPlainText()).strip()),
+            #('formula',str(alarm._ui.formulaLineEdit.text()).strip() \
+            #   or str(widget._wi.formulaTextEdit.toPlainText()).strip()),
             ('formula',str(widget._wi.formulaTextEdit.toPlainText()).strip()),
             ('severity',str(widget._wi.severityCombo.currentText())),
             ])
@@ -371,7 +386,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             try:
                 self.api.add(**data)
             except Exception,e:
-                Qt.QMessageBox.critical(self,"Error!",str(e), QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
+                Qt.QMessageBox.critical(self,"Error!",str(e), 
+                    QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
                 print traceback.format_exc()
         
         elif old_name == tag:
@@ -386,7 +402,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             alarm.setup(write=True,**data)
 
         elif tag in self.api:
-            Qt.QMessageBox.critical(self,"Error!",'%s already exists!'%tag, QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
+            Qt.QMessageBox.critical(self,"Error!",'%s already exists!'%tag, 
+                QtGui.QMessageBox.AcceptRole, QtGui.QMessageBox.AcceptRole)
             
         else:
             print "\tAlarm renamed (%s -> %s)"%(old_name,tag)
@@ -403,7 +420,8 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
                     snapi = get_snap_api()
                     self.ctx_list = snapi.get_contexts()
                     for cid in self.ctx_list:
-                        if (self.ctx_list[cid].name.lower()==old_name.lower() and self.ctx_list[cid].reason=='ALARM'):
+                        if (self.ctx_list[cid].name.lower()==old_name.lower() 
+                            and self.ctx_list[cid].reason=='ALARM'):
                             snapi.db.rename_context(cid, tag.lower())
                             break
                 except: print 'Renaming context: Failed!\n%s'%traceback.format_exc()
@@ -417,13 +435,11 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
 
     @Catched
     def onAckStateChanged(self,checked=False):
-        import panic.gui.actions
         panic.gui.actions.AcknowledgeAlarm(self,self.getCurrentAlarm())
         self.valueChanged(forced=True)
         
     @Catched
     def onDisStateChanged(self,checked=False):
-        import panic.gui.actions
         panic.gui.actions.ChangeDisabled(self,self.getCurrentAlarm())
         self.valueChanged(forced=True)
         
@@ -435,7 +451,7 @@ class ReceiversForm(QtGui.QWidget):
         self._wi = Ui_ReceiversLine()
         self._wi.setupUi(self)
         
-###########################################################################################
+###############################################################################
 # Formula editor widgets
 
 class MyRow(QtGui.QWidget):
@@ -445,7 +461,9 @@ class MyRow(QtGui.QWidget):
         self._wi.setupUi(self)
 
     def GetText(self):
-        return self._wi.variableCombo.currentText() + " " + self._wi.valueCombo.currentText() + " " + self._wi.operatorCombo.currentText()
+        return self._wi.variableCombo.currentText() + " " \
+            + self._wi.valueCombo.currentText() + " " \
+                + self._wi.operatorCombo.currentText()
 
     def CreateText(self):
         self.newText = self.GetText()
@@ -479,11 +497,14 @@ class MyRelation(QtGui.QWidget):
         self.pushButton_3.setObjectName("pushButton_3")
         self.pushButton_3.setIcon(getThemeIcon("list-remove"))
         self.gridLayout.addWidget(self.pushButton_3, 0, 5, 1, 1)
-        self.spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
+        self.spacerItem = QtGui.QSpacerItem(40, 20, 
+                QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         self.gridLayout.addItem(self.spacerItem, 0, 1, 1, 1)
-        self.spacerItem1 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
+        self.spacerItem1 = QtGui.QSpacerItem(40, 20, 
+                QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         self.gridLayout.addItem(self.spacerItem1, 0, 4, 1, 1)
-        QtCore.QObject.connect(self.comboBox, QtCore.SIGNAL("currentIndexChanged(QString)"), self.CreateText)
+        QtCore.QObject.connect(self.comboBox, 
+                QtCore.SIGNAL("currentIndexChanged(QString)"), self.CreateText)
 
     def GetText(self):
         return self.comboBox.currentText()
@@ -508,7 +529,8 @@ class MyRelation(QtGui.QWidget):
         #self.msgBox.setText("The document has been modified.")
         #self.msgBox.setIcon(QtGui.QMessageBox.Warning)
         #self.msgBox.setInformativeText("Do you want to save your changes?")
-        #self.msgBox.setStandardButtons(QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard | QtGui.QMessageBox.Cancel)
+        #self.msgBox.setStandardButtons(QtGui.QMessageBox.Save | 
+        #           QtGui.QMessageBox.Discard | QtGui.QMessageBox.Cancel)
         #self.msgBox.setDefaultButton(QtGui.QMessageBox.Save)
         #self.msgBox.setDetailedText("DetailedText")
         #self.ret = self.msgBox.exec_()
@@ -538,9 +560,12 @@ class FormulaEditor(QtGui.QWidget):
         self.booleans = ['OR','AND','XOR','NOT','(',')']
         self.operators = ['==','>=','>','<=','<','!=']
         self._widgetList=[]
-        QtCore.QObject.connect(self._ui.clearButton, QtCore.SIGNAL("clicked()"), self.Clr)
-        QtCore.QObject.connect(self._ui.addExpressionButton, QtCore.SIGNAL("clicked()"), self.Add)
-        QtCore.QObject.connect(self._ui.addRelationButton, QtCore.SIGNAL("clicked()"), self.addRelation)
+        QtCore.QObject.connect(self._ui.clearButton, 
+                               QtCore.SIGNAL("clicked()"), self.Clr)
+        QtCore.QObject.connect(self._ui.addExpressionButton, 
+                               QtCore.SIGNAL("clicked()"), self.Add)
+        QtCore.QObject.connect(self._ui.addRelationButton, 
+                               QtCore.SIGNAL("clicked()"), self.addRelation)
 
     def clickedClose(self):
         self.Clr()
@@ -556,13 +581,15 @@ class FormulaEditor(QtGui.QWidget):
         """Add expressions"""
         self.exampleRow = MyRow()
         self.firstList(self.exampleRow)
-        QtCore.QObject.connect(self.exampleRow._wi.removeButton, QtCore.SIGNAL("clicked()"), self.Rm)
+        QtCore.QObject.connect(self.exampleRow._wi.removeButton, 
+                               QtCore.SIGNAL("clicked()"), self.Rm)
         self._ui.scrollAreaWidgetContents.layout().addWidget(self.exampleRow)
         if edit:
             self.exampleRow._wi.variableCombo.addItem(QtCore.QString(edit[0]))
             self.exampleRow._wi.valueCombo.setItemText(0, edit[1])
             self.exampleRow._wi.operatorCombo.addItem(QtCore.QString(edit[2]))
-        self.connect(self.exampleRow,QtCore.SIGNAL('textChanged(QString)'),self.UpdateText)
+        self.connect(self.exampleRow,
+                     QtCore.SIGNAL('textChanged(QString)'),self.UpdateText)
 
     def addRelation(self, edit=False):
         self.relation = MyRelation(self)
@@ -570,10 +597,14 @@ class FormulaEditor(QtGui.QWidget):
         self._ui.scrollAreaWidgetContents.layout().addWidget(self.relation)
         if edit:
             self.relation.comboBox.setItemText(0, edit)
-        self.connect(self.relation,QtCore.SIGNAL('textChanged(QString)'),self.UpdateText)
-        QtCore.QObject.connect(self.relation.pushButton, QtCore.SIGNAL("clicked()"), self.UpRelation)
-        QtCore.QObject.connect(self.relation.pushButton_2, QtCore.SIGNAL("clicked()"), self.DownRelation)
-        QtCore.QObject.connect(self.relation.pushButton_3, QtCore.SIGNAL("clicked()"), self.Rm)
+        self.connect(self.relation,QtCore.SIGNAL('textChanged(QString)'),
+                     self.UpdateText)
+        QtCore.QObject.connect(self.relation.pushButton, 
+                               QtCore.SIGNAL("clicked()"), self.UpRelation)
+        QtCore.QObject.connect(self.relation.pushButton_2, 
+                               QtCore.SIGNAL("clicked()"), self.DownRelation)
+        QtCore.QObject.connect(self.relation.pushButton_3, 
+                               QtCore.SIGNAL("clicked()"), self.Rm)
 
     def UpRelation(self):
         self.widget = self.sender().parent()
@@ -584,10 +615,12 @@ class FormulaEditor(QtGui.QWidget):
             self._rowList.insert(i-1, self.object)
             self.widget.setParent(None)   
             self.widget.close()
-            self._ui.scrollAreaWidgetContents.layout().insertWidget(i-1,self.object)
+            scrollarea = self._ui.scrollAreaWidgetContents
+            scrollarea.layout().insertWidget(i-1,self.object)
         else:
             print "widget is already first"
-            Qt.QMessageBox.warning(self,"Warning","What you are about to do is impossible.")
+            Qt.QMessageBox.warning(self,"Warning",
+                                   "What you are about to do is impossible.")
         self.UpdateText()
 
     def DownRelation(self):
@@ -602,7 +635,8 @@ class FormulaEditor(QtGui.QWidget):
             self._ui.scrollAreaWidgetContents.layout().insertWidget(i+1,self.object)
         else:
             print "widget is already first"
-            Qt.QMessageBox.warning(self,"Warning","What you are about to do is impossible.")
+            Qt.QMessageBox.warning(self,"Warning",
+                                   "What you are about to do is impossible.")
         self.UpdateText()
 
     def Clr(self):

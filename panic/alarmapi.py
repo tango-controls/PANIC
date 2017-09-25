@@ -49,15 +49,16 @@ import traceback,re,time,os,sys
 import fandango
 import fandango as fn
 
-from fandango import first,searchCl,matchCl,isString,isSequence,isNumber,\
-    isFalse,xor,now,str2time,time2str,END_OF_TIME,isCallable,isMapping,Cached
+from fandango import first,searchCl,matchCl,clmatch,clsearch,\
+    isString,isSequence,isNumber,isFalse,isCallable,isMapping,\
+    xor,now,str2time,time2str,END_OF_TIME,Cached
 from fandango.dicts import defaultdict
 from fandango.tango import CachedAttributeProxy, AttrDataFormat
 from fandango.tango import PyTango,get_tango_host, check_device_cached
 from fandango.tango import parse_tango_model
 from fandango.log import tracer,shortstr
 
-from panic.properties import *
+from .properties import *
 
 _TANGO = PyTango.Database()
 
@@ -336,7 +337,7 @@ class Alarm(object):
             
         elif isNumber(state):
             # equals to set_active(timestamp)
-            state = 'state=ACTIVE;time=%s'%state
+            state = 'state=UNACK;time=%s'%state
             
         elif not str(state).strip(): 
             state = 'NORM'
@@ -346,8 +347,8 @@ class Alarm(object):
         # Up to this point, state should be string
         if ':' in state and state.split(':')[0]==tag:
             #Parsing an ActiveAlarms row (Panic <6)
-            state,stamp = 'ACTIVE',0 # To be read from DS cache
-            try: state = 'ACKED' if self.get_acknowledged() else 'ACTIVE'
+            state,stamp = 'UNACK',0 # To be read from DS cache
+            try: state = 'ACKED' if self.get_acknowledged() else 'UNACK'
             except: traceback.print_exc()
 
         elif '=' in state:
@@ -474,7 +475,7 @@ class Alarm(object):
                 elif self.acknowledged:
                     self._state = AlarmStates.ACKED
                 else:
-                    self._state = AlarmStates.ACTIVE
+                    self._state = AlarmStates.UNACK
                 
             else: # no active
                 self._state = AlarmStates.NORM
@@ -1321,6 +1322,15 @@ class AlarmAPI(fandango.SingletonMap):
         """ Shortcut to force alarm update in database """
         self[self.has_tag(tag,True)].write()
         
+    def check_tag(self,tag,raise_=False):
+        """ Checks if tag is a valid tag """
+        if clmatch('^[a-zA-Z_][a-zA-Z_0-9]*$',tag):
+            return True
+        elif raise_:
+                raise Exception("TagContainsInvalidCharacters")
+        else:
+            return False
+        
     def get_device(self,key,full=False):        
         """ Given a device or alarm name returns an AlarmDS object """
         if key in self.alarms:
@@ -1828,9 +1838,12 @@ class AlarmAPI(fandango.SingletonMap):
                 self.modify(tag=tag,device=device,formula=formula,
                     description=description,receivers=receivers,
                     severity=severity,load=load,config=config)
-                
+                       
+        #Creating a new alarm:
+        self.check_tag(tag,raise_=True)
+            
         if device not in self.devices: 
-            raise Exception('DeviceDescriptiondDesntExist:%s'%device)
+            raise Exception('DeviceDoesntExist')
           
         alarm = Alarm(tag, api=self, device=device, formula=formula, 
               description=description, receivers=receivers, severity=severity)
@@ -1914,8 +1927,10 @@ class AlarmAPI(fandango.SingletonMap):
         new_device = new_device.lower()
         if new_device and new_device not in self.devices: 
             raise Exception('DeviceDoesntExist:%s'%new_device)
-          
-        tag = self.has_tag(tag,True)
+        
+        tag = self.has_tag(tag,raise_=True)
+        self.check_tag(new_tag,raise_=True)        
+
         alarm = self.remove(tag)
         new_device = new_device or alarm.device
         new_tag = new_tag or alarm.tag

@@ -166,13 +166,26 @@ class devattrchangeForm(iValidatedWidget,object):
             prop=str(self.tableWidget.item(row,0).text())
             value=str(self.tableWidget.item(row,1).text())
             print 'DeviceAttributeChanger.onEdit(%s,%s = %s)'%(dev,prop,value)
-            ptype=fandango.device.cast_tango_type(
-                panic.PyAlarmDefaultProperties[prop][0]).__name__
-            if(value):
-                dev.put_property(prop, value)
-                dev.init()
+            
+            alarms = dev.alarms.keys()
+            v = QtGui.QMessageBox.warning(None,'Write Properties',\
+                'The following alarms will be afected:\n\n'+
+                '\n'.join(alarms)+'\n\nAre you sure?',
+                QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel)
+
+            if v == QtGui.QMessageBox.Ok: 
+                ptype=fandango.device.cast_tango_type(
+                    panic.PyAlarmDefaultProperties[prop][0]).__name__
+                if(value):
+                    dev.put_property(prop, value)
+                    dev.init()
+                else:
+                    raise Exception('%s must have a value!'%prop)
+
             else:
-                raise Exception('%s must have a value!'%prop)
+                self.buildList()
+                return
+
         except Exception,e:
             Qt.QMessageBox.warning(self.Form,"Warning",'Exception: %s'%e)
         finally:

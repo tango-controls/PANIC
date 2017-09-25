@@ -815,9 +815,9 @@ class QFilterGUI(QAlarmList):
             if name in filters:
                 v = QtGui.QMessageBox.warning(None,'Save Filter As',\
                     'Filter %s already exists,\ndo you want to overwrite it?'
-                    %name)
+                    %name,QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel)
                 if v == QtGui.QMessageBox.Cancel: 
-                    self.onRegexSave()
+                    self.onRegExSave()
             filters.update({name:self.getFilters()})
             self.api.set_user_filters(filters,overwrite=True)
             self.onReload()
@@ -825,7 +825,7 @@ class QFilterGUI(QAlarmList):
             #msg = traceback.format_exc()
             v = QtGui.QMessageBox.warning(self,'Warning',
                                         e.message,QtGui.QMessageBox.Ok)
-            if e.message == comment_error: self.onRegexSave()
+            if e.message == comment_error: self.onRegExSave()
 
     @Catched
     def regExFiltering(self, source):
