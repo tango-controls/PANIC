@@ -5,8 +5,6 @@ GPL Licensed
 """
 
 from utils import Qt, QtCore, QtGui
-import taurus
-from taurus.qt.qtgui.panel import TaurusForm
 from utils import getThemeIcon
 
 class Ui_AlarmList(object):
@@ -245,9 +243,6 @@ class Ui_AlarmList(object):
         #self.tableWidget.setRowCount(0)
         #self.gridLayout.addWidget(self.tableWidget)
         #self.tableWidget.hide()
-        #self.taurusForm = TaurusForm(self.frame_2)
-        #self.taurusForm.setObjectName("taurusForm")
-        #self.taurusForm.hide()
         self.frame_2.hide()
         self.verticalLayout.addWidget(self.frame_2)
 

@@ -21,17 +21,6 @@ from fandango.log import tracer,shortstr,pprint,pformat
 import panic
 import panic.view
 
-import taurus
-import taurus.qt.qtgui.base
-from taurus.qt.qtgui import container
-from taurus.qt.qtgui.panel import TaurusForm
-
-try:
-  from taurus.core.tango.tangovalidator import \
-      TangoAttributeNameValidator as AttributeNameValidator
-except:
-  #Taurus3
-  from taurus.core import AttributeNameValidator
 
 #from row import AlarmRow, QAlarm, QAlarmManager
 from panic.properties import *
