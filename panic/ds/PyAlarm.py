@@ -1760,6 +1760,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         This method can be called from both updateAlarms thread or external clients 
         """
         #    Add your own code here
+        external = not tag_name #command called outside of process_alarm()
+        
         t0,STATE,VALUE = time.time(),False,None
         variables = notNone(variables,{})
         try:
@@ -1781,16 +1783,23 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
               
             STATE = any((not attribute or attribute.lower().strip() == 'state') 
                         for device,attribute,what in varnames)
-            RAISE = ((STATE and self.RethrowState) or self.RethrowAttribute 
-                            or fandango.isFalse(self.IgnoreExceptions))
+
+            RAISE = ((STATE and self.RethrowState) 
+                        or self.RethrowAttribute 
+                        or fandango.isFalse(self.IgnoreExceptions))
+
             if not RAISE: 
                 RAISE = fandango.NaN if fandango.isNaN(self.IgnoreExceptions)\
                     else None
-            self.debug('In EvaluateFormula(%s): STATE = %s, RAISE = %s'
-                       %(tag_name or formula,STATE,RAISE))
+                
+            self.debug('In EvaluateFormula(%s): '
+                'STATE = %s, RAISE = %s, RS=%s, RA=%s, Ignore=%s'
+                    %(tag_name or formula,STATE,RAISE,self.RethrowState,
+                        self.RethrowAttribute,self.IgnoreExceptions))
             
+            ##################################################################
             # ALARM EVALUATION
-            #####################################################
+            
             if self.worker and tag_name:
                 if tag_name in self.Alarms:
                     alarm = self.Alarms[tag_name]
@@ -1802,9 +1811,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             else:
                 if 'debug' in str(self.getLogLevel()).lower(): 
                     self.Eval._trace = True
+                    
                 VALUE = self.Eval.eval(formula,_raise=RAISE)
+            ##################################################################
 
-            if tag_name:
+            if tag_name: #not external
+                # variables value returned as process_alarms cache
                 variables.update(
                     self.get_last_values(alarm=tag_name,variables=varnames))
             else:
@@ -1824,12 +1836,15 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             else:
                 self.info( '-> Exception while checking alarm %s:\n%s'
                           %(tag_name or formula,except2str(e) ) )
-            if (self.RethrowState and STATE) or self.RethrowAttribute:
-                # Eceptions reading State attributes trigger alarms
+            if RAISE: #(self.RethrowState and STATE) or self.RethrowAttribute:
+                # Exceptions reading State attributes trigger alarms
                 ###############################################################
-                VALUE = e #desc or str(e) or 'Exception!' #Must Have a Value!
+                VALUE = fandango.NaN if fandango.isNaN(RAISE) else e
+                #desc or str(e) or 'Exception!' #Must Have a Value!
                 #variables = self.get_last_values(alarm=tag_name,variables=variables)
                 variables.update({tag_name or 'VALUE':VALUE})
+            elif external:
+                VALUE = str(VALUE) + '(%s )'%e
             else:
                 if tag_name: self.FailedAlarms[tag_name]=desc
                 self.info('-> Exceptions in Non-State attributes (%s) '\
@@ -1838,8 +1853,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         finally: 
             if lock: self.lock.release()
 
-        if tag_name: self.EvalTimes[tag_name] = time.time()-t0
-        return str(VALUE) if as_string else VALUE
+        if external:
+            return ('%s (IgnoreExceptions=%s,RethrowState=%s,'
+                    'RethrowAttribute=%s)'
+                        %(VALUE,self.IgnoreExceptions,self.RethrowState,
+                          self.RethrowAttribute))
+        else:
+            self.EvalTimes[tag_name] = time.time()-t0            
+            return str(VALUE) if as_string else VALUE
 
 #------------------------------------------------------------------
 #    ResetAlarm command:
