@@ -301,7 +301,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
                 models = self.api.parse_attributes(a.formula)
                 devices = sorted(set(fn.tango.parse_tango_model(m)['device'] 
                                      for m in models))
-                print 'onItemSelected(%s): %s'%(a,devices)
+                print('onItemSelected(%s) devices: %s'%(a,shortstr(devices)))
                 self.emit(Qt.SIGNAL('devicesSelected'),'|'.join(devices+tags))
         except: traceback.print_exc()      
             

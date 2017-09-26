@@ -1029,6 +1029,7 @@ class AlarmAPI(fandango.SingletonMap):
         self.__init_logger(logger)
         self.log('In AlarmAPI(%s)'%filters)
         self.alarms = {}
+        self.devices = fandango.CaselessDict()
         self.filters = filters
         self.tango_host = tango_host or get_tango_host()
         self._global_receivers = [],0
@@ -1098,7 +1099,7 @@ class AlarmAPI(fandango.SingletonMap):
         filters = filters or self.filters or '*'
         if isSequence(filters): filters = '|'.join(filters)
         filters = filters.lower()
-        self.devices,all_alarms = fandango.CaselessDict(),{}
+        all_alarms = {}
         self.log('Loading PyAlarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
@@ -1133,6 +1134,7 @@ class AlarmAPI(fandango.SingletonMap):
             
         tdevs = time.time() - tdevs
         tprops = time.time()
+        all_devices = [d.lower().strip() for d in all_devices]
 
         for d in all_devices:
             self.log('Loading device: %s'%d)
@@ -1145,7 +1147,14 @@ class AlarmAPI(fandango.SingletonMap):
                 #Parsing also if the filters are referenced in the formula
                 #This kind of extended filter exceeds the domain concept
                 alarms = ad.read(filters=filters)
-                if alarms: self.devices[d],all_alarms[d] = ad,alarms
+                if alarms: 
+                    self.devices[d],all_alarms[d] = ad,alarms
+                    
+        removed = [d for d in self.devices.keys() 
+                        if d.lower().strip() not in all_devices] 
+        for r in removed:
+            self.devices.pop(r)
+            print('>>> Removed: %s'%r)
                 
         tprops=(time.time()-tprops)
         self.log('\t%d PyAlarm devices loaded, %d alarms'%(
