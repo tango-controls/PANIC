@@ -51,7 +51,7 @@ def check_multi_host(model,host=None,raise_=False):
     """ returns True if tango_host in model does not match host """
     h0 = (host or fandango.get_tango_host().split(':')[0]).split('.')[0]
     h1 = parse_tango_model(model).host.split('.')[0] 
-    r = h0 != h1
+    r = h0.lower()!= h1.lower()
     assert not r or not raise_,'%s!=%s'%(h1,h0)
     return r
 
@@ -610,7 +610,7 @@ class AlarmView(EventListener):
             
             self.info('event_hook(\n\tsrc=%s,\n\ttype=%s)'%(src,type_))
             ## eventReceived already log that
-            check_multi_host(src.full_name,raise_=True)
+            error = error or check_multi_host(src.full_name,raise_=False)
             
             if locked is True: self.lock.acquire()
             if src.simple_name in self.api.alarms:
