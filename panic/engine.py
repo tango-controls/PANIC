@@ -25,4 +25,26 @@
 
 __doc__ = "panic.engine"
 
-pass
+import fandango.callbacks
+import fandango.tango
+import fandango.log as fl
+
+global INIT_DONE
+INIT_DONE = False
+
+def init_callbacks(period_ms=200.):
+    """ Configure fandango.callbacks module to process attribute readings """
+    global INIT_DONE
+    if not INIT_DONE:
+        fl.tracer('panic.engine: init_callbacks(period_ms=%s)'%period_ms)
+        fandango.callbacks.EventSource.get_thread().set_period_ms(period_ms)
+        fandango.callbacks.EventThread.SHOW_ALIVE = 10000
+        fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
+        #fandango.callbacks.EventThread.MinWait = 0.01
+        fandango.tango.check_device_cached.expire = 60. 
+        fandango.tango.get_all_devices.set_keeptime(180)
+        INIT_DONE = True
+    
+if __name__ == '__main__':
+    init_callbacks()
+    print _INIT_DONE

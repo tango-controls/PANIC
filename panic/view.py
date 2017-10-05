@@ -149,10 +149,8 @@ class AlarmView(EventListener):
             {verbose>3:'DEBUG',4>verbose>1:'INFO',verbose<=1:'WARNING'}[True])
 
         if not AlarmView._LOADED:
-            fandango.callbacks.EventSource.get_thread().set_period_ms(200.)
-            fandango.callbacks.EventThread.SHOW_ALIVE = 10000
-            fandango.callbacks.EventThread.EVENT_POLLING_RATIO = 1000
-            ft.check_device_cached.expire = 60.
+            import panic.engine
+            panic.engine.init_callbacks()
             AlarmView._LOADED = True
             
         EventListener.__init__(self,name)

@@ -57,6 +57,7 @@ except:
 
 import panic 
 from panic.properties import *
+from panic.engine import init_callbacks
 
 try: 
   __RELEASE__ = panic.__RELEASE__
@@ -1172,10 +1173,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #This code should be executed only at server_init() and not at device.init()
         print('In PyAlarm.__init__(%s,%s)'%(cl,name))
         PyTango.Device_4Impl.__init__(self,cl,name)
-        self.call__init__(fandango.log.Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
+        self.call__init__(fandango.log.Logger,name,
+                format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel('DEBUG')
         panic._proxies[name] = self
-        fandango.tango.get_all_devices.set_keeptime(180)
+        init_callbacks(period_ms=50.)
         self.db = PyTango.Database()
         self.db.put_device_property(name,{'VersionNumber':__RELEASE__})
         self.snap = None
