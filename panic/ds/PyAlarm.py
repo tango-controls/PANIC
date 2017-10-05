@@ -2691,9 +2691,9 @@ def main(args=None):
         py = PyTango.Util(args)
         py.add_TgClass(PyAlarmClass,PyAlarm,'PyAlarm')
         try:
-          import sys
-          from fandango.device import DDebug          
-          DDebug.addToServer(py,'PyAlarm',args[1])
+            if '--ddebug' in sys.argv:
+                from fandango.device import DDebug          
+                DDebug.addToServer(py,'PyAlarm',args[1])
         except Exception,e:
           print('Unable to add DDebug class to PyAlarm: ',e)
 
