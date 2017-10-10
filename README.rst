@@ -25,8 +25,12 @@ The optional panic submodules are:
  panic.ds : PyAlarm device server
  panic.gui :  Placeholder for the PanicGUI application
  
+See the docs at: http://www.pythonhosted.org/panic
+Recipes are also available at: https://github.com/tango-controls/PANIC/tree/documentation/doc/recipes
+
 Get the latest release of Panic from: https://github.com/tango-controls/PANIC/releases
 See CHANGE log in panic/CHANGES file
+
 
 Other Project pages
 ===================
