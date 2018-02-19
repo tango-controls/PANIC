@@ -111,7 +111,10 @@ class AlarmValueLabel(Qt.QLabel):#TaurusValueLabel):
             
     def updateStyle(self,extra=''):
         self.setAlignment(QtCore.Qt.AlignCenter)
-        obj = self.alarm #obj = self.getModelValueObj()
+        if hasattr(self, 'alarm'): 
+            obj = self.alarm 
+        else:
+	    obj = {}
         #print('AlarmValueLabel.updateStyle(%s,%s)'%(type(obj),obj))
         if hasattr(obj,'active'):
             value = obj.active
