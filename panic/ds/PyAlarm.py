@@ -1447,7 +1447,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 if self.get_enabled():
                     self.set_state(PyTango.DevState.ALARM if actives 
                                    else PyTango.DevState.ON)
-                    status = "There are %d active alarms\n" % len(actives)
+                    status = "There are %d/%d active alarms\n" % (
+                            len(actives),len(self.Alarms))
+
                 else:
                     self.set_state(PyTango.DevState.DISABLE)
                     status = ("Device is DISABLED temporarily (Enabled=%s)\n"
@@ -1467,8 +1469,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 if self.Uncatched:
                     status+='\nUncatched exceptions:\n%s'%self.Uncatched
                     
-                self.eval_status = 'EvalTimes are: \n %s\n'%(self.EvalTimes)
-                self.set_status(status)
+                self.eval_status = "Last eval was %s at %s" % (
+                                self.Eval.getter('TAG'),
+                                time2str(self.Eval.getter('now')))                    
+                #self.eval_status += 'EvalTimes are: \n %s\n'%(self.EvalTimes)
+                self.set_status(status+self.eval_status)
                 
         except:
             self.warning( traceback.format_exc())
