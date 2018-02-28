@@ -1,3 +1,37 @@
+PANIC 6.5.0
+-----------
+
+6.5.0: Fix New Alarm button bug
+
+"New Alarm" button fix by S2innovation
+Improve Status Message
+update kpi
+
+6.4.1: solved high cpu issues in pyalarm
+
+Solve High CPU bug: init_callbacks(50ms) added to panic.engine and PyAlarm
+fix case bug in panic.view.check_multi_host
+Avoid api.devices clear during load, do 1by1 update instead
+
+Temporary patch: Multiple disabling/ack disabled to
+prevent PyAlarm exceptions. see CS4-526
+Add Enabled sorting as "PreCondition" to sort alarms by operation modes
+Solve bugs on editing formulas or looking at remote values
+remove unnecessary imports
+Solve bug on writing arrays on ACTION
+Execute SNAP/actions on DEBUG Alarms (only sms ignored)
+Add warning on reset of active alarms
+Remove unused severity checkboxes from main window
+(replaced by priority filter)
+Force devices update on PhoneBook values change
+remove wrong multi-host warning
+Return exception strings on evaluation from client
+
+Add warnings on modifying Device config, unify calls on gui/editor
+Add exceptions on wrong tag name, use UNACK as active state
+Extend regexp syntax to key=value and & clauses
+add minimal widget for panic system status
+
 PANIC 6.3.1
 -----------
 
