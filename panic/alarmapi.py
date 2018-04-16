@@ -1335,7 +1335,8 @@ class AlarmAPI(fandango.SingletonMap):
     def has_tag(self,tag,raise_=False):
         """ check for tags is case independent """
         nt = first((k for k in self.keys() if k.lower()==tag.lower()),None)
-        if raise_ and nt is None: raise('TagDoesntExist:%s'%tag)
+        if raise_ and nt is None: 
+            raise Exception('TagDoesntExist:%s'%tag)
         return nt
 
     def save_tag(self,tag):

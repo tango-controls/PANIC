@@ -197,20 +197,33 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
                 return
             
         if len(tags)>1:
+            print('-'*80)
             [self.onDelete(tag,ask=False) for tag in tags]
         else:
-            tag = tags[0]
-            trace('onDelete(%s)'%tag)
-            self.removeAlarmRow(tag)
-            self.api.remove(tag)
-            self.onReload()
             try:
+                tag = tags[0]
+                trace('onDelete(%s)'%tag)
+                
+                view = getattr(self,'view',None)
+                if view:
+                    view.api.remove(tag)
+                    view.apply_filters()
+                    view.disconnect(tag)
+                    #self.removeAlarmRow(tag)
+
+                if self.api.has_tag(tag):
+                    self.api.remove(tag)
+                    
                 [f.close() for f in WindowManager.WINDOWS 
                     if isinstance(f,AlarmForm) 
                             and f.getCurrentAlarm().tag==tag] 
-            except: pass
+
+                self.onReload(clear_selection=True)
+                trace('onDelete(%s): done'%tag)
+            except: 
+                traceback.print_exc()
         
-    def onReload(self):
+    def onReload(self,clear_selection=False):
         raise Exception('onReload():NotImplemented!')
 
     ###########################################################################

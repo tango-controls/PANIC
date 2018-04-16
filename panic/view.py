@@ -296,7 +296,7 @@ class AlarmView(EventListener):
                 return self.api[alarm]
             else:
                 m = self.api.get(alarm)
-                assert len(m)<=1, '%s_MultipleAlarmMatches!'%m
+                assert len(m)<=1, str('%s_MultipleAlarmMatches!'%str(m))
                 assert m, '%s_AlarmNotFound!'%m
                 a = m[0]
         return a
@@ -485,8 +485,11 @@ class AlarmView(EventListener):
         vals = [t.strip() for t in str(text).split(sep)]
         i = cols.index('tag') if 'tag' in cols else 0
         a = vals[i]
-        return self.get_alarm(a) if obj else a
-    
+        try:
+            return self.get_alarm(a) if obj else a
+        except Exception as e:
+            print('get_alarm_from_text(%s): %s,%s'%(text,obj,a))
+            traceback.print_exc()
     
     def get_source(self,alarm):
         try:alarm = self.get_model(alarm)
@@ -579,9 +582,10 @@ class AlarmView(EventListener):
     def disconnect(self,alarm=None):
         sources = self.sources.values() if alarm is None else [self.get_source(alarm)]
         for s in sources:
-            s.removeListener(self)
-            if not s.hasListeners():
-                AlarmView.sources.pop(s.full_name)
+            if s is not None:
+                s.removeListener(self)
+                if not s.hasListeners():
+                    AlarmView.sources.pop(s.full_name)
         return
           
     def error_hook(self,src,type_,value):
