@@ -513,6 +513,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
                 self._ui.listWidget.item(i).setFont(font)
             
             item = self._ui.listWidget.item(i)
+            item.setHidden(False)
             row = str(item.text())
             if text!=row:
                 #font = Qt.QFont(Qt.QString("Courier"))
@@ -532,6 +533,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             
         for i in range(len(data),self._ui.listWidget.count()):
             item = self._ui.listWidget.item(i)
+            item.setHidden(True)
             item.setText('')
             item.setBackgroundColor(Qt.QColor('white'))
             item.setIcon(self.NO_ICON)
