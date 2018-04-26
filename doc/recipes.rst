@@ -9,6 +9,7 @@ PANIC Recipes
 
    recipes/AlarmDistribution
    recipes/AlarmExamples
+   recipes/AlarmStates
    recipes/AlarmsHierarchy
    recipes/CustomAlarms
    recipes/Exceptions
