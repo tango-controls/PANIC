@@ -21,17 +21,6 @@ from fandango.log import tracer,shortstr,pprint,pformat
 import panic
 import panic.view
 
-import taurus
-import taurus.qt.qtgui.base
-from taurus.qt.qtgui import container
-from taurus.qt.qtgui.panel import TaurusForm
-
-try:
-  from taurus.core.tango.tangovalidator import \
-      TangoAttributeNameValidator as AttributeNameValidator
-except:
-  #Taurus3
-  from taurus.core import AttributeNameValidator
 
 #from row import AlarmRow, QAlarm, QAlarmManager
 from panic.properties import *
@@ -152,7 +141,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         N = len(self.getAlarms())
         trace('AlarmGUI(): %d alarms'%N)
         if 1: #N<150: 
-            self._ui.sevDebugCheckBox.setChecked(True)
+            #self._ui.sevDebugCheckBox.setChecked(True)
             self._ui.activeCheckBox.setChecked(False)
         #else:
             #self._ui.sevDebugCheckBox.setChecked(False)
@@ -312,7 +301,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
                 models = self.api.parse_attributes(a.formula)
                 devices = sorted(set(fn.tango.parse_tango_model(m)['device'] 
                                      for m in models))
-                print 'onItemSelected(%s): %s'%(a,devices)
+                print('onItemSelected(%s) devices: %s'%(a,shortstr(devices)))
                 self.emit(Qt.SIGNAL('devicesSelected'),'|'.join(devices+tags))
         except: traceback.print_exc()      
             
@@ -586,14 +575,16 @@ class QFilterGUI(QAlarmList):
                            Qt.SIGNAL('stateChanged(int)'), self.onSelectAllNone)
         Qt.QObject.connect(self._ui.activeCheckBox, 
                            Qt.SIGNAL('stateChanged(int)'), self.onFilter)
-        Qt.QObject.connect(self._ui.sevAlarmCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevErrorCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevWarningCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
-        Qt.QObject.connect(self._ui.sevDebugCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSevFilter) 
+        
+        #@DEPRECATED
+        #Qt.QObject.connect(self._ui.sevAlarmCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        #Qt.QObject.connect(self._ui.sevErrorCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        #Qt.QObject.connect(self._ui.sevWarningCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter)
+        #Qt.QObject.connect(self._ui.sevDebugCheckBox, 
+                           #Qt.SIGNAL('stateChanged(int)'), self.onSevFilter) 
         
         self.regExToolTip = '\n'.join(s.strip() for s in """
         Type a string to filter alarms:
@@ -621,7 +612,8 @@ class QFilterGUI(QAlarmList):
             ('regEx','severities','timeSortingEnabled','changed',)]),level=2)
         
         filters = []
-        device = receiver = formula = state = priority = userfilter = ''
+        device = receiver = formula = state = priority = \
+            condition = userfilter = ''
         
         active = self._ui.activeCheckBox.isChecked() \
                         or self.timeSortingEnabled
@@ -644,7 +636,9 @@ class QFilterGUI(QAlarmList):
         elif combo1 in ('Annunciator','Receivers'):
             receiver = '*' + re.escape(combo2) + '*'
         elif combo1 == 'Priority':
-            priority = combo2            
+            priority = combo2     
+        elif combo1 == 'PreCondition':
+            condition = combo2           
         elif combo1 == 'UserFilters':
             userfilter = combo2
         #elif combo1 == 'Severity': 
@@ -692,6 +686,7 @@ class QFilterGUI(QAlarmList):
         if active: filters.append({'active':active})
         if device: filters.append({'device':device})
         if priority: filters.append({'priority':priority})
+        if condition: filters.append({'condition':condition})
         
         self._ui.regExUpdate.setToolTip(pformat(filters))
         
@@ -701,8 +696,8 @@ class QFilterGUI(QAlarmList):
     def setFirstCombo(self):
         self.setComboBox(self._ui.contextComboBox,
             #['Alarm','Time','Devices','Hierarchy','Receiver','Severity'],
-            ['State','UserFilters','Priority','Devices','Annunciator',
-             'Receivers','Domain','Family',],
+            ['State','UserFilters','Priority','Devices','PreCondition',
+             'Annunciator','Receivers','Domain','Family',],
             sort=False)
 
     def setSecondCombo(self):
@@ -714,18 +709,18 @@ class QFilterGUI(QAlarmList):
         self._ui.comboBoxx.show()
         self._ui.infoLabel0_1.show()
         self._ui.comboBoxx.setEnabled(True)
+        devs = sorted(set(a.device for a in self.api.values()))
         if source =='Devices':
-            r,sort,values = 1,True,sorted(set(a.device 
-                                              for a in self.api.values()))
-            print(values)
+            r,sort,values = 1,True,devs
+            
+        elif source =='PreCondition':
+            r,sort,values = 1,True,sorted(set(self.api.devices[d].condition 
+                                        for d in devs))
+            
         elif source =='Domain':
-            r,sort,values = 1,True,sorted(set(a.device.split('/')[-3]
-                                              for a in self.api.values()))
+            r,sort,values = 1,True,sorted(set(d.split('/')[-3] for d in devs))
         elif source =='Family':
-            devs = sorted(set(a.device for a in self.getAlarms()))
-            values = sorted(set(a.device.split('/')[-2]
-                                              for a in self.api.values()))
-            print(devs,values)
+            values = sorted(set(d.split('/')[-2] for d in devs if '/' in d))
             r,sort,values = 1,True,values
             
         elif source in ('Annunciator','Receivers'):
@@ -765,15 +760,16 @@ class QFilterGUI(QAlarmList):
         [comboBox.addItem(Qt.QString(i)) for i in values]
         if sort: comboBox.model().sort(0, Qt.Qt.AscendingOrder)
         
-    def getSeverities(self):
-        self.severities=[]
-        if self._ui.sevAlarmCheckBox.isChecked(): self.severities.append('alarm')
-        if self._ui.sevErrorCheckBox.isChecked(): self.severities.append('error')
-        if self._ui.sevWarningCheckBox.isChecked():
-            self.severities.append('warning')
-            self.severities.append('')
-        if self._ui.sevDebugCheckBox.isChecked(): self.severities.append('debug')
-        return self.severities
+    #@DEPRECATED
+    #def getSeverities(self):
+        #self.severities=[]
+        #if self._ui.sevAlarmCheckBox.isChecked(): self.severities.append('alarm')
+        #if self._ui.sevErrorCheckBox.isChecked(): self.severities.append('error')
+        #if self._ui.sevWarningCheckBox.isChecked():
+            #self.severities.append('warning')
+            #self.severities.append('')
+        #if self._ui.sevDebugCheckBox.isChecked(): self.severities.append('debug')
+        #return self.severities
       
     ###########################################################################
     
@@ -787,10 +783,11 @@ class QFilterGUI(QAlarmList):
         self.showList()
         self.refreshTimer.setInterval(self.REFRESH_TIME)
 
-    def onSevFilter(self):
-        # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
-        self.getSeverities()
-        self.onFilter()
+    #@DEPRECATED
+    #def onSevFilter(self):
+        ## THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
+        #self.getSeverities()
+        #self.onFilter()
 
     def onRegExUpdate(self):
         # THIS METHOD WILL CHECK FOR CHANGES IN FILTERS (not only severities)
@@ -897,8 +894,8 @@ class AlarmGUI(QFilterGUI):
             
         if self.mainwindow:
             
-            self.mainwindow.setWindowTitle('PANIC (%s[%s]@%s)'%(
-                self.scope,self.default_regEx,
+            self.mainwindow.setWindowTitle('PANIC %s (%s[%s]@%s)'%(
+                panic.__RELEASE__,self.scope,self.default_regEx,
                 fn.get_tango_host().split(':')[0]))
             
             icon = '/gui/icon/panic-6-big.png' #'.svg'
@@ -1055,8 +1052,8 @@ class AlarmGUI(QFilterGUI):
         #url = os.path.dirname(panic.__file__)+'/gui/icon/panel-view.png'
         #panel_icon = Qt.QIcon(Qt.QPixmap(url))
         alarm_panel_action = (getThemeIcon('actions:leftjust.svg'),
-            "View Raw",lambda s=self:alarmApp.tools['rawview'].setModel(self))
-        [o.addAction(*alarm_panel_action) for o in (tmw.toolsMenu,toolbar)]          
+            "RawView",lambda s=self:alarmApp.tools['rawview'].setModel(self))
+        [o.addAction(*alarm_panel_action) for o in (tmw.toolsMenu,)]          
             
         print('Toolbars created after %s seconds'%(time.time()-t0))
         tmw.setCentralWidget(alarmApp)

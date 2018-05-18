@@ -53,7 +53,7 @@ from fandango import first,searchCl,matchCl,clmatch,clsearch,\
     isString,isSequence,isNumber,isFalse,isCallable,isMapping,\
     xor,now,str2time,time2str,END_OF_TIME,Cached
 from fandango.dicts import defaultdict
-from fandango.tango import CachedAttributeProxy, AttrDataFormat
+from fandango.tango import CachedAttributeProxy, AttrDataFormat, retango
 from fandango.tango import PyTango,get_tango_host, check_device_cached
 from fandango.tango import parse_tango_model
 from fandango.log import tracer,shortstr
@@ -547,7 +547,10 @@ class Alarm(object):
     
     def get_annunciators(self): return self.receivers
     def set_annunciators(self,val): self.receivers = val
-    annunciators = property(fget=get_annunciators,fset=set_annunciators)     
+    annunciators = property(fget=get_annunciators,fset=set_annunciators)    
+    
+    def get_condition(self): return self.get_ds().condition
+    condition = property(get_condition)
 
     def parse_config(self):
         """ Checks the Alarm config related to this alarm """
@@ -792,6 +795,7 @@ class AlarmDS(object):
                 print('Unparsable Alarm!: %s' % line)
         #print('%s device manages %d alarms: %s'
         #   %(self.name,len(self.alarms),self.alarms.keys()))
+        
         return self.alarms        
         
     def get(self,alarm=None):
@@ -857,6 +861,12 @@ class AlarmDS(object):
                 
             self.version = fandango.objects.ReleaseNumber(v)
         return self.version 
+    
+    def get_condition(self):
+        # Operation Mode (Enabled formula)
+        return self.config['Enabled']
+
+    condition = property(get_condition)
     
     def get_model(self):
         """ 
@@ -1019,6 +1029,7 @@ class AlarmAPI(fandango.SingletonMap):
         self.__init_logger(logger)
         self.log('In AlarmAPI(%s)'%filters)
         self.alarms = {}
+        self.devices = fandango.CaselessDict()
         self.filters = filters
         self.tango_host = tango_host or get_tango_host()
         self._global_receivers = [],0
@@ -1053,10 +1064,11 @@ class AlarmAPI(fandango.SingletonMap):
     def __get_tag(self,k):
         if isinstance(k,Alarm):
             return self.__get_tag(k.tag)
-        elif '/' in str(k): 
+        elif clmatch(retango,k): 
             if ':' in k:
                 self.warning('[%s]: AlarmAPI does not support multi-host!'%k)
-            k = k.split('/')[-1]
+            else:
+                k = k.split('/')[-1]
         return k
     def __getitem__(self,k): #*a,**k): 
         return self.alarms.__getitem__(self.__get_tag(k)) #*a,**k)
@@ -1087,7 +1099,7 @@ class AlarmAPI(fandango.SingletonMap):
         filters = filters or self.filters or '*'
         if isSequence(filters): filters = '|'.join(filters)
         filters = filters.lower()
-        self.devices,all_alarms = fandango.CaselessDict(),{}
+        all_alarms = {}
         self.log('Loading PyAlarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
@@ -1122,6 +1134,7 @@ class AlarmAPI(fandango.SingletonMap):
             
         tdevs = time.time() - tdevs
         tprops = time.time()
+        all_devices = [d.lower().strip() for d in all_devices]
 
         for d in all_devices:
             self.log('Loading device: %s'%d)
@@ -1134,7 +1147,14 @@ class AlarmAPI(fandango.SingletonMap):
                 #Parsing also if the filters are referenced in the formula
                 #This kind of extended filter exceeds the domain concept
                 alarms = ad.read(filters=filters)
-                if alarms: self.devices[d],all_alarms[d] = ad,alarms
+                if alarms: 
+                    self.devices[d],all_alarms[d] = ad,alarms
+                    
+        removed = [d for d in self.devices.keys() 
+                        if d.lower().strip() not in all_devices] 
+        for r in removed:
+            self.devices.pop(r)
+            print('>>> Removed: %s'%r)
                 
         tprops=(time.time()-tprops)
         self.log('\t%d PyAlarm devices loaded, %d alarms'%(
@@ -1419,8 +1439,9 @@ class AlarmAPI(fandango.SingletonMap):
         prop = self.get_class_property('PyAlarm','Phonebook')
         if tag not in str(prop): raise Exception('NotFound:%s'%tag)
         self.save_phonebook([p for p in prop if not p.split(':',1)[0]==tag])
+        self.on_phonebook_changed(tag)
 
-    def edit_phonebook(self, tag, value, section=''):
+    def edit_phonebook(self, tag, value, section='',notify=True):
         """ Adds a person to the phonebook """
         prop = self.get_class_property('PyAlarm','Phonebook')
         name = tag.upper()
@@ -1440,6 +1461,18 @@ class AlarmAPI(fandango.SingletonMap):
             prop = prop[:index]+[value]+prop[index:]
             
         self.save_phonebook(prop)
+        if notify: self.on_phonebook_changed(name)
+
+    def on_phonebook_changed(self,tag):
+        devs = set()
+        for a in self.alarms.values():
+            recs = a.receivers
+            if not isSequence(recs): 
+                recs = [r.strip() for r in recs.split(',')]
+            if tag in recs:
+                devs.add(a.device.lower())
+        print('on_phonebook_changed(%s): updating %s'%(tag,devs))
+        [self.devices[d].init() for d in devs]
 
     def save_phonebook(self, new_prop):
         """ Saves a new phonebook in the database """
@@ -1605,7 +1638,8 @@ class AlarmAPI(fandango.SingletonMap):
                                                 if replace else formula)
         return sorted('%s/%s'%(t[:2]) for t in attributes)
         
-    def evaluate(self, formula, device=None,timeout=1000,_locals=None):
+    def evaluate(self, formula, device=None,timeout=1000,_locals=None,
+                 _raise=True):
         #Returns the result of evaluation on formula
         #Both result and attribute values are kept!, 
         #be careful to not generate memory leaks
@@ -1629,7 +1663,9 @@ class AlarmAPI(fandango.SingletonMap):
                 self._eval.set_timeout(timeout)
                 self._eval.update_locals({'PANIC':self})
                 if _locals: self._eval.update_locals(_locals)
-                return self._eval.eval(self.replace_alarms(formula))
+                formula = self.replace_alarms(formula)
+                print('AlarmAPI.evaluate(%s,%s)'%(formula,_locals))
+                return self._eval.eval(formula,_raise=_raise)
         except Exception,e:
             return e
 

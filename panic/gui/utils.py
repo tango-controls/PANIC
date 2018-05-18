@@ -155,29 +155,26 @@ def formatAlarm(f):
     if len(f)<80: return f
     else: return 
     
-def line2multiline(line):
-    if '\n' in line: return line
+def line2multiline(line,maxwidth=60):
+    line = multiline2line(line)
     import re
-    comms = 'OR','AND','FOR'
-    comms = '|'.join(f(c) for c in comms for f in (str.upper,str.lower))
-    comms = '([\ ]+)('+comms+')[\ ]'
-    insertline = lambda matchobj: '\n'+matchobj.group(0)
-    lines = re.sub(comms,insertline,line)
-    lines = '\n'.join(l.replace(' ',' \n') if len(l)>80 \
-                    else l for l in lines.split('\n'))
-    lines = '\n'.join(l.replace(' ',' \n') if len(l)>80 \
-                    else l for l in lines.split('\n'))
-    lines = '\n'.join(l for l in lines.split('\n') if len(l.strip(' \n\r\t')))
-    return lines
+    def linesplit(l,char):
+        if maxwidth<max(len(s) for s in l.split('\n')):
+            if re.search('[ ]%s[ ]'%char,l):
+                l = clsub('[ ]%s[ ]'%char,'\n%s '%char,l)
+        return l
+        
+    for c in ('else','if','OR','or','AND','and','for','FIND'):
+        if len(line)<maxwidth: return line
+        line = linesplit(line,c)
+        
+    return line
 
 def multiline2line(lines):
-    if '\n' not in lines: return lines
-    b,e = 0,len(lines)-1
-    while True:
-        i = lines.find('\n')
-        if i<0: break
-        elif i==e or lines[b:][i+1] in ' \n\t': lines=lines[:i]+lines[i+1:]
-        else: lines = lines[:i]+' '+lines[i+1:]
+    bads = '\n\r\t'
+    for b in bads:
+        lines = lines.replace(b,' ')
+    lines = ' '.join(l for l in lines.split() if l)
     return lines
 
 ###############################################################################
@@ -635,7 +632,8 @@ class AttributesPreview(Qt.QFrame):
                          self.updateAttributes)
         except:
             print traceback.format_exc()
-            
+    
+    @Catched
     def updateAttributes(self,model=None):
         print('AttributesPreview.updateAttributes(%s)'%model)
         if not model and self.source:
@@ -644,13 +642,17 @@ class AttributesPreview(Qt.QFrame):
                 elif hasattr(self.source,'__call__'): model = self.source()
                 else: model = str(self.source or '')
             except: print(traceback.format_exc())
-        print 'In AttributesPreview.updateAttributes(%s)'%model
-        if fandango.isSequence(model): 
-            model = sorted(model)
-        else: 
-            model = sorted(set('%s/%s'%(var[0],var[1]) 
-                            for var in self.test.parse_variables(model or '')))
-        self.model = model
+        
+        if not fandango.isSequence(model): 
+            ms,model = self.test.parse_variables(model or ''),set()
+            for var in ms:
+                dev,attr = var[0],var[1]
+                if ':' in dev and not dev.startswith('tango://'):
+                    dev = 'tango://'+dev
+                model.add(dev+'/'+attr)
+            
+        self.model = sorted(model)
+        print('In AttributesPreview.updateAttributes(%s)'%model)
         self.taurusForm.setModel(model)
         [tvalue.setLabelConfig("<attr_fullname>") 
             for tvalue in self.taurusForm.getItems()]

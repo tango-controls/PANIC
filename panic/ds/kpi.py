@@ -6,6 +6,9 @@ import fandango as fd
 from fandango.functional import *
 import panic
 
+global opts
+opts = []
+
 def report2text(report, columns):
     """ report should be a list of dicts or tuples """
     pass
@@ -27,16 +30,18 @@ def get_panic_report(api=None,timeout=3000.,tries=3,
     if not len(api.servers): 
       if devfilter == '*':
           api.servers.load_by_name('PyAlarm/*')
-      if isString(devfilter):
+      elif isString(devfilter):
           api.servers.load_by_name(devfilter)
       else:
           [api.servers.load_by_name(d) for d in devfilter]
     alldevs = fd.tango.get_all_devices(exported=True)
+    #print('%d devices in %s'%(len(alldevs),fd.tango.get_tango_host()))
     
     result = fd.dicts.defaultdict(dict)
     result['//alarms//'] = api.alarms.keys()
     result['//devices//'] = api.devices.keys()
     result['//servers//'] = api.servers.keys()
+    result['//attrs//'] = []
     
     off = []
     hung = []
@@ -46,7 +51,12 @@ def get_panic_report(api=None,timeout=3000.,tries=3,
     
     for s,ss in api.servers.items():
 
-        admin = fd.parse_tango_model(ss.get_admin_name())['device']
+        admin = ss.get_admin_name()
+        try:
+            admin = fd.parse_tango_model(admin)['device']
+        except:
+            print('unable to parse %s'%admin)
+            continue
         if admin.lower() not in alldevs:
             off.append(admin)
 
@@ -89,10 +99,12 @@ def get_panic_report(api=None,timeout=3000.,tries=3,
                 result[d]['attrs'] += len(attrs)
                 result[a]['device'] = d
                 result[a]['attrs'] = attrs
+                result['//attrs//'].extend(attrs)
                 result[a]['timeout'] = evals.get(a,-1)
                 if result[a]['timeout'] > polling/result[d]['alarms']:
                     aslow.append(a)
 
+    result['//attrs//'] = sorted(set(map(str.lower,result['//attrs//'])))
     result['//off//'] = off
     result['//bloat//'] = [k for k in result 
           if k.count('/')==2 and result[k].get('ratio',-1)>=1.]
@@ -107,9 +119,13 @@ def get_panic_report(api=None,timeout=3000.,tries=3,
           #if '/' in k and result[k].get('ratio',-1)>=1.]))
     #print('slow alarms: %s\n'%aslow)
     
-    return result
-                    
-    
+    if '-v' in opts:
+        print(fd.get_tango_host())
+        for k,v in sorted(result.items()):
+            if fd.isSequence(v):
+                print('%s: %d'%(k,len(v)))
+            elif fd.isNumber(v):
+                print('%s: %d'%(k,v))
 
 def get_panic_devices(api=None,devfilter='*',exported=False):
     api = api or panic.api()
@@ -272,6 +288,7 @@ def get_alarms_eval_times(api=None,alarmfilter='*',timeout=10000.):
   
   
 def main(args=[]):
+    global opts
     opts = [a for a in args if a.startswith('-')]
     args = [a for a in args if a not in opts]
     if args:
@@ -279,6 +296,7 @@ def main(args=[]):
         m = globals().get(args[0].strip(';'),None)
         if m and isCallable(m):
             args = map(str2type,args[1:])
+            print('%s(%s)'%(m,args))
             try:
                 r = m(*args)
             except:
@@ -288,10 +306,11 @@ def main(args=[]):
                 if isSequence(r):
                     print('')
                     for i,t in enumerate(r):
-                      print('%s: %s'%(i,obj2str(t)))
+                      print('%s: %s'%(i,fd.pprint(t)))#obj2str(t)))
                     print('')
                 else:
-                    print(obj2str(r))
+                    if hasattr(r,'items'): r = dict(r.items())
+                    print(fd.pprint(r)) #obj2str(r))
             else:
                 print ''
 

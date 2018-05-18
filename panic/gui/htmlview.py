@@ -1,5 +1,4 @@
 from utils import Qt, QtCore, QtGui, getThemeIcon
-from taurus.qt.qtgui.panel import TaurusForm
 
 import panic, fandango, taurus
 

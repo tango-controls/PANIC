@@ -72,19 +72,17 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         
         # Reset / Acknowledge options
         act = self.popMenu.addAction(getThemeIcon("edit-undo"), 
-                        "Reset Alarm(s)",lambda s=self:ResetAlarm(s))
-
-        #items = [view.get_alarm_from_text(i.text(),obj=True) for i in items]
-        #print('oncontextMenu(%s)'%items)
-            
+                        "Reset Alarm(s)",lambda s=self:ResetAlarm(s))    
         act.setEnabled(any(i.active for i in items))
 
-        if len([i.acknowledged for i in items]) in (len(items),0):
+        #if len([i.acknowledged for i in items]) in (len(items),0):
+        if len(items)==1:
             self.popMenu.addAction(getThemeIcon("media-playback-pause"), 
                 "Acknowledge/Renounce Alarm(s)",
                 lambda s=self:AcknowledgeAlarm(s))
 
-        if len([i.disabled for i in items]) in (len(items),0):
+        #if len([i.disabled for i in items]) in (len(items),0):
+        if len(items)==1:
             self.popMenu.addAction(getThemeIcon("dialog-error"), 
                 "Disable/Enable Alarm(s)",
                 lambda s=self:ChangeDisabled(s))
@@ -286,6 +284,21 @@ def ResetAlarm(parent=None,alarm=None):
                 +'\n\t'.join([t.tag for t in alarms])
         trace('In ResetAlarm(): %s'%text)
         text += '\n\n'+'Must type a comment to continue:'
+        
+        for a in alarms:
+            try:
+                r = parent.api.evaluate(a.formula)
+                if r:
+                    v = QtGui.QMessageBox.warning(self,'Warning',
+                        '%s condition is still active'%a.tag
+                        +'. Do you want to reset it anyway?',
+                        QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel)
+                    if v == QtGui.QMessageBox.Cancel:
+                        return
+                    else:
+                        break
+            except:
+                traceback.print_exc()        
         
         self.setAllowedUsers(self.api.get_admins_for_alarm(len(alarms)==1 
                     and alarms[0].tag))
