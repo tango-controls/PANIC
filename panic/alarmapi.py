@@ -155,6 +155,35 @@ def getAlarmDeviceProperty(device, prop):
 def setAlarmDeviceProperty(device, prop, value):
     """ Sets property of the device """
     _TANGO.put_device_property(device,{prop:[value]})
+
+def substitute(message, substitutions=[[], {}], depth=1):
+    """
+    Substitute `{%x%}` items in the message with values provided by substitutions
+    :param message: message to be substituted
+    :param substitutions: list of list and dictionary. List is used for {%number%} substitutions and dictionary for
+    {%name%} substitutions
+    :param depth: defines number of pass
+    :return: substituted message
+    """
+
+    assert isinstance(message, str)
+
+    if depth <1 :
+        return message
+
+    substituted_message = message
+
+    # substitute numbered substitutions
+    i = 0
+    for value in substitutions[0]:
+        substituted_message = substituted_message.replace("{%%%d%%}" % i, value)
+        i += 1
+    # processing named substitutions
+    for (k, value) in substitutions[1].items():
+        substituted_message = substituted_message.replace("{%%%s%%}" % k, value)
+
+    return substitute(substituted_message, substitutions, depth-1)
+
     
 ###############################################################################
 # Alarm object used by API
@@ -485,7 +514,7 @@ class Alarm(object):
         return AlarmStates.get_key(self._state)
       
     state = property(fget=get_state,fset=set_state)
-      
+
     def set_time(self,t=None):
         self._time =  t if t and t>0 else time.time()
         #tracer('%s.set_time(%s,%s)'
@@ -572,6 +601,17 @@ class Alarm(object):
         else:
             config = {}
         return config
+
+    def get_wiki_link(self):
+        """Returns string with link to Wiki for this alarm or empty string"""
+
+        wiki_prop = _TANGO.get_class_property('PyAlarm','AlarmWikiLink').get('AlarmWikiLink',['',]) + ['',]
+        wiki_link = wiki_prop[0]
+
+        # change the property
+        wiki_link = substitute(wiki_link, [['',], {"ALARM": self.tag}])
+
+        return wiki_link
 
     def get_enabled(self,force=True):
         if force:
