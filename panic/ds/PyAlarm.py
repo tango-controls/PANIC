@@ -2307,7 +2307,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 command = 'echo -e "'+format4sendmail(argin[0])+'" '
                 command += '| mail -s "%s" ' % argin[1]
                 command += '-S from=%s ' % self.FromAddress 
-                #'-r %s ' % (self.FromAddress)
+                if len(self.MailDashRoption) > 0:
+                    command += '-r %s ' % (self.MailDashRoption)
                 command += (argin[2] if isString(argin[2]) 
                                       else ','.join(argin[2]))
                 self.info( 'Launching mail command: '
