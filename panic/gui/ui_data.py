@@ -106,7 +106,7 @@ class Ui_Data(object):
         # self.gridLayout.addWidget(self.wikiLabel, 7, 0, 1, 1)
         self.wikiLink = QtGui.QLabel(Data)
         self.wikiLink.setObjectName("wikiLlink")
-        self.wikiLink.openExternalLinks(true);
+        self.wikiLink.setOpenExternalLinks(True)
         self.gridLayout.addWidget(self.wikiLink,7,1,1,3)
 
         self.receiversLabel = QtGui.QLabel(Data)
