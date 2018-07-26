@@ -435,6 +435,13 @@ These will be the typical properties of a PyAlarm device
 Mail Messages
 =============
 
+PyAlarm allows to send mail notifications. Each alarm may be configured with :ref:`AlarmReceivers` property to provide
+notification list. There is also a `GobalReceivers` property which allows to define notification for all alarms.
+
+PyAlarm supports two ways of sending mails configured with the `MailMethod` class property:
+
+* using 'mail' shell command, when *MailMethod* is set to `mail`, which is default,
+* or using `smtplib` when *MailMethod* is set to `smtp[:host[:port]]`.
 
 Format of Alarm message
 
