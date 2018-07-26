@@ -440,15 +440,17 @@ notification list. There is also a `GobalReceivers` property which allows to def
 
 PyAlarm supports two ways of sending mails configured with the `MailMethod` class property:
 
-* using 'mail' shell command, when *MailMethod* is set to `mail`, which is default,
-* or using `smtplib` when *MailMethod* is set to `smtp[:host[:port]]`.
+* using `mail` shell command, when *MailMethod* is set to `mail`, which is default,
+* or using `smtplib` python library when *MailMethod* is set to `smtp[:host[:port]]`.
 
 When using *mail* method it setup *from* variable as '-S' option (see: https://linux.die.net/man/1/mail ).
 However, some setups may require to use `-r` option additionally. To enable it set `MailDashRoption` class property
 with a proper mail address.
 
-Format of Alarm message
+As it is now, mail messages are formatted as the following:
 
+Format of Alarm message
+-----------------------
 
 .. code-block:: python
 
@@ -469,7 +471,7 @@ Format of Alarm message
 
 
 Format of Recovered message
-
+---------------------------
 
 .. code-block:: python
 
