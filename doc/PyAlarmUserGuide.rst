@@ -443,6 +443,10 @@ PyAlarm supports two ways of sending mails configured with the `MailMethod` clas
 * using 'mail' shell command, when *MailMethod* is set to `mail`, which is default,
 * or using `smtplib` when *MailMethod* is set to `smtp[:host[:port]]`.
 
+When using *mail* method it setup *from* variable as '-S' option (see: https://linux.die.net/man/1/mail ).
+However, some setups may require to use `-r` option additionally. To enable it set `MailDashRoption` class property
+with a proper mail address.
+
 Format of Alarm message
 
 
