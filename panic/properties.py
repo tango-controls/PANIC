@@ -172,6 +172,11 @@ PANIC_PROPERTIES = {
         Declared as FILTER:receiver,ACTION(MESSAGE:...) like\n\
         \t*VC*:vacuum@cells.es,ACTION(RESET:command,t/t/t/stop)",
         [ 0 ] ],
+    'AlarmWikiLink':
+        [PyTango.DevString,
+         "An URL to a WiKi page, where one can find more info on alarma. If set it will appear in AlarmEditor widget.\n\
+          The URL may contain {%ALARM%} which is then substituted with an alarm tag. ",
+         [ ] ],
      
     }
 
