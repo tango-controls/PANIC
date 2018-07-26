@@ -443,8 +443,10 @@ PyAlarm supports two ways of sending mails configured with the `MailMethod` clas
 * using 'mail' shell command, when *MailMethod* is set to `mail`, which is default,
 * or using `smtplib` when *MailMethod* is set to `smtp[:host[:port]]`.
 
-Format of Alarm message
+As it is now, mail messages are formatted as the following:
 
+Format of Alarm message
+-----------------------
 
 .. code-block:: python
 
@@ -465,7 +467,7 @@ Format of Alarm message
 
 
 Format of Recovered message
-
+---------------------------
 
 .. code-block:: python
 
