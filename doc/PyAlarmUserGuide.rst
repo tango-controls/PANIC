@@ -440,8 +440,8 @@ notification list. There is also a `GobalReceivers` property which allows to def
 
 PyAlarm supports two ways of sending mails configured with the `MailMethod` class property:
 
-* using 'mail' shell command, when *MailMethod* is set to `mail`, which is default,
-* or using `smtplib` when *MailMethod* is set to `smtp[:host[:port]]`.
+* using `mail` shell command, when *MailMethod* is set to `mail`, which is default,
+* or using `smtplib` python library when *MailMethod* is set to `smtp[:host[:port]]`.
 
 As it is now, mail messages are formatted as the following:
 
