@@ -51,7 +51,7 @@ the search field is empty. It will be overriden by any expression entered
 by user
 
 Filters (f0, f1, ...) just initialize the regular expression 
-search to a default value.
+search to a default value (f0|f1|f2|...)
 
 
 
@@ -956,12 +956,12 @@ class AlarmGUI(QFilterGUI):
         tmw.menuBar = Qt.QMenuBar(tmw)
         tmw.toolsMenu = Qt.QMenu('Tools',tmw.menuBar)
         tmw.fileMenu = Qt.QMenu('File',tmw.menuBar)
-        tmw.viewMenu = Qt.QMenu('View',tmw.menuBar)
+        tmw.windowMenu = Qt.QMenu('Windows',tmw.menuBar)
         tmw.helpMenu = Qt.QMenu('Help',tmw.menuBar)
 
         tmw.setMenuBar(tmw.menuBar)
         [tmw.menuBar.addAction(a.menuAction()) 
-                for a in (tmw.fileMenu,tmw.toolsMenu,tmw.helpMenu,tmw.viewMenu)]
+                for a in (tmw.fileMenu,tmw.toolsMenu,tmw.helpMenu,tmw.windowMenu)]
         toolbar = Qt.QToolBar(tmw)
         toolbar.setIconSize(Qt.QSize(20,20))
         
@@ -979,8 +979,8 @@ class AlarmGUI(QFilterGUI):
             "Use external editor",alarmApp.editFile)
         tmw.fileMenu.addAction(getThemeIcon("applications-system"),
             "Exit",tmw.close)
-        tmw.viewMenu.connect(tmw.viewMenu,
-            Qt.SIGNAL('aboutToShow()'),alarmApp.setViewMenu)
+        tmw.windowMenu.connect(tmw.windowMenu,
+            Qt.SIGNAL('aboutToShow()'),alarmApp.setWindowMenu)
         
         from phonebook import PhoneBook
         alarmApp.tools['bookApp'] = WindowManager.addWindow(
@@ -1200,14 +1200,15 @@ class AlarmGUI(QFilterGUI):
                 self.loadFromFile(filename,ask=False)
             return filename
             
-    def setViewMenu(self,action=None):
-        print 'In AlarmGUI.setViewMenu(%s)'%action
-        self.mainwindow.viewMenu.clear()
+    def setWindowMenu(self,action=None):
+        print 'In AlarmGUI.setWindowMenu(%s)'%action
+        self.mainwindow.windowMenu.clear()
         windows = WindowManager.getWindowsNames()
         for w in windows:
-            self.mainwindow.viewMenu.addAction(w,
-                            lambda x=w:WindowManager.putOnTop(x))
-        self.mainwindow.viewMenu.addAction('Close All',
+            if w and WindowManager.getWindow(w).isVisible():
+                self.mainwindow.windowMenu.addAction(w,
+                    lambda x=w:WindowManager.putOnTop(x))
+        self.mainwindow.windowMenu.addAction('Close All',
                             lambda : WindowManager.closeAll())
         return
         

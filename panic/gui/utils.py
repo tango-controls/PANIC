@@ -324,7 +324,10 @@ class WindowManager(fandango.objects.Singleton):
     @classmethod
     def putOnTop(klass,window):
         w = klass.getWindow(window)
-        if w: (w.hide(),w.show())
+        if 0: #w.isVisible(): #Doesn't work properly
+            w.setFocus()
+        else:
+            (w.hide(),w.show())
     @classmethod
     def closeAll(klass):
         print 'In WindowManager.closeAll(%s)'%klass
