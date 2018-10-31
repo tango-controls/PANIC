@@ -209,8 +209,9 @@ class iValidatedWidget(object):
           self.UserValidator,self.validator = '',None
           log,p = '',str(sys.path)
           try:
-              props = self.api.servers.db.get_class_property(
-                  'PyAlarm',['UserValidator','PanicAdminUsers'])
+              #props = self.api.servers.db.get_class_property('PyAlarm',
+              props = getPanicProperty(
+                        ['UserValidator','PanicAdminUsers'])
               self.UserValidator = fandango.first(props['UserValidator'],'')
               self.AdminUsers = filter(bool,
                                        map(str.strip,props['PanicAdminUsers']))
