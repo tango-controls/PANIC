@@ -766,7 +766,11 @@ class AlarmDS(object):
                 #print('read:pass')
                 continue
             try:
-                tag,formula = map(str.strip,line.split(':',1))
+                if ':' in line:
+                    tag,formula = map(str.strip,line.split(':',1))
+                else:
+                    tag,formula = line.strip(),'True'
+                    
                 self.alarms[tag] = {'formula':formula}
                 try: 
                     local_receivers = [r for r in props['AlarmReceivers'] 
@@ -1100,13 +1104,13 @@ class AlarmAPI(fandango.SingletonMap):
         if isSequence(filters): filters = '|'.join(filters)
         filters = filters.lower()
         all_alarms = {}
-        self.log('Loading PyAlarm devices matching %s'%(filters))
+        self.log('Loading Alarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
         dbd = fandango.tango.get_database_device(db=self.db)
         all_devices = []
         all_servers = []
-        for cl in ('PyAlarm','PanicEngineDS','PanicViewDS'):
+        for cl in ('PyAlarm','PanicEngineDS','PanicViewDS','AlarmHandler'):
             all_devices.extend(map(str.lower,dbd.DbGetDeviceList(['*',cl])))
             all_servers.extend(map(str.lower,dbd.DbGetServerList(cl+'/*')))
 
@@ -1157,7 +1161,7 @@ class AlarmAPI(fandango.SingletonMap):
             print('>>> Removed: %s'%r)
                 
         tprops=(time.time()-tprops)
-        self.log('\t%d PyAlarm devices loaded, %d alarms'%(
+        self.log('\t%d Alarm devices loaded, %d alarms'%(
             len(self.devices),sum(len(v) for v in all_alarms.values())))
         
         ######################################################################
@@ -1247,7 +1251,7 @@ class AlarmAPI(fandango.SingletonMap):
             devs = set(v['device'] for v in alarms.values())
             for d in devs:
                 if d not in self.devices:
-                    raise Exception('PyAlarm %s does not exist!'%d)
+                    raise Exception('Alarm device %s does not exist!'%d)
             for i,(tag,v) in enumerate(alarms.items()):
                 if tag not in self:
                     self.add(**v)
