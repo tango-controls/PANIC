@@ -773,7 +773,15 @@ class AlarmDS(object):
         """ forces the device to reload its configuration"""
         try:
             self.read()
-            self.get().init()
+            if self.DeviceClass == 'AlarmHandler':
+                print('Restarting %s server' % self.name)
+                astor = fn.Astor(self.name)
+                astor.stop_servers()
+                fn.wait(3.)
+                astor.start_servers()
+            else:
+                print('Init %s device' % self.name)            
+                self.get().init()
             self.config = None
         except:
             print 'Device %s is not running' % self.name            
