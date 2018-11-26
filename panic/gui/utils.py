@@ -18,6 +18,7 @@ from taurus.core.util  import Logger
 
 import panic
 from panic import getAttrValue
+from panic.alarmapi import getPanicProperty, setPanicProperty
 from panic.widgets import AlarmValueLabel,getThemeIcon,getIconForAlarm
 import getpass
 
@@ -199,7 +200,7 @@ class iValidatedWidget(object):
       UserValidator : user_login.TangoLoginDialog
     
     """
-    KEEP = int(fandango.tango.get_class_property('PyAlarm','PanicUserTimeout')
+    KEEP = int(getPanicProperty('PanicUserTimeout')
                or 60)
     
     def init(self,tag=''):
@@ -209,8 +210,7 @@ class iValidatedWidget(object):
           self.UserValidator,self.validator = '',None
           log,p = '',str(sys.path)
           try:
-              props = self.api.servers.db.get_class_property(
-                  'PyAlarm',['UserValidator','PanicAdminUsers'])
+              props = getPanicProperty(['UserValidator','PanicAdminUsers'])
               self.UserValidator = fandango.first(props['UserValidator'],'')
               self.AdminUsers = filter(bool,
                                        map(str.strip,props['PanicAdminUsers']))
@@ -221,8 +221,7 @@ class iValidatedWidget(object):
                 klass = getattr(mod,klass)
                 self.validator = klass()
                 try:
-                    log = (self.api.get_class_property(
-                            'PyAlarm','PanicLogFile') or [''])[0]
+                    log = (getPanicProperty('PanicLogFile') or [''])[0]
                     if log: self.validator.setLogging(True,log)
                 except:
                     print('Unable to write log %s'%log)
@@ -324,7 +323,10 @@ class WindowManager(fandango.objects.Singleton):
     @classmethod
     def putOnTop(klass,window):
         w = klass.getWindow(window)
-        if w: (w.hide(),w.show())
+        if 0: #w.isVisible(): #Doesn't work properly
+            w.setFocus()
+        else:
+            (w.hide(),w.show())
     @classmethod
     def closeAll(klass):
         print 'In WindowManager.closeAll(%s)'%klass

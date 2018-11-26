@@ -1,5 +1,9 @@
-PANIC 6.5.0
+PANIC 7.0.0
 -----------
+
+7.0.0 AlarmHandler compatibility, use TANGO properties instead of PyAlarm class
+
+6.5.1 Fixes on new/delete alarms by s2innovation
 
 6.5.0: Fix New Alarm button bug
 

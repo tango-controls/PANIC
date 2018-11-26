@@ -643,6 +643,7 @@ class AlarmView(EventListener):
                 l = self.info #(self.info('ERROR','OOSRV') else self.info)
                 #devup = get_device_info(src.device).exported
                 devup = check_device_cached(src.device)
+
                 s = ('OOSRV','ERROR')[bool(devup)]    
                 if s=='ERROR': 
                     self.warning('%s seems hung!'%(src.device))

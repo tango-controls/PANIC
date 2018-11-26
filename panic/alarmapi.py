@@ -133,6 +133,31 @@ def getAttrValue(obj,default=Exception):
         
     return r
 
+def getPanicProperty(prop):
+    """
+    Method to obtain global properties 
+    It manages compatibility with PANIC <= 6 using PyAlarm properties
+    """
+    k = [prop] if not fn.isSequence(prop) else prop
+    r = _TANGO.get_property('PANIC',k)
+    if not any(r.values()):
+        r = _TANGO.get_class_property('PyAlarm',k)
+    return r if fn.isSequence(prop) else r[prop]
+
+def setPanicProperty(prop, value):
+    """
+    Method to write global properties 
+    It manages compatibility with PANIC <= 6 using PyAlarm properties
+    """
+    r = _TANGO.get_property('PANIC',[prop])[prop]
+    o = _TANGO.get_class_property('PyAlarm',[prop])[prop]
+    if o and not r:
+        _TANGO.put_class_property('PyAlarm',{prop:value})
+        return 'PyAlarm'
+    else:
+        _TANGO.put_property('PANIC',{prop:value})
+        return 'PANIC'
+
 def getAlarmDeviceProperties(device):
     """ Method used in all panic classes """
     props = _TANGO.get_device_property(device,ALARM_TABLES.keys())
@@ -736,18 +761,24 @@ class AlarmDS(object):
         self.name = name
         self.api = api
         self.alarms = {}
+        self.DeviceClass = ''
         self._actives = None
         self._acknowledged = None
         self._disabled = None
         self.proxy = None
-        self.version = None        
+        self.version = None
         self.get_config(True)
         
     def init(self):
         """ forces the device to reload its configuration"""
         try:
             self.read()
-            self.get().init()
+            if self.DeviceClass == 'AlarmHandler':
+                print('Reloading %s' % self.name)
+                self.get().Load()
+            else:
+                print('Init %s device' % self.name)            
+                self.get().init()
             self.config = None
         except:
             print 'Device %s is not running' % self.name            
@@ -766,7 +797,11 @@ class AlarmDS(object):
                 #print('read:pass')
                 continue
             try:
-                tag,formula = map(str.strip,line.split(':',1))
+                if ':' in line:
+                    tag,formula = map(str.strip,line.split(':',1))
+                else:
+                    tag,formula = line.strip(),'None'
+                    
                 self.alarms[tag] = {'formula':formula}
                 try: 
                     local_receivers = [r for r in props['AlarmReceivers'] 
@@ -805,6 +840,8 @@ class AlarmDS(object):
 
     def get_config(self,update=False):
         if not getattr(self,'config',None) or update: 
+            if not self.DeviceClass:
+                self.DeviceClass = fn.tango.get_device_class(self.name)            
             props = self.api.get_db_properties(self.name,ALARM_CONFIG)
             for p,v in props.items():
                 if v in (False,True):
@@ -1100,13 +1137,13 @@ class AlarmAPI(fandango.SingletonMap):
         if isSequence(filters): filters = '|'.join(filters)
         filters = filters.lower()
         all_alarms = {}
-        self.log('Loading PyAlarm devices matching %s'%(filters))
+        self.log('Loading Alarm devices matching %s'%(filters))
         
         t0 = tdevs = time.time()
         dbd = fandango.tango.get_database_device(db=self.db)
         all_devices = []
         all_servers = []
-        for cl in ('PyAlarm','PanicEngineDS','PanicViewDS'):
+        for cl in ('PyAlarm','PanicEngineDS','PanicViewDS','AlarmHandler'):
             all_devices.extend(map(str.lower,dbd.DbGetDeviceList(['*',cl])))
             all_servers.extend(map(str.lower,dbd.DbGetServerList(cl+'/*')))
 
@@ -1157,7 +1194,7 @@ class AlarmAPI(fandango.SingletonMap):
             print('>>> Removed: %s'%r)
                 
         tprops=(time.time()-tprops)
-        self.log('\t%d PyAlarm devices loaded, %d alarms'%(
+        self.log('\t%d Alarm devices loaded, %d alarms'%(
             len(self.devices),sum(len(v) for v in all_alarms.values())))
         
         ######################################################################
@@ -1247,7 +1284,7 @@ class AlarmAPI(fandango.SingletonMap):
             devs = set(v['device'] for v in alarms.values())
             for d in devs:
                 if d not in self.devices:
-                    raise Exception('PyAlarm %s does not exist!'%d)
+                    raise Exception('Alarm device %s does not exist!'%d)
             for i,(tag,v) in enumerate(alarms.items()):
                 if tag not in self:
                     self.add(**v)
@@ -1394,16 +1431,18 @@ class AlarmAPI(fandango.SingletonMap):
         self.put_db_properties(ref,{prop:value})
         
     def get_class_property(self,klass,prop):
-        return list(self.servers.db.get_class_property(klass,[prop])[prop])
+        #return list(self.servers.db.get_class_property(klass,[prop])[prop])
+        return list(getPanicProperty(prop))
     
     def put_class_property(self,klass,prop,value):
         if not isSequence(value): value = [value]
-        self.servers.db.put_class_property(klass,{prop:value})
+        #self.servers.db.put_class_property(klass,{prop:value})
+        setPanicProperty(prop,value)
         
     def get_phonebook(self,load=True):
         """ gets the phonebook, returns a list """        
         if load or not getattr(self,'phonebook',None):
-            ph,prop = {},self.get_class_property('PyAlarm','Phonebook')
+            ph,prop = {},getPanicProperty('Phonebook')
             for line in prop:
                 line = line.split('#',1)[0]
                 if line: ph[line.split(':',1)[0]]=line.split(':',1)[-1]
@@ -1437,14 +1476,14 @@ class AlarmAPI(fandango.SingletonMap):
 
     def remove_phonebook(self, tag):
         """ Removes a person from the phonebook """        
-        prop = self.get_class_property('PyAlarm','Phonebook')
+        prop = getPanicProperty('Phonebook')
         if tag not in str(prop): raise Exception('NotFound:%s'%tag)
         self.save_phonebook([p for p in prop if not p.split(':',1)[0]==tag])
         self.on_phonebook_changed(tag)
 
     def edit_phonebook(self, tag, value, section='',notify=True):
         """ Adds a person to the phonebook """
-        prop = self.get_class_property('PyAlarm','Phonebook')
+        prop = getPanicProperty('Phonebook')
         name = tag.upper()
         value = '%s:%s'%(name,value)
         lines = [line.strip().split(':',1)[0].upper() for line in prop]
@@ -1477,7 +1516,7 @@ class AlarmAPI(fandango.SingletonMap):
 
     def save_phonebook(self, new_prop):
         """ Saves a new phonebook in the database """
-        self.put_class_property('PyAlarm','Phonebook',new_prop)
+        self.setPanicProperty('Phonebook',new_prop)
         self.phonebook = None #Force to reload
         return new_prop
     
@@ -1509,7 +1548,7 @@ class AlarmAPI(fandango.SingletonMap):
     def get_global_receivers(self,tag='',renew=False):
         try:
           if (renew or self._global_receivers[-1]<time.time()-3600):
-            prop = self.get_class_property('PyAlarm','GlobalReceivers')
+            prop = getPanicProperty('GlobalReceivers')
             self._global_receivers = (prop,time.time())
           else:
             prop = self._global_receivers[0]
@@ -1855,7 +1894,7 @@ class AlarmAPI(fandango.SingletonMap):
 
     def get_admins_for_alarm(self,alarm=''):
         users = filter(bool,
-                self.get_class_property('PyAlarm','PanicAdminUsers'))
+                getPanicProperty('PanicAdminUsers'))
         if users:
           if alarm: 
              users = users+[r.strip().split('@')[0] for r in 
