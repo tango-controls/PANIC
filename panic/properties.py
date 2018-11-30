@@ -141,6 +141,10 @@ PANIC_PROPERTIES = {
         [PyTango.DevString,
          "mail or smtp[:host[:port]]",
          [ "mail" ] ],
+    'MailDashRoption':
+        [PyTango.DevString,
+         "If not empty, adds -r oprtion to the mail command with its value. Usefull to avoid 'sender address rejected' when sending from local domains.",
+         [ "" ] ],
     'FromAddress':
         [PyTango.DevString,
         "Address that will appear as Sender in mail and SMS",
