@@ -2326,13 +2326,17 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             elif self.MailMethod == 'mail':
                 command = 'echo -e "'+format4sendmail(argin[0])+'" '
                 command += '| mail -s "%s" ' % argin[1]
-                command += '-S from=%s ' % self.FromAddress 
-                #'-r %s ' % (self.FromAddress)
-                command += (argin[2] if isString(argin[2]) 
-                                      else ','.join(argin[2]))
-                self.info( 'Launching mail command: '
-                            +shortstr(command,512))
-                os.system(command)
+                if len(self.MailDashRoption) > 0:
+                    command += '-r %s ' % (self.FromAddress)
+                else:
+                    # Legacy sendmail for old Linux
+                    command += '-S from=%s ' % self.FromAddress 
+                # Add Receivers
+                command += ' -- '+(argin[2] if isString(argin[2]) 
+                        else ','.join(argin[2]))
+                self.info( 'Launching mail command: '+shortstr(command,512))
+                # & needed in Debian to avoid timeouts
+                os.system(command+ ' &')
                 
                 for m in argin[2].split(','):
                     self.SentEmails[m.lower()]+=1
