@@ -60,15 +60,20 @@ For each of the implemented alarms the behaviour is:
 6.0.7 RESULTS
 -------------
 
-@PENDING TESTS: Compatibility of T9 device against T7 GUI; and T7 device against T9 GUI
+@PENDING TESTS: Compatibility of T9 device against T7 GUI; 
+and T7 device against T9 GUI
 
 @PENDING TESTS: Receivers refactored: Test SMS, Mail, ACTION, flag, html
 
-@BUG: On Tango9 Class Properties are not being loaded (FromAddress/SMSConfig do not override empty device properties!!)
+@BUG: On Tango9 Class Properties are not being loaded 
+(FromAddress/SMSConfig do not override empty device properties!!)
 
 @BUG: PyAlarm logging not working !! (setLogLevel is useless, only printf works)
 
-@PENDING DOC: States and Severities moved to panic.properties module ; document them properly to each of the cases (OOSRV = device off, DSUPR=Enabled is False , SHLVD=alarm in DisabledAlarms list, ERROR= device alive but alarm not evaluating (thread dead or exception).
+@PENDING DOC: States and Severities moved to panic.properties module ; 
+document them properly to each of the cases (OOSRV = device off, 
+DSUPR=Enabled is False , SHLVD=alarm in DisabledAlarms list, 
+ERROR= device alive but alarm not evaluating (thread dead or exception).
 
 6.0 RESULTS
 -----------
@@ -80,3 +85,9 @@ For each of the implemented alarms the behaviour is:
 * GROUP_ALL is hard to predict due to chained delay in evaluation
 
 
+Other procedures
+----------------
+
+Test email using both SMTP and SendMail
+
+ 

@@ -311,10 +311,14 @@ ALARM_LOGS = {
         "Max Number of messages to be sent each time that an Alarm "
         "is activated/recovered/reset.",
         [ 0 ] ],
+    'MailMethod':
+        [PyTango.DevString,
+         "mail or smtp[:host[:port]]",
+         [ "mail" ] ],
     'FromAddress':
         [PyTango.DevString,
         "Address that will appear as Sender in mail and SMS",
-        [ ] ],
+        [ tango_host ] ],        
     'SMSConfig':
         [PyTango.DevString,
         "Arguments for sendSMS command (user:word)",
