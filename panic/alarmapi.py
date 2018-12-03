@@ -60,7 +60,7 @@ from fandango.log import tracer,shortstr
 
 from .properties import *
 
-_TANGO = PyTango.Database()
+get_tango = fandango.tango.get_database
 
 _proxies = fandango.ProxiesDict()
 GetProxy = _proxies.get
@@ -137,49 +137,53 @@ def getPanicProperty(prop):
     """
     Method to obtain global properties 
     It manages compatibility with PANIC <= 6 using PyAlarm properties
+    BUT!!! It triggers exceptions in device servers if called at Init()
     """
+    print('getPanicProperty(%s)' % prop)
     k = [prop] if not fn.isSequence(prop) else prop
-    r = _TANGO.get_property('PANIC',k)
+    r = get_tango().get_property('PANIC',k)
     if not any(r.values()):
-        r = _TANGO.get_class_property('PyAlarm',k)
-    return r if fn.isSequence(prop) else r[prop]
+        r = get_tango().get_class_property('PyAlarm',k)
+    r = r if fn.isSequence(prop) else r[prop]
+    return list(r) if fn.isSequence(r) else r
 
 def setPanicProperty(prop, value):
     """
     Method to write global properties 
     It manages compatibility with PANIC <= 6 using PyAlarm properties
     """
-    r = _TANGO.get_property('PANIC',[prop])[prop]
-    o = _TANGO.get_class_property('PyAlarm',[prop])[prop]
+    print('setPanicProperty(%s, %s)' % (prop, value))
+    r = get_tango().get_property('PANIC',[prop])[prop]
+    o = get_tango().get_class_property('PyAlarm',[prop])[prop]
     if o and not r:
-        _TANGO.put_class_property('PyAlarm',{prop:value})
+        get_tango().put_class_property('PyAlarm',{prop:value})
         return 'PyAlarm'
     else:
-        _TANGO.put_property('PANIC',{prop:value})
+        get_tango().put_property('PANIC',{prop:value})
         return 'PANIC'
 
 def getAlarmDeviceProperties(device):
     """ Method used in all panic classes """
-    props = _TANGO.get_device_property(device,ALARM_TABLES.keys())
+    props = get_tango().get_device_property(device,ALARM_TABLES.keys())
 
     #Updating old property names for backwards compatibility
     if not props['AlarmList']:
-        props['AlarmList'] = _TANGO.get_device_property(
+        props['AlarmList'] = get_tango().get_device_property(
                                   device,['AlarmsList'])['AlarmsList']
         if props['AlarmList']:
             print '%s: AlarmsList property renamed to AlarmList'%device
-            _TANGO.put_device_property(
+            get_tango().put_device_property(
                     device,{'AlarmList':props['AlarmList'],'AlarmsList':[]})
             
     return props
 
 def getAlarmDeviceProperty(device, prop):
     """ Gets the value of pointed property from the device """
-    return _TANGO.get_device_property(device,[prop])[prop]
+    return get_tango().get_device_property(device,[prop])[prop]
 
 def setAlarmDeviceProperty(device, prop, value):
     """ Sets property of the device """
-    _TANGO.put_device_property(device,{prop:[value]})
+    get_tango().put_device_property(device,{prop:[value]})
     
 ###############################################################################
 # Alarm object used by API
@@ -1058,6 +1062,7 @@ class AlarmAPI(fandango.SingletonMap):
     Panic API is a dictionary-like object
     """
     CURRENT = None
+    _phonebooks = {}
     
     def __init__(self,filters='*',tango_host=None,
                  extended=False,
@@ -1201,7 +1206,7 @@ class AlarmAPI(fandango.SingletonMap):
 
         tcheck = time.time()
         #Loading phonebook
-        self.get_phonebook(load=True)
+        #self.get_phonebook(load=True)
         
         #Verifying that previously loaded alarms still exist
         for k,v in self.alarms.items()[:]:
@@ -1409,25 +1414,33 @@ class AlarmAPI(fandango.SingletonMap):
     
     def get_db_properties(self,ref,props):
         if '/' not in ref:
-          return self.servers.db.get_property(ref,props)
+            return self.db.get_property(ref,props)
         elif ref.count('/')>=2:
-          return self.servers.db.get_device_property(ref,props)
+            return self.db.get_device_property(ref,props)
         else:
-          raise Exception,'Unknown %s'%ref      
+            raise Exception,'Unknown %s'%ref      
      
     def get_db_property(self,ref,prop):
         return list(self.get_db_properties(ref,[prop])[prop])
     
     def put_db_properties(self,ref,props):
+        """
+        Inserts multiple properties into database as a dict {keys:values}
+        """
         if '/' not in ref:
-          self.servers.db.put_property(ref,props)
+            self.db.put_property(ref,props)
         elif ref.count('/')>=2:
-          self.servers.db.put_device_property(ref,props)
+            self.db.put_device_property(ref,props)
         else:
           raise Exception,'Unknown %s'%ref
     
     def put_db_property(self,ref,prop,value):
-        if not isSequence(value): value = [value]
+        """
+        Insert a single property into Tango Database
+        Value is converted into list
+        """
+        if not isSequence(value): 
+            value = [value]
         self.put_db_properties(ref,{prop:value})
         
     def get_class_property(self,klass,prop):
@@ -1439,20 +1452,33 @@ class AlarmAPI(fandango.SingletonMap):
         #self.servers.db.put_class_property(klass,{prop:value})
         setPanicProperty(prop,value)
         
-    def get_phonebook(self,load=True):
-        """ gets the phonebook, returns a list """        
-        if load or not getattr(self,'phonebook',None):
-            ph,prop = {},getPanicProperty('Phonebook')
+    @staticmethod
+    def get_phonebook(host='', load=False):
+        """
+        gets the phonebook for the selected host
+        """   
+        tango_host = getattr(host,'tango_host',host) or get_tango_host()
+        if load or not AlarmAPI._phonebooks.get(tango_host,None):
+            print('-'*80)
+            print(AlarmAPI._phonebooks.keys())
+            print('AlarmAPI.get_phonebook(%s, True)' % tango_host)
+            ph,prop = {}, getPanicProperty('Phonebook')
             for line in prop:
                 line = line.split('#',1)[0]
-                if line: ph[line.split(':',1)[0]]=line.split(':',1)[-1]
+                if line: 
+                    ph[line.split(':',1)[0]] = line.split(':',1)[-1]
+
             #Replacing nested keys
             for k,v in ph.items():
                 for s in v.split(','):
                     for x,w in ph.items():
-                        if s==x: ph[k] = v.replace(s,w)
-            self.phonebook = ph
-        return self.phonebook
+                        if s==x: 
+                            ph[k] = v.replace(s,w)
+
+            print([(t,len(v)) for t,v in AlarmAPI._phonebooks])
+            AlarmAPI._phonebooks[tango_host] = ph
+
+        return AlarmAPI._phonebooks[tango_host]
         
     def parse_phonebook(self,receivers):
         """
@@ -1462,15 +1488,16 @@ class AlarmAPI(fandango.SingletonMap):
         on using '%' to mark phonebook entries.
         
         """
+        ph = self.get_phonebook()
         result,receivers = [],[s.strip() for s in receivers.split(',')]
         for r in receivers:
-          if r in self.phonebook: 
-            r = self.phonebook[r]
+          if r in ph: 
+            r = ph[r]
           elif '%' in r:
-            for p in self.phonebook:
+            for p in ph:
               #re.split used to discard partial matches
               if p in re.split('[,:;/\)\(]',r):
-                r = r.replace(p,self.phonebook[p])
+                r = r.replace(p,ph[p])
           result.append(r)
         return ','.join(result)
 
@@ -1516,8 +1543,8 @@ class AlarmAPI(fandango.SingletonMap):
 
     def save_phonebook(self, new_prop):
         """ Saves a new phonebook in the database """
-        self.setPanicProperty('Phonebook',new_prop)
-        self.phonebook = None #Force to reload
+        setPanicProperty('Phonebook',new_prop)
+        AlarmAPI._phonebooks[self.tango_host] = None #Force to reload
         return new_prop
     
     @Cached(expire=10.)

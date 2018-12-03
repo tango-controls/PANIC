@@ -252,7 +252,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                                     self.get_name().split('/'))))
             _locals.update({'DEVICE':self.get_name(),
                             'ALARMS':self.Alarms.keys(),
-                            'PHONEBOOK':self.Alarms.phonebook,
+                            'PHONEBOOK':self.Alarms.get_phonebook(),
                             'PANIC':self.Panic,
                             'SELF':self})
             _locals['t'] = time.time() - (self.TStarted + self.StartupDelay)
@@ -499,14 +499,19 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     
     
     def updateAlarms(self):
-        self.info( 'In PyAlarm::updateAlarms ...')
+        self.pause.wait()
+        self.info( 'In PyAlarm::updateAlarms()')
         self.pause.clear()
         self.kill.clear()
         polled_attrs = []
-        #Alarms will not start evaluation until StartupDelay seconds has passed.
+        
+        # Alarms will not start evaluation until StartupDelay seconds has passed.
+        self.info( 'PyAlarm::updateAlarms: waiting %d s' % self.StartupDelay)
         if time.time()<(self.TStarted+self.StartupDelay):
-            self.info('Alarms evaluation not started yet, waiting StartupDelay=%d seconds.'%self.StartupDelay)
+            self.info('Alarms evaluation not started yet, '
+                'waiting StartupDelay=%d seconds.'%self.StartupDelay)
             self.pause.wait(self.StartupDelay-(time.time()-self.TStarted))
+            
         #Checking that the background test process is running
         if self.worker:
             if not self.worker.isAlive(): self.worker.start()
@@ -515,19 +520,26 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         _locals = self.update_locals(check=True)
             
         while not self.kill.isSet():
+            self.info( 'In PyAlarm::updateAlarms(): process()')
             self.pause.clear()
             try:
                 try:
                     #self.Alarms.servers.db.get_info()
-                    fandango.tango.get_database_device().state()
+                    dbd = fandango.tango.get_database_device()
+                    dbd.state()
                 except:
-                    self.warning('Tango database is not available!\n%s'%traceback.format_exc())
+                    self.warning('Tango database is not available!\n%s'
+                                % traceback.format_exc())
                     self.set_state(PyTango.DevState.FAULT)
-                    ## This wait is here just to prevent the loop to spin continuously
-                    # The update_locals command will not allow background process to die
+                    ## This wait is here just to prevent the loop to 
+                    # spin continuously
+                    # The update_locals command will not allow 
+                    # background process to die
                     for k in self.Alarms.servers:
-                        self.pause.wait(self.PollingPeriod/len(self.Alarms.servers))
-                        if self.worker: _locals = self.update_locals(_locals,update=True)
+                        self.pause.wait(self.PollingPeriod / 
+                                        len(self.Alarms.servers))
+                        if self.worker: 
+                            _locals = self.update_locals(_locals, update=True)
                     continue
 
                 ###############################################################
@@ -844,7 +856,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
               
               def _rcatched(*args,**kwargs):
                 
-                self.info('-'*40+' %s(%s,%s)'%(method,args,kwargs))
+                self.info('send_alarm(%s) => %s(%s,%s)'% 
+                          (tag_name, method, args, kwargs))
                 try: 
                     r = method(*args,**kwargs)
                 except:
@@ -1218,10 +1231,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.updateThread = None
         self.last_attribute_check = 0
         
-        #A class object will keep all declared alarms to search for children alarms and duplications
-        if type(self).Panic is None: type(self).Panic = panic.AlarmAPI()
         self.debug('Out of __init__()')
-
         PyAlarm.init_device(self,allow=True)
 
 #------------------------------------------------------------------
@@ -1259,11 +1269,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             "::init_device(update_properties=%s,allow=%s)"
             %(update_properties,allow))
         
+        # A class object will keep all declared alarms 
+        # to search for children alarms and duplications
+        if type(self).Panic is None: 
+            type(self).Panic = panic.AlarmAPI()
+        
         if not allow: 
             raise Exception('init_device() is not allowed,'
               ' please restart the server')
         try:
             if update_properties or not self._initialized: 
+                
+                # Reading this from DB at init() may cause BAD_CORB_INV_ORDER
+                # Should be done in background by alarms thread
+                # It means that AddressList will be empty on first iterations
+                self.PhoneBook = None #self.Alarms.get_phonebook()
+                self.AddressList = {} #dict(self.PhoneBook)
 
                 self.get_device_properties(self.get_device_class())
                 
@@ -1339,7 +1360,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                       use_tau=False)
                     
                     [self.Eval.add_macro(*m) for m in self.Panic.macros]
-                    self.update_locals(check=True,update=True)
+                    ## MAY TRIGGER EXCEPTIONS AT INIT!!
+                    #self.update_locals(check=True,update=True)
                     self.Eval.set_timeout(self.EvalTimeout)
                     
                 if hasattr(self.Eval,'clear'): self.Eval.clear()
@@ -1378,10 +1400,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.info('Configured WorkerProcess, waiting %s seconds'
                       ' in background ...'%self.StartupDelay)
 
-                self.PhoneBook = self.Alarms.phonebook #done at Alarms.load()
-
-            self.AddressList = dict(self.PhoneBook)
-
             for tag,alarm in self.Alarms.items():
                 self.info('\n\t%s: %s\n\t\tFormula: %s\n\t\tSeverity: %s\n'
                   '\t\tReceivers: %s'%(tag,alarm.description,alarm.formula,
@@ -1402,6 +1420,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.set_state(PyTango.DevState.ON)
                 
             if not self.updateThread or not self.updateThread.isAlive(): 
+                self.pause.clear()
                 self.start()
                 
             self.info( 'Ready to accept request ...')
@@ -1415,7 +1434,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             raise e
           
         finally:
-            self.pause.clear()
+            self.pause.set() #starts updateAlarmsThread
             self.kill.clear()
         return
 
@@ -1464,7 +1483,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     status+='\n%d alarms couldnt be evaluated:\n%s'%(
                         len(self.FailedAlarms),
                         ','.join(str(t) for t in self.FailedAlarms.items()))
-                    if float(len(self.FailedAlarms))/len(self.Alarms) > 0.1:
+                    if (float(len(self.FailedAlarms))/len(self.Alarms) > 0.1
+                        and fandango.isFalse(self.IgnoreExceptions)):
                       self.set_state(PyTango.DevState.FAULT)
                 if self.Uncatched:
                     status+='\nUncatched exceptions:\n%s'%self.Uncatched
@@ -2567,8 +2587,7 @@ class PyAlarmClass(PyTango.DeviceClass):
                 'Display level':PyTango.DispLevel.EXPERT,
                 'description':"Returns Property:Value list",
             } ],
-        
-        
+        ######################################################################
         'ActiveAlarms':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
@@ -2620,9 +2639,7 @@ class PyAlarmClass(PyTango.DeviceClass):
             [[PyTango.DevString,
             PyTango.SPECTRUM,
             PyTango.READ, 512]],
-        
-        
-        
+        ######################################################################
         'PhoneBook':
             [[PyTango.DevString,
             PyTango.SPECTRUM,
@@ -2635,7 +2652,7 @@ class PyAlarmClass(PyTango.DeviceClass):
             [[PyTango.DevString,
             PyTango.IMAGE,
             PyTango.READ, 512,512]],
-
+        ######################################################################
         'MemUsage':
             [[PyTango.DevDouble,
             PyTango.SCALAR,
@@ -2701,7 +2718,7 @@ def main(args=None):
                 DDebug.addToServer(py,'PyAlarm',args[1])
         except Exception,e:
           print('Unable to add DDebug class to PyAlarm: ',e)
-
+          
         U = PyTango.Util.instance()
         U.server_init()
         U.server_run()

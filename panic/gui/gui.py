@@ -728,7 +728,6 @@ class QFilterGUI(QAlarmList):
             r,sort,values = 1,True,values
             
         elif source in ('Annunciator','Receivers'):
-            #r,sort,values = 2,True,list(set(a for a in self.api.phonebook.keys() for l in self.api.values() if a in l.receivers))
             r,sort,values = 2,True,list(set(s for a in self.api.values() 
                     for s in ['SNAP','SMS']+
                     [r.strip() for r in a.receivers.split(',') if r.strip()]))

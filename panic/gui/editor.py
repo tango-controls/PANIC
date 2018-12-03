@@ -325,7 +325,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
                         break
                     
             self.setComboBox(self._receiversLine._wi.receiversCombo,
-                             self.api.phonebook.keys(),sort=True)
+                             self.api.get_phonebook().keys(),sort=True)
             self._tvl.updateStyle()
             #End of prepareDataWidget(self)
             
