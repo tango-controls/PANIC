@@ -141,11 +141,11 @@ PANIC_PROPERTIES = {
         [PyTango.DevString,
          "mail or smtp[:host[:port]]",
          [ "mail" ] ],
-    #'MailDashRoption':
-        #[PyTango.DevString,
-         #"If not empty, use -r to specify from_address instead of -S from=. "
-         #"Required in Debian and other linux systems",
-         #[ "true" ] ],
+    'MailDashRoption':
+        [PyTango.DevString,
+         "If not empty, use -r to specify from_address instead of -S from=. "
+         "Required in Debian and other linux systems",
+         [ "true" ] ],
     'FromAddress':
         [PyTango.DevString,
         "Address that will appear as Sender in mail and SMS",
