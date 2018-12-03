@@ -628,7 +628,7 @@ class AlarmView(EventListener):
                 alarms = dev.alarms.keys()
                 
             check =  check_device_cached(src.device)
-            if check in (None,'FAULT','UNKNOWN'):
+            if check in (None,'UNKNOWN'): #'FAULT',
                 error = 'AlarmView[%s] returned %s state'%(src.device,check)
                 self.warning(error)
                 
