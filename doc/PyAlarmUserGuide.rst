@@ -472,7 +472,7 @@ Format of Alarm message
 
 
 Format of Recovered message
-
+---------------------------
 
 .. code-block:: python
 
