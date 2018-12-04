@@ -31,7 +31,7 @@
 #         (c) - Software Engineering Group - ESRF
 #=============================================================================
 
-import sys,os,time,threading,traceback,re,collections,json
+import sys,os,time,threading,traceback,re,collections,json, urllib
 
 import PyTango
 import fandango
@@ -764,7 +764,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             alarm_obj = self.Alarms[tag_name]
             receivers = self.parse_receivers(tag_name,message=message)
             was_active = alarm_obj.active
-            self.info('-'*80),self.info('In free_alarm(%s,%s,%s,%s,%s)'%(tag_name,comment,message,notify,was_active))
+            self.info('-'*80)
+            self.info('In free_alarm(%s,%s,%s,%s,%s)'
+                      %(tag_name,comment,message,notify,was_active))
             if message=='RESET' and self.CheckDisabled(tag_name): 
                 self.Enable(tag_name)
             if not was_active:
@@ -832,16 +834,19 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
               receivers = self.parse_receivers(tag_name,receivers=receivers,message=message)
               mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
               sms_receivers = self.parse_receivers(tag_name,'SMS',receivers,message=message)
+              tg_receivers = self.parse_receivers(tag_name,'TG',receivers,message=message)
               action_receivers = self.parse_action_receivers(tag_name,message,receivers)
               #self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers))[:240]+'...')
-              self.info(('%s receivers:\n\t%s\n\tmail:%s\n\tsms:%s\n\taction[%s]: %s'%(
-                tag_name,alarm.receivers,mail_receivers,sms_receivers,len(action_receivers),action_receivers)))
+              self.info(('%s receivers:\n\t%s\n\tmail:%s\n\t'
+                        'sms:%s\n\ttg:%s\n\taction[%s]: %s'%(
+                        tag_name,alarm.receivers,mail_receivers,sms_receivers,
+                        tg_receivers,len(action_receivers),action_receivers)))
           finally:
               self.lock.release()
           
           self.info('\n\n')
           if message not in ('ALARM','REMINDER') and not self.AlertOnRecovery:
-              mail_receivers = sms_receivers = []
+              mail_receivers = sms_receivers = tg_receivers = []
 
           if alarm:
             report = self.GenerateReport(tag_name,mail_receivers or '',message=message,
@@ -888,6 +893,16 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                   rcatched(self.SendSMS)(
                     tag_name,sms_receivers,message=message,values=values)
                   
+            # telegram
+            if tg_receivers: 
+              self.info('-'*80)
+              try:
+                self.SendTelegram(tag_name, tg_receivers,
+                                  message=message, values=report)
+              except:
+                self.warning('Exception sending telegram!: %s'
+                             % traceback.format_exc())
+                
             # SNAP ARCHIVING
             if (self.snap and SNAP_ALLOWED
                 and (message in ('ALARM','ACKNOWLEDGED','RESET') 
@@ -2472,6 +2487,73 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                         self.SentSMS[s.lower()]+=1
                 return 'DONE'
         return 'FAILED'
+    
+    #------------------------------------------------------------------
+    #    SendTelegram command:
+    #
+    #    Description: Sends a Telegram message
+    #
+    #    argin:  DevVarStringArray    tag/message,receivers,...,
+    #    argout: DevBoolean
+    #------------------------------------------------------------------
+    def SendTelegram(self,tag,receivers=[],message='TEST',values=None):
+        """
+        Sending telegram
+        :param tag_name:    Alarm or Test message to be sent
+        :param receivers:   telegram chat IDs to receive the alarm
+        """
+        if not receivers and hasattr(tag, '__iter__'):
+            tag,receivers = tag[0], tag[1:]
+        alarm = (self.Alarms.get(tag) or [None])[0]
+        self.info('In SendTelegram(%s, %s, %s, %s)' %
+                   (tag, receivers, message, values))
+        report = ''
+        token = self.TGConfig
+        now = time.time()
+        if receivers:
+            # Build report
+            try:
+                self.lock.acquire()
+                report = 'TAG: ' + tag
+                if values:
+                    report = ''
+                    self.debug( 'Telegram values: %s' % str( values))
+                    report = values[0]
+                elif message in ('ALARM',) and tag in self.Alarms:
+                    report += '\nFormula: ' \
+                              + self.Alarms[tag].formula \
+                              + '\nDescription: ' \
+                              + self.Alarms[tag].parse_description()
+                else:
+                    report += str(message)
+                self.info('TG Sending: message %s to %s'
+                           % (report, ','.join(receivers)))
+                report = report.replace('\r', '\n').replace('\n\n', '\n')
+                report = report.replace('\n', '%0a').replace("'", '"')
+            except:
+                self.warning('Exception generating TG report: %s'
+                             % traceback.format_exc())
+            finally:
+                self.lock.release()
+                
+            if ('tg' not in self.AlertOnRecovery.lower()
+                and message.strip() not in ('ALARM','TEST')):
+                self.warning('TG sending not allowed for %s message type.'
+                             % message)
+            else:
+                # Send Telegram
+                for r in receivers:
+                    id = str(r).split(":")[-1]
+                    url = ('https://api.telegram.org/bot'
+                           + token
+                           + "/sendMessage?chat_id="
+                           + id
+                           + "&text="
+                           + report)
+                    self.debug('Telegram url: "%s"' % url)
+                    urllib.urlopen(url)
+                return 'DONE'
+        return 'FAILED'    
 
 #==================================================================
 #
@@ -2555,6 +2637,9 @@ class PyAlarmClass(PyTango.DeviceClass):
         'SendSMS':
             [[PyTango.DevVarStringArray, "tag/message,receivers,..."],
             [PyTango.DevString,""]],
+        'SendTelegram':
+            [[PyTango.DevVarStringArray, "tag/message,receivers,..."],
+            [PyTango.DevString,""]],            
         'CheckAcknowledged':
             [[PyTango.DevString, "alarm tag"],
             [PyTango.DevBoolean,"true if alarm is on the list else false"]],

@@ -1,6 +1,12 @@
 PANIC 7.0.0
 -----------
 
+7.1.0 - Merged pull requests from github
+
+S2Innovation: Solve -r problems, added MailRDashOptio for backwards compatibility
+Gabriel Jover: Add Telegram messaging, using SendTelegram command and TGConfig property
+Daniel Roldan: patch in setup.py for Debian packaging
+
 7.0.0 AlarmHandler compatibility, use TANGO properties instead of PyAlarm class
 
 6.5.1 Fixes on new/delete alarms by s2innovation

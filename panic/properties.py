@@ -328,6 +328,10 @@ ALARM_LOGS = {
         [PyTango.DevString,
         "Arguments for sendSMS command (user:word)",
         [ ] ],
+    'TGConfig':
+        [PyTango.DevString,
+        "Arguments for sendTelegram command",
+        [ "" ] ],        
     }
     
 __doc__+="""
