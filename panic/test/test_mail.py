@@ -60,7 +60,7 @@ def cleanup(delete=True):
 
 @fn.Catched    
 def configure():
-    global tangodb, alarms
+    global tangodb, alarms, receiver, sender
     fn.log.info('MAIL_TEST: CONFIGURE '+'>'*40)
         
     ft.add_new_device('PyAlarm/test_mail','PyAlarm','test/pyalarm/sendmail')
@@ -77,7 +77,7 @@ def configure():
 
     alarms.put_db_properties('test/pyalarm/sendmail',{
         'MailMethod':'mail', 
-        'FromAddress': 'oncall-noreply@cells.es',
+        'FromAddress': sender, #'oncall-noreply@cells.es',
         'PollingPeriod':3,'AlarmThreshold':1, 'StartupDelay':0, 'Enabled':'1'})
 
     alarms.add('TEST_SMTP',
@@ -88,7 +88,7 @@ def configure():
 
     alarms.put_db_properties('test/pyalarm/smtpmail',{
         'MailMethod':'smtp:%s'%smtp_host, 
-        'FromAddress': 'oncall-noreply@cells.es',
+        'FromAddress': sender, #'oncall-noreply@cells.es',
         'PollingPeriod':3,'AlarmThreshold':1, 'StartupDelay':0, 'Enabled':'1'})
 
 @fn.Catched
