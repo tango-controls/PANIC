@@ -291,6 +291,10 @@ Other options are SNAP or ACTION:
    SMS:+34666777888, #If SMS sending available
    SNAP, #Alarm changes will be recorded in SNAP database.
    ACTION(alarm:command,mach/alarm/beep/play_sequence,$DESCRIPTION)
+   
+Or Telegram messages, see:
+
+  https://github.com/tango-controls/PANIC/blob/documentation/doc/recipes/TelegramSetup.rst
 
 
 Adding ACTION as receiver
