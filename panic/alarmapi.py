@@ -171,7 +171,7 @@ def getAlarmDeviceProperties(device):
         props['AlarmList'] = get_tango().get_device_property(
                                   device,['AlarmsList'])['AlarmsList']
         if props['AlarmList']:
-            print '%s: AlarmsList property renamed to AlarmList'%device
+            print('%s: AlarmsList property renamed to AlarmList'%device)
             get_tango().put_device_property(
                     device,{'AlarmList':props['AlarmList'],'AlarmsList':[]})
             
@@ -785,7 +785,7 @@ class AlarmDS(object):
                 self.get().init()
             self.config = None
         except:
-            print 'Device %s is not running' % self.name            
+            print('Device %s is not running' % self.name)
         
     def read(self,filters='*'):
         """ 
@@ -855,7 +855,8 @@ class AlarmDS(object):
                 else: #Using default property value
                     try: 
                         props[p] = (PyAlarmDefaultProperties[p][-1] or [''])[0]
-                    except: print traceback.format_exc()
+                    except: 
+                        print(traceback.format_exc())
             self.config = props
         return self.config
                     
@@ -1035,8 +1036,8 @@ class AlarmDS(object):
         try:
             return (False if self.get().ResetAlarm(args) else True)
         except:
-            print 'Device %s is not running' % self.name
-            print traceback.format_exc()
+            print('Device %s is not running' % self.name)
+            print(traceback.format_exc())
             return None            
 
     def acknowledge(self,alarm,comment):
@@ -1050,8 +1051,8 @@ class AlarmDS(object):
         try:
             return (False if self.get().Acknowledge(args) else True)
         except:
-            print 'Device %s is not running' % self.name
-            print traceback.format_exc()
+            print('Device %s is not running' % self.name)
+            print(traceback.format_exc())
             return None
     
     def __repr__(self):
@@ -1344,7 +1345,7 @@ class AlarmAPI(fandango.SingletonMap):
         Updates devices properties values from a .csv file
         """
         csv = fandango.CSVArray(filename,header=0,comment='#',offset=1)
-        print 'Loading %s file'%filename
+        print('Loading %s file'%filename)
         for i in range(csv.size()[0]):
             l = csv.getd(i)
             if not matchCl(l['Host'],self.tango_host): 
@@ -1357,7 +1358,7 @@ class AlarmAPI(fandango.SingletonMap):
             diff = [k for k,v in self.devices[d].get_config().items() 
                 if str(v).lower()!=str(l[k]).lower()]
             if diff:
-                print 'Updating %s properties: %s'%(d,diff)
+                print('Updating %s properties: %s'%(d,diff))
                 self.put_db_properties(d,dict((k,[l[k]]) for k in diff))
                 self.devices[d].init()
         return
@@ -1372,7 +1373,7 @@ class AlarmAPI(fandango.SingletonMap):
             c = v.get_config()
             lines.append([self.tango_host,d]+[str(c[k]) for k in ALARM_CONFIG])
         open(filename,'w').write('\n'.join('\t'.join(l) for l in lines))
-        print '%s devices exported to %s'%(len(lines),filename)
+        print('%s devices exported to %s'%(len(lines),filename))
         
     def has_tag(self,tag,raise_=False):
         """ check for tags is case independent """
@@ -1459,9 +1460,8 @@ class AlarmAPI(fandango.SingletonMap):
         """   
         tango_host = getattr(host,'tango_host',host) or get_tango_host()
         if load or not AlarmAPI._phonebooks.get(tango_host,None):
-            print('-'*80)
-            print(AlarmAPI._phonebooks.keys())
-            print('AlarmAPI.get_phonebook(%s, True)' % tango_host)
+            print('%s: AlarmAPI.get_phonebook(%s, True)' % 
+                  (fn.time2str(), tango_host))
             ph,prop = {}, getPanicProperty('Phonebook')
             for line in prop:
                 line = line.split('#',1)[0]
@@ -1475,7 +1475,6 @@ class AlarmAPI(fandango.SingletonMap):
                         if s==x: 
                             ph[k] = v.replace(s,w)
 
-            print([(t,len(v)) for t,v in AlarmAPI._phonebooks])
             AlarmAPI._phonebooks[tango_host] = ph
 
         return AlarmAPI._phonebooks[tango_host]

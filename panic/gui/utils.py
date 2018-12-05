@@ -16,6 +16,11 @@ from taurus.qt.qtgui.container import TaurusWidget
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.core.util  import Logger
 
+# Set tangoFormatter as default formatter 
+from taurus.qt.qtgui.base import TaurusBaseComponent
+from taurus.core.tango.util import tangoFormatter 
+TaurusBaseComponent.FORMAT = tangoFormatter
+
 import panic
 from panic import getAttrValue
 from panic.alarmapi import getPanicProperty, setPanicProperty
@@ -200,8 +205,7 @@ class iValidatedWidget(object):
       UserValidator : user_login.TangoLoginDialog
     
     """
-    KEEP = int(getPanicProperty('PanicUserTimeout')
-               or 60)
+    KEEP = int(first(getPanicProperty('PanicUserTimeout'),60))
     
     def init(self,tag=''):
       
