@@ -289,8 +289,11 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         ## Dynamic Attributes Creator
         self.debug( '#'*40)
         self.info( 'In PyAlarm(%s).dyn_attr()'%self.get_name())
-        alarms = self.Alarms.keys()# if hasattr(self,'Alarms') else [a.tag for a in self.panic.get(device=self.get_name())]
-        self.update_locals(dict.fromkeys(self.Panic.keys()),check=False,update=True) # Done here to avoid subprocess triggering exceptions
+        alarms = self.Alarms.keys()
+        if self.worker:
+            # Done here to avoid subprocess triggering exceptions
+            self.update_locals(
+                dict.fromkeys(self.Panic.keys()),check=False,update=True) 
         
         for alarm in alarms:
             try:
@@ -506,6 +509,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         polled_attrs = []
         
         # Alarms will not start evaluation until StartupDelay seconds has passed.
+        self.StartupDelay = max((self.StartupDelay, 3.))
         self.info( 'PyAlarm::updateAlarms: waiting %d s' % self.StartupDelay)
         if time.time()<(self.TStarted+self.StartupDelay):
             self.info('Alarms evaluation not started yet, '
@@ -2550,7 +2554,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                            + id
                            + "&text="
                            + report)
-                    self.debug('Telegram url: "%s"' % url)
+                    self.info('Telegram url: "%s"' % url)
                     urllib.urlopen(url)
                 return 'DONE'
         return 'FAILED'    
