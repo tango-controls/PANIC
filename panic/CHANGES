@@ -1,6 +1,8 @@
 PANIC 7.1.1
 -----------
 
+7.1.2 - Solved bugs at gui startup
+
 7.1.1 - Solved bugs on server init, add test_telegram.py
 
 7.1.0 - Merged pull requests from github
