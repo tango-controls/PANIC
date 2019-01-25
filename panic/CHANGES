@@ -1,5 +1,7 @@
-PANIC 7.1.1
+PANIC 7.2.0
 -----------
+
+7.2.0 - added back taurus3 compatibility, solved bug on history widget
 
 7.1.2 - Solved bugs at gui startup
 
