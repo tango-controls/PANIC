@@ -16,10 +16,13 @@ from taurus.qt.qtgui.container import TaurusWidget
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.core.util  import Logger
 
-# Set tangoFormatter as default formatter 
-from taurus.qt.qtgui.base import TaurusBaseComponent
-from taurus.core.tango.util import tangoFormatter 
-TaurusBaseComponent.FORMAT = tangoFormatter
+try:
+    # Set tangoFormatter as default formatter 
+    from taurus.qt.qtgui.base import TaurusBaseComponent
+    from taurus.core.tango.util import tangoFormatter
+    TaurusBaseComponent.FORMAT = tangoFormatter
+except:
+    print('tangoFormatter not available (Taurus < 4!?)')
 
 import panic
 from panic import getAttrValue
