@@ -12,5 +12,5 @@ with actual alarm name.
 
 So, the value of the property may looks like:: 
 
-    http://wiki.cps.uj.edu.pl/alarms/{%ALARM%}
+    http://wiki.example.com/alarms/{%ALARM%}
   
