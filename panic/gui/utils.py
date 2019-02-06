@@ -208,7 +208,7 @@ class iValidatedWidget(object):
       UserValidator : user_login.TangoLoginDialog
     
     """
-    KEEP = int(first(getPanicProperty('PanicUserTimeout'),60))
+    KEEP = int(first(getPanicProperty('PanicUserTimeout')) or 60)
     
     def init(self,tag=''):
       
