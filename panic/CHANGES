@@ -1,5 +1,13 @@
-PANIC 7.2.0
+PANIC 7.2.1
 -----------
+
+7.2.1 - Merge panic-wiki-links by s2Innovation
+
+PANIC_DEFAULT deprecated as option
+Merge branch 'S2Innovation-panic-2-wiki-links' into develop
+Solve bug on empty PanicUserTimeout  property
+Merge branch 'panic-2-wiki-links' of https://github.com/S2Innovation/PANIC into S2Innovation-panic-2-wiki-links
+
 
 7.2.0 - added back taurus3 compatibility, solved bug on history widget
 
