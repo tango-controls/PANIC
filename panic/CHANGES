@@ -1,6 +1,7 @@
 PANIC 7.2.1
 -----------
 
+7.2.2 - fix bug when UserTimeout is not specified
 7.2.1 - Merge panic-wiki-links by s2Innovation
 
 PANIC_DEFAULT deprecated as option
