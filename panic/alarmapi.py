@@ -1106,16 +1106,21 @@ class AlarmDS(object):
 class AlarmAPI(fandango.SingletonMap):
     """
     Panic API is a dictionary-like object
+    
+    It will load alarms matching the given filters from the given tango_host
+    Filters will apply only to device names by default.
+    Will be searched also in formulas if extended = True
+    (or None and an initial search returnd no results).
     """
     CURRENT = None
     _phonebooks = {}
     
-    def __init__(self,filters='*',tango_host=None,
-                 extended=False,
-                 logger=fandango.log.WARNING):
+    def __init__(self,filters = '*',tango_host = None,
+                 extended = None,
+                 logger = fandango.log.WARNING):
       
         self.__init_logger(logger)
-        self.log('In AlarmAPI(%s)'%filters)
+        self.warning('In AlarmAPI(%s)'%filters)
         self.alarms = {}
         self.devices = fandango.CaselessDict()
         self.filters = filters
@@ -1137,6 +1142,8 @@ class AlarmAPI(fandango.SingletonMap):
         self.db = self.servers.db
         
         self.load(self.filters,extended=extended)
+        if extended is None and not len(self.keys()):
+            self.load(self.filters, extended = True)
         
     def __init_logger(self,logger):
         if fandango.isCallable(logger):
