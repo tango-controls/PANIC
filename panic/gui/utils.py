@@ -365,7 +365,7 @@ def get_snap_api():
           #from PyTangoArchiving.widget.snaps import *
           db = panic.alarmapi.get_tango() #fandango.get_database()
           assert list(db.get_device_exported_for_class('SnapManager'))
-          SNAP_ALLOWED = snap.SnapAPI()
+          SNAP_ALLOWED = snap.SnapAPI(load=False)
           
       except Exception,e:
           trace('PyTangoArchiving.Snaps not available: '\
