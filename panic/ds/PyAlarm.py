@@ -53,6 +53,23 @@ except:
     #PyTango.PyUtil = PyTango.Util
 
 ###############################################################################
+# SMS Thread from smslib and smsmodem
+
+def SMSThread(**kwargs):
+    try:
+        # Test library
+        smslib
+    except:
+        # Use smsmodem
+        kwargs.pop("source", None)
+        kwargs["numbers"] = kwargs.pop("dest", None)
+        return threading.Thread(target=smsmodem.send_sms, kwargs=kwargs)
+    else:
+        # Use smslib
+        kwargs.pop("host", None)
+        return smslib.SMSThread(**kwargs)
+
+
 # Checking Dependencies
 
 import panic 
@@ -64,21 +81,34 @@ try:
 except Exception,e: __RELEASE__ = '6.?'
 print '> PyAlarm %s'%__RELEASE__
 
+# TODO: Use logs instead of prints.
 try:
-    try: import panic.extra.smslib as smslib
+    try:
+        print(" ... trying to import panic.extra.smslib")
+        import panic.extra.smslib as smslib
     except:
-      try: import albasmslib as smslib
+      try:
+        print(" panic.extra.smslib import failed, trying to import albasmslib")
+        import albasmslib as smslib
       except:
-        import smslib
+        try:
+            print(" albasmslib import failed, trying to import smslib")
+            import smslib
+            print('Using smslib from %s'%smslib.__file__)
+        except:
+            print(" smslib import failed, trying to import smsmodem")
+            import smsmodem
+            print("Using smsmodem from {0}".format(smsmodem.__file__))
     SMS_ALLOWED=True
-    print('Using smslib from %s'%smslib.__file__)
+# TODO: This can be more specific, better to use ImportError
 except Exception,e: 
-    print('UNABLE TO LOAD SMSLIB ... SMS MESSAGING DISABLED: %s'%e)
+    print('UNABLE TO LOAD SMSLIB OR SMSMODEM ... SMS MESSAGING DISABLED: %s'%e)
     SMS_ALLOWED=False
 
 try:
     from PyTangoArchiving import snap
     SNAP_ALLOWED=True
+# TODO: This can be more specific, better to use ImportError
 except Exception,e:
     print('UNABLE TO LOAD SNAP ... SNAP ARCHIVING DISABLED: %s'%e)
     SNAP_ALLOWED=False
@@ -459,6 +489,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         # t is time passed since start
         t = int(time.time() - (self.TStarted+self.StartupDelay))
         
+        self.info(" ... Get_enabled with values:"\
+                  " e={0}, last={1}, t={2}".format(e, last, t))
+
         if e in ('true','1','yes','enabled'): r = True
         elif e in ('','false','0','no','none','disabled'): r = None
         elif e=='nan': r = fandango.NaN
@@ -466,6 +499,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         elif not force and last[0] and (t-last[0])<self.PollingPeriod:
             # return last cached value
             return last[1]
+            self.info(" ... Get_enabled returns the last cached value")
         else:
             # Evaluating an alarm formula
             try:
@@ -477,6 +511,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 r = False
                 
         self.PastValues['Enabled'] = t,r
+        self.info(" ... Get_enabled returns {}".format(r))
         return r
 
         
@@ -2412,7 +2447,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         alarm = (self.Alarms.get(tag) or [None])[0]
 
         self.info( 'In SendSMS(%s,%s,%s,%s)'%(tag,receivers,message,values))
-        if not SMS_ALLOWED or not 'smslib' in globals():
+        if not SMS_ALLOWED:  #or not 'smslib' in globals():
             self.warning( 'SMS Messaging is not allowed '
                 +'or smslib not available!!!')
             return
@@ -2479,8 +2514,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     self.info( 'Sending SMS in a different Thread ... '
                         +'SMS-Send%d'%self.sms_threads)
                     source = (re.findall('[a-zA-Z]+',str(source)) or [''])[0]
-                    thr = smslib.SMSThread(message=report, dest=smslist, 
-                        username=username, password=password, source=source)
+                    thr = SMSThread(message=report, dest=smslist, username=username,
+                                    password=password, source=source, host=self.SMSHost)
                     thr.setDaemon(True)
                     thr.start()
                     self.SMS_Sent.append(now)

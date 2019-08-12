@@ -129,6 +129,10 @@ PANIC_PROPERTIES = {
         [PyTango.DevString,
         "Arguments for sendSMS command",
         [ ] ],#user:word
+    'SMSHost':
+        [PyTango.DevString,
+        "Host name of sms sender",
+        [ "" ] ],
     'SMSMaxLength':
         [PyTango.DevLong,
          "Maximum length of SMS messages",
