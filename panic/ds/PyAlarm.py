@@ -31,7 +31,16 @@
 #         (c) - Software Engineering Group - ESRF
 #=============================================================================
 
-import sys,os,time,threading,traceback,re,collections,json, urllib
+import sys
+import os
+import time
+import threading
+import traceback
+import re
+import collections
+import json
+import urllib
+import socket
 
 import PyTango
 import fandango
@@ -747,7 +756,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.lock.acquire()
             if not self.Alarms[tag_name].active:
                 now = time.time()
-                self.Alarms[tag_name].active = now
+                # self.Alarms[tag_name].active = now
+                self.Alarms[tag_name].activate()
                 self.Alarms[tag_name].recovered = 0
                 self.Alarms[tag_name].set_time(now)
                 result = True
@@ -788,6 +798,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     
                     if tag_name in self.AcknowledgedAlarms: 
                       self.AcknowledgedAlarms.remove(tag_name)
+            
+            if self._loggerds:
+                report = self.generate_json(tag_name, message=message, user_comment=comment)
+                self._loggerds.alarm(report)
+
+            if self.LogStash:
+                report = self.generate_json(tag_name, message=message, user_comment=comment)
+                self.send_logstash(report)
                       
         except:
             s = traceback.format_exc()
@@ -825,63 +843,69 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.info('='*80)
         self.info(shortstr('In PyAlarm.send_alarm(%s,%s,%s)'%(tag_name,message,values),255))
         alarm = (self.Alarms.get(tag=tag_name) or [None])[0]
+        
         try:
-          if alarm and self.MaxMessagesPerAlarm and self.Alarms[tag_name].sent >= self.MaxMessagesPerAlarm: 
-              #This counter is reset calling .clear() from free_alarm()
-              self.debug('*'*80)
-              self.warning('Too many alarms (%d) already sent for %s!!!' % (self.Alarms[tag_name].sent, tag_name))
-              self.debug('*'*80)
-              return
-            
-          try:
-              self.lock.acquire()
-              receivers = self.parse_receivers(tag_name,receivers=receivers,message=message)
-              mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
-              sms_receivers = self.parse_receivers(tag_name,'SMS',receivers,message=message)
-              tg_receivers = self.parse_receivers(tag_name,'TG',receivers,message=message)
-              action_receivers = self.parse_action_receivers(tag_name,message,receivers)
-              #self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers))[:240]+'...')
-              self.info(('%s receivers:\n\t%s\n\tmail:%s\n\t'
+            if alarm and self.MaxMessagesPerAlarm and self.Alarms[tag_name].sent >= self.MaxMessagesPerAlarm: 
+                #This counter is reset calling .clear() from free_alarm()
+                self.debug('*'*80)
+                self.warning('Too many alarms (%d) already sent for %s!!!' % (self.Alarms[tag_name].sent, tag_name))
+                self.debug('*'*80)
+                return
+
+            try:
+                self.lock.acquire()
+                receivers = self.parse_receivers(tag_name,receivers=receivers,message=message)
+                mail_receivers = self.parse_receivers(tag_name,'@',receivers,message=message)
+                sms_receivers = self.parse_receivers(tag_name,'SMS',receivers,message=message)
+                tg_receivers = self.parse_receivers(tag_name,'TG',receivers,message=message)
+                action_receivers = self.parse_action_receivers(tag_name,message,receivers)
+                #self.info('receivers:'+';'.join(str(r) for r in (receivers,mail_receivers,sms_receivers,action_receivers))[:240]+'...')
+                self.info(('%s receivers:\n\t%s\n\tmail:%s\n\t'
                         'sms:%s\n\ttg:%s\n\taction[%s]: %s'%(
                         tag_name,alarm.receivers,mail_receivers,sms_receivers,
                         tg_receivers,len(action_receivers),action_receivers)))
-          finally:
-              self.lock.release()
-          
-          self.info('\n\n')
-          if message not in ('ALARM','REMINDER') and not self.AlertOnRecovery:
-              mail_receivers = sms_receivers = tg_receivers = []
+            finally:
+                self.lock.release()
 
-          if alarm:
-            report = self.GenerateReport(tag_name,mail_receivers or '',message=message,
-                        user_comment=comment,values=values)
-          else: 
-            #Sending a test message (no alarm involved)
-            report = [message, tag_name+'-'+message,','.join(mail_receivers)]
+            self.info('\n\n')
+            if message not in ('ALARM','REMINDER') and not self.AlertOnRecovery:
+                mail_receivers = sms_receivers = tg_receivers = []
 
-          if self.get_enabled():
-            
-            def rcatched(method):
-              
-              def _rcatched(*args,**kwargs):
+            if alarm:
+                report = self.GenerateReport(tag_name,mail_receivers or '',message=message,
+                            user_comment=comment,values=values)
+            else: 
+                #Sending a test message (no alarm involved)
+                report = [message, tag_name+'-'+message,','.join(mail_receivers)]
+
+            if self.get_enabled():
                 
-                self.info('send_alarm(%s) => %s(%s,%s)'% 
-                          (tag_name, method, args, kwargs))
-                try: 
-                    r = method(*args,**kwargs)
-                except:
-                    msg = getattr(method,'__name__',str(method))
-                    msg = '%s crashed! \n%s'%(msg,traceback.format_exc())
-                    self.warning(msg)
-                    report[0] += '\n'+'-'*80+'\n'+msg
-                return r
+                def rcatched(method):
+
+                    def _rcatched(*args,**kwargs):
+                        
+                        self.info('send_alarm(%s) => %s(%s,%s)'% 
+                                (tag_name, method, args, kwargs))
+                        try: 
+                            r = method(*args,**kwargs)
+                        except:
+                            msg = getattr(method,'__name__',str(method))
+                            msg = '%s crashed! \n%s'%(msg,traceback.format_exc())
+                            self.warning(msg)
+                            report[0] += '\n'+'-'*80+'\n'+msg
+                        return r
               
-              return _rcatched
+                    return _rcatched
           
             ## ACTIONS MUST BE EVALUATED FIRST PRIOR TO NOTIFICATION
             if action_receivers:
                 self.info('-'*80)
                 for ac in action_receivers:
+                    # TODO: If self.get_enabled() returns false, the following
+                    #       line will raise an exception because it will 
+                    #       reference rcatched before is defined. That needs
+                    #       to be refactored. In fact, I don't see why rcatched
+                    #       has been implemented in that way.
                     rcatched(self.trigger_action)(
                         tag_name,ac,message=message)          
               
@@ -891,21 +915,21 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
             #NOTIFICATION OF ALARMS
             else:
-              #Disabling sms message for messages not related to new alarms
-              if sms_receivers and message in ('ALARM',) \
-                    or 'sms' in str(self.AlertOnRecovery).lower(): 
-                  rcatched(self.SendSMS)(
-                    tag_name,sms_receivers,message=message,values=values)
+                #Disabling sms message for messages not related to new alarms
+                if sms_receivers and message in ('ALARM',) \
+                        or 'sms' in str(self.AlertOnRecovery).lower(): 
+                    rcatched(self.SendSMS)(
+                        tag_name,sms_receivers,message=message,values=values)
                   
             # telegram
             if tg_receivers: 
-              self.info('-'*80)
-              try:
-                self.SendTelegram(tag_name, tg_receivers,
-                                  message=message, values=report)
-              except:
-                self.warning('Exception sending telegram!: %s'
-                             % traceback.format_exc())
+                self.info('-'*80)
+                try:
+                    self.SendTelegram(tag_name, tg_receivers,
+                                    message=message, values=report)
+                except:
+                    self.warning('Exception sending telegram!: %s'
+                                % traceback.format_exc())
                 
             # SNAP ARCHIVING
             if (self.snap and SNAP_ALLOWED
@@ -928,23 +952,32 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             ## emails
             if mail_receivers: 
                 r = rcatched(self.SendMail)(report)
-                          
-            self.info('-'*80),self.update_flag_file()
+                self.info('-'*80),self.update_flag_file()
+            else:
+                self.info('=============> ALARM SENDING DISABLED!!')
 
-          else:
-            self.info('=============> ALARM SENDING DISABLED!!')
-
-          try:
-            self.update_log_file(tag=tag_name,report=report,
+            try:
+                self.update_log_file(tag=tag_name,report=report,
                                  message=message or '')
-          except:
-            self.warning(traceback.format_exc())
+            except:
+                self.warning(traceback.format_exc())
             
-          if alarm:
-            self.Alarms[tag_name].sent += 1
-            self.Alarms[tag_name].last_sent = time.time()
-                
-          return report
+            if alarm:
+                self.Alarms[tag_name].sent += 1
+                self.Alarms[tag_name].last_sent = time.time()
+        
+            if self._loggerds:
+                report = self.generate_json(tag_name, message=message, values=values)
+                try:
+                    self._loggerds.alarm(report)
+                except Exception, e:
+                    self.warning('PyAlarm loggerds exception:\n%s' % traceback.format_exc())
+
+            if self.LogStash:
+                report = self.generate_json(tag_name, message=message, values=values)
+                self.send_logstash(report)  
+        
+            return report
               
         except Exception,e:
             self.warning('PyAlarm.send_alarm crashed with exception:\n%s' 
@@ -1025,6 +1058,68 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                           % traceback.format_exc())
         finally:
             self.lock.release()
+
+    def send_logstash(self, string_report):
+        if not hasattr(self,'LogStash') \
+           or not self.LogStash \
+           or self.LogStash.strip()=='/dev/null': return
+
+        ALARM_PRIORITIES = {"ALARM": 400,
+                            "ERROR": 400,
+                            "WARNING": 300,
+                            "INFO": 200,
+                            "DEBUG": 100}
+        event = json.loads(string_report)
+        # add debug
+        json_event = json.dumps(event)
+        dbg_msg = 'Appending alarm to logstash queue: {}'.format(json_event)
+        self.debug(dbg_msg)
+
+        #TODO: Logic to be added in the pipeline file of logstash
+        #priority field needed by elasticsearch          
+        if "priority" not in event:
+            sev = str(event["severity"])
+            event["priority"] = ALARM_PRIORITIES.get(sev.upper(), 0)
+        # convert to string all the value ta
+        values_list = event["values"]
+        values_list = [str(val['value']) for val in values_list]
+        event["values"] = values_list
+        
+        # append alarm to logstash queue
+        self.logstash_queue.append(json.dumps(event))
+        # debug stream
+        n_alarms = len(self.logstash_queue)
+        dbg_msg = 'Number of alarms in logstash queue is now: {}'.format(n_alarms)
+        self.debug(dbg_msg)
+            
+    def _send_logstash(self):
+        while self.logstash_thread_running == True:
+            # debug stream
+            self.debug('In _send_logstash, logstash thread flag True.')
+            if len(self.logstash_queue) > 0:
+                try:
+                    self.debug('Number of alarms in logstash queue: {}'.format(len(self.logstash_queue)))
+                    queued_alarm = self.logstash_queue.pop(0)
+                    logstash_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    logstash_socket.settimeout(1)
+                    logstash_socket.connect((self.LogStash,5959))
+                    logstash_socket.send(queued_alarm)
+                    logstash_socket.close()
+                    # debug stream
+                    self.debug('Alarm sent to logstash: %s ' % queued_alarm)
+                #Here, maybe just catch socket.gaierror and socket.timeout?
+                except Exception,e:
+                    self.error('Exception in PyAlarm.send_logstash: %s' % traceback.format_exc())
+                    self.logstash_queue.insert(0, queued_alarm)
+                    #if unable to send to logstash, keep a maximum of 1000 alarms in the logstash queue
+                    if len(self.logstash_queue) > 1000:
+                        self.logstash_queue = self.logstash_queue[:1000]
+                        self.warning('LogStash alarm queue cap reached, limiting the number of alarms in the queue to 1000.')
+                    time.sleep(5)
+                finally:
+                    time.sleep(0.1)
+            else:
+                time.sleep(5)
 
     def trigger_action(self, alarm, args, message='',asynch=True):
         """
@@ -1262,6 +1357,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 
     def delete_device(self,stop=False):
         self.warning( "0[Device delete_device method] for device %s"%self.get_name())
+        # join logstash_thread
+        self.logstash_thread_running = False
+        self.logstash_thread.join()
         if stop:
             self.stop()
         else: 
@@ -1446,12 +1544,25 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.info('#'*80)
             self.setLogLevel(self.LogLevel)
 
+            self._loggerds = None
+            if self.LoggerDevice:
+                try:
+                    self._loggerds = PyTango.DeviceProxy(self.LoggerDevice)
+                except PyTango.DevFailed as e:
+                    print "Unable to connect to logger device '%s': %s" % (self.LoggerDevice, e)
+
+            #Logstash thread and queue
+            self.logstash_queue = []
+            self.logstash_thread = threading.Thread(target=self._send_logstash)
+            self.logstash_thread_running = True
+            self.logstash_thread.start()
+                
         except Exception,e:
             self.info( 'Exception in PyAlarm.init_device(): \n%s'
                       %traceback.format_exc())
             self.set_state(PyTango.DevState.FAULT)
             raise e
-          
+
         finally:
             self.pause.set() #starts updateAlarmsThread
             self.kill.clear()
@@ -2244,7 +2355,68 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug( 'Out of GenerateReport(%s,%s,%s)'%(tag,receivers,message))
         self.debug( '>'*80)
         return result
-        
+
+    
+    def generate_json(self, tag_name, message='DETAILS',
+                      values=None, user_comment=None, html=False):
+        # Check alarm
+        try:
+            msg = "Generating a json report for alarm {0}"
+            self.info(msg.format(tag_name))
+            alarm = self.Alarms[tag_name]
+        except KeyError:
+            return self.warn('Unknown alarm: {0}'.format(tag_name))
+
+        # Helper function
+        def cast_dict(dct):
+            """Convert Boost.Enum objects to strings"""
+            boost_eval_type = PyTango._PyTango.AttrQuality.__base__
+            for key, value in dct.items():
+                if isinstance(value, boost_eval_type):
+                    dct[key] = str(value)
+
+        # Build dictionary
+        try:
+            self.info("Building dictionary for alarm {0}".format(tag_name))
+            _values = values or self.PastValues.get(tag_name) or {}
+            cast_dict(_values)  # Convert Boost.Enum objects to string
+            report = {
+                "timestamp": int(time.time() * 1000),
+                "alarm_tag": tag_name,
+                "message": message.strip(),
+                "values": [{"attribute": attr, "value": value}
+                           for attr, value in _values.items()],
+                "device": self.get_name().strip(),
+                "description": alarm.parse_description().strip(),
+                "severity": alarm.parse_severity().strip(),
+                "instance": alarm.instance,
+                "formula": alarm.formula.strip()
+            }
+            if user_comment:
+                report["user_comment"] = user_comment
+            if alarm.recovered:
+                report["recovered_at"] = int(alarm.recovered * 1000)
+            if alarm.active:
+                report["active_since"] = int(alarm.active * 1000)
+        except Exception as exc:
+            msg = 'Unexpected exception while building dictionary'
+            msg = 'for alarm {0}: '.format(tag_name)
+            return self.warn(msg + repr(exc))
+
+        # Dump the json string
+        try:
+            self.info("Dumping json for alarm {0}".format(tag_name))
+            string = json.dumps(report)
+        except Exception as exc:
+            msg = 'Unexpected exception while dumping json'
+            msg = 'for alarm {0}: '.format(tag_name)
+            return self.warn(msg + repr(exc))
+        else:
+            self.debug(string.replace('%', '%%'))
+
+        # Return json
+        return string
+
 #------------------------------------------------------------------
 #    CreateAlarmContext command:
 #
