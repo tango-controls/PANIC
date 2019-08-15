@@ -1435,6 +1435,17 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 except Exception,e: 
                     self.warning('SnapConfig failed: %s'%e)
 
+            # Get status
+            try:
+                self.disabled
+            except AttributeError:
+                self.disabled = self.Disabled
+
+            # Process status
+            if self.disabled:
+                self.set_state(PyTango.DevState.OFF)
+                return
+
             if not self._initialized: 
                 self.set_state(PyTango.DevState.ON)
                 
@@ -1458,7 +1469,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         return
 
 #------------------------------------------------------------------
-#    Always excuted hook method
+#    Always executed hook method
 #------------------------------------------------------------------
     def always_executed_hook(self):
         self.debug("In "+ self.get_name()+ "::always_excuted_hook()")
@@ -1467,8 +1478,15 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             actives = list(reversed([(v.active,k) 
                         for k,v in self.Alarms.items() if v.active]))
             tlimit = time.time()-2*self.PollingPeriod
-            
-            if [a for a in self.Alarms if a not in self.DisabledAlarms] \
+
+            # Start/Stop feature
+            if self.get_state() == PyTango.DevState.OFF:
+                self.last_attribute_check = 0
+                for alarm in self.Alarms.values():
+                    alarm.active = False
+                self.set_status("The device is stopped")
+
+            elif [a for a in self.Alarms if a not in self.DisabledAlarms] \
                     and 0<self.last_attribute_check<tlimit:
                 
                 self.set_state(PyTango.DevState.FAULT)
@@ -1935,6 +1953,25 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             return 'DONE'
         else: return '%s_NotFound'%argin
 
+
+#------------------------------------------------------------------
+#    Start command:
+#
+#    Description: Start the device when stopped
+#
+#    argin:  DevVoid
+#    argout: DevVoid
+#------------------------------------------------------------------
+    def Start(self):
+        """Start the device when stopped"""
+        self.disabled = False
+        self.set_state(PyTango.DevState.INIT)
+        self.init_device(update_properties=False)
+
+    def is_Start_allowed(self):
+        return self.get_state() in [PyTango.DevState.OFF]
+
+
 #------------------------------------------------------------------
 #    Disable command:
 #
@@ -1967,6 +2004,26 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             return 'DONE'
         else: 
             raise Exception('%s_NotFound'%argin)
+
+
+#------------------------------------------------------------------
+#    Stop command:
+#
+#    Description: Stop the device when started
+#
+#    argin:  DevVoid
+#    argout: DevVoid
+#------------------------------------------------------------------
+    def Stop(self):
+        """Stop the device when stopped"""
+        self.stop()
+        self.disabled = True
+        self.set_state(PyTango.DevState.OFF)
+
+    def is_Stop_allowed(self):
+        return self.get_state() in [PyTango.DevState.ON,
+                                    PyTango.DevState.ALARM]
+
 
 #------------------------------------------------------------------
 #    CheckDisabled command:
@@ -2607,11 +2664,17 @@ class PyAlarmClass(PyTango.DeviceClass):
               "(TAG,) This is used to inform which alarm should be enabled,"
               " alarm won't skip the updateAlarms loop"],
             [PyTango.DevString, "If succeed, returns DONE"]],
+        'Start':
+            [[PyTango.DevVoid, "Start the device"],
+            [PyTango.DevVoid, ""]],
         'Disable':
             [[PyTango.DevVarStringArray, 
               "(TAG,comment,[timeout s/m/h/d]) Disable an alarm, "
               "skips update loop until timeout"],
             [PyTango.DevString, "If succeed, returns DONE"]],
+        'Stop':
+            [[PyTango.DevVoid, "Stop the device"],
+            [PyTango.DevVoid, ""]],
         'ResetAll':
             [[PyTango.DevVarStringArray, "User message"],
             [PyTango.DevString, ""]],

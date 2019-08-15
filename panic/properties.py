@@ -238,6 +238,10 @@ ALARM_CYCLE = {
         " if INT then it will last only for N seconds after Startup; "
         "if a python formula is written it will enable/disable the device",
         [ '120' ] ],#Overriden by panic.DefaultPyAlarmProperties
+    'Disabled':
+        [PyTango.DevBoolean,
+        "Start the device in disabled state, False otherwise",
+        [ False ] ],
     'AlarmThreshold':
         [PyTango.DevLong,
         "Min number of consecutive Events/Pollings that must trigger an Alarm.",
