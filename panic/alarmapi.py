@@ -1782,7 +1782,7 @@ class AlarmAPI(fandango.SingletonMap):
                 self._eval.update_locals({'PANIC':self})
                 if _locals: self._eval.update_locals(_locals)
                 formula = self.replace_alarms(formula)
-                print('AlarmAPI.evaluate(%s,%s)'%(formula,_locals))
+                self.debug('AlarmAPI.evaluate(%s,%s)'%(formula,_locals))
                 return self._eval.eval(formula,_raise=_raise)
         except Exception,e:
             return e
