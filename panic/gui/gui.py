@@ -60,7 +60,7 @@ search to a default value (f0|f1|f2|...)
 OPEN_WINDOWS = []
 
 import utils as widgets
-widgets.TRACE_LEVEL = -1
+widgets.TRACE_LEVEL = 0 #-1
 
     ###########################################################################
     
@@ -99,7 +99,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             options = dict((o.replace('-','').split('=')[0],o.split('=',1)[-1]) 
                 for o in options)
             
-        trace( 'In AlarmGUI(%s): %s'%(filters,options))
+        print( 'In AlarmGUI(%s): %s'%(filters,options))
 
         self.last_reload = 0
         self.AlarmRows = {}
@@ -113,7 +113,6 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         self.scope = options.get('scope','*') #filters or '*'
         self.default_regEx = options.get('default',filters or '*')
         self.regEx = self.default_regEx
-        self.init_ui(parent,mainwindow) #init_mw is called here
         self.NO_ICON = Qt.QIcon()
         
         refresh = int(options.get('refresh',self.REFRESH_TIME))
@@ -123,17 +122,20 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         #if self.regEx not in ('','*'): 
             #print 'Setting RegExp filter: %s'%self.regEx
             #self._ui.regExLine.setText(str(self.regEx))
-               
+        
+        print('AlarmGUI(%s, %s)'%(api,self.scope))
         self.api = api or panic.AlarmAPI(self.scope)
-        trace('AlarmGUI(%s): api done'%self.scope)
+        print('AlarmGUI(%s): api done, %d devs, %d alarms' % 
+              (self.scope, len(self.api.devices), len(self.api.alarms)))
 
+        self.init_ui(parent,mainwindow) #init_mw is called here
+        
         # @TODO: api-based views are not multi-host
         self.view = panic.view.AlarmView(api=self.api,scope=self.scope,
                 refresh = self.REFRESH_TIME/1e3,events=False,verbose=1) 
         trace('AlarmGUI(): view done')
         
-        self.snapi = None
-        self.ctx_names = []
+        self.snaps = None
 
         if not self.api.keys(): trace('NO ALARMS FOUND IN DATABASE!?!?')
         #AlarmRow.TAG_SIZE = 1+max([len(k) for k in self.api] or [40])
@@ -237,6 +239,8 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             self.last_reload=now
             self._ui.listWidget.clearSelection()
             self.api.load()
+            if not self.api.keys(): 
+                trace('NO ALARMS FOUND IN DATABASE!?!?')
             self.setSecondCombo()
             #self.checkAlarmRows()
                     
@@ -706,7 +710,7 @@ class QFilterGUI(QAlarmList):
 
     def setSecondCombo(self):
         source = str(self._ui.contextComboBox.currentText())
-        trace("AlarmGUI.setSecondCombo(%s)"%source)
+        print("AlarmGUI.setSecondCombo(%s)"%source)
         if source == self.source: return
         else: self.source = source
         self._ui.comboBoxx.clear()
@@ -714,6 +718,7 @@ class QFilterGUI(QAlarmList):
         self._ui.infoLabel0_1.show()
         self._ui.comboBoxx.setEnabled(True)
         devs = sorted(set(a.device for a in self.api.values()))
+        print(devs)
         if source =='Devices':
             r,sort,values = 1,True,devs
             

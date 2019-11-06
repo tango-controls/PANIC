@@ -61,7 +61,6 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         act = self.popMenu.addAction(getThemeIcon("office-calendar"), 
                                      "View History",self.viewHistory)
         act.setEnabled(SNAP_ALLOWED and len(items)==1) 
-            # and row.get_alarm_tag() in self.ctx_names)
             
         sevMenu = self.popMenu.addMenu('Change Priority')
         for S in SEVERITIES:
@@ -230,23 +229,21 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
 
     def viewHistory(self):
         alarm = self.getCurrentAlarm().tag
+        print('viewHistory(%s)'%str(alarm))
 
-        if SNAP_ALLOWED and not self.snapi: 
-          self.snapi = get_snap_api()
+        if SNAP_ALLOWED and not self.snaps: 
+          self.snaps = get_snap_api()
 
-        if self.snapi:
-          self.ctx_names=[c.name for c in self.snapi.get_contexts().values()]
-
-        if alarm in self.ctx_names: 
-          self.ahApp = ahWidget()
-          self.ahApp.show()
-          #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.\
-          #currentItem().text().split('|')[0]).strip(' '))
-          self.ahApp.setAlarmCombo(alarm=alarm)
+        if self.snaps and self.snaps.get_context(alarm):
+            self.ahApp = ahWidget()
+            self.ahApp.show()
+            #self.ahApp.setAlarmCombo(alarm=str(self._ui.listWidget.\
+            #currentItem().text().split('|')[0]).strip(' '))
+            self.ahApp.setAlarmCombo(alarm=alarm)
         else:
-          v = QtGui.QMessageBox.warning(None,'Not Archived', \
-              'This alarm has not recorded history',QtGui.QMessageBox.Ok)
-          return
+            v = QtGui.QMessageBox.warning(None,'Not Archived', \
+                'This alarm has not recorded history',QtGui.QMessageBox.Ok)
+            return
         
         
     def showAlarmPreview(self):

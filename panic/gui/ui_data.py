@@ -101,9 +101,17 @@ class Ui_Data(object):
         self.descriptionTextEdit.setReadOnly(True)
         self.descriptionTextEdit.setObjectName("descriptionTextEdit")
         self.gridLayout.addWidget(self.descriptionTextEdit, 6, 1, 1, 3)
+        # self.wikiLabel = QtGui.QLabel(Data)
+        # self.wikiLabel.setObjectName("wikiLabel")
+        # self.gridLayout.addWidget(self.wikiLabel, 7, 0, 1, 1)
+        self.wikiLink = QtGui.QLabel(Data)
+        self.wikiLink.setObjectName("wikiLlink")
+        self.wikiLink.setOpenExternalLinks(True)
+        self.gridLayout.addWidget(self.wikiLink,7,1,1,3)
+
         self.receiversLabel = QtGui.QLabel(Data)
         self.receiversLabel.setObjectName("receiversLabel")
-        self.gridLayout.addWidget(self.receiversLabel, 7, 0, 1, 1)
+        self.gridLayout.addWidget(self.receiversLabel, 8, 0, 1, 1)
         self.horizontalLayout = QtGui.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
 
@@ -128,7 +136,7 @@ class Ui_Data(object):
         self.horizontalLayout.addWidget(self.addReceiversButton)
         self.addReceiversButton.setEnabled(False)
 
-        self.gridLayout.addLayout(self.horizontalLayout, 7, 1, 1, 1)
+        self.gridLayout.addLayout(self.horizontalLayout, 8, 1, 1, 1)
         self.verticalLayout_3.addLayout(self.gridLayout)
         self.frame = QtGui.QFrame(Data)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
@@ -216,6 +224,7 @@ class Ui_Data(object):
         self.severityLabel.setText("Priority:")
 
         self.descriptionLabel.setText("Description:")
+        # self.wikiLabel.setText("More info on Wiki:")
         self.receiversLabel.setText("Annunciators:")
         self.formulaLabel.setText("Formula:")
         self.editButton.setText("Edit")

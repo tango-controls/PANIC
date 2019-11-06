@@ -16,10 +16,13 @@ from taurus.qt.qtgui.container import TaurusWidget
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.core.util  import Logger
 
-# Set tangoFormatter as default formatter 
-from taurus.qt.qtgui.base import TaurusBaseComponent
-from taurus.core.tango.util import tangoFormatter 
-TaurusBaseComponent.FORMAT = tangoFormatter
+try:
+    # Set tangoFormatter as default formatter 
+    from taurus.qt.qtgui.base import TaurusBaseComponent
+    from taurus.core.tango.util import tangoFormatter
+    TaurusBaseComponent.FORMAT = tangoFormatter
+except:
+    print('tangoFormatter not available (Taurus < 4!?)')
 
 import panic
 from panic import getAttrValue
@@ -205,7 +208,7 @@ class iValidatedWidget(object):
       UserValidator : user_login.TangoLoginDialog
     
     """
-    KEEP = int(first(getPanicProperty('PanicUserTimeout'),60))
+    KEEP = int(first(getPanicProperty('PanicUserTimeout'),None) or 60)
     
     def init(self,tag=''):
       
@@ -360,9 +363,9 @@ def get_snap_api():
       try:
           from PyTangoArchiving import snap
           #from PyTangoArchiving.widget.snaps import *
-          db = panic.alarmapi._TANGO #fandango.get_database()
+          db = panic.alarmapi.get_tango() #fandango.get_database()
           assert list(db.get_device_exported_for_class('SnapManager'))
-          SNAP_ALLOWED = snap.SnapAPI()
+          SNAP_ALLOWED = snap.SnapAPI(load=False)
           
       except Exception,e:
           trace('PyTangoArchiving.Snaps not available: '\

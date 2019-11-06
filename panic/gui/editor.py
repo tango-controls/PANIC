@@ -227,6 +227,9 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._dataWidget._wi.nameLineEdit.clear()
         self._dataWidget._wi.deviceLineEdit.clear()
         self._dataWidget._wi.descriptionTextEdit.clear()
+        self._dataWidget._wi.wikiLink.clear()
+        self._dataWidget._wi.wikiLink.hide()
+        # self._dataWidget._wi.wikiLink.show()
         self._dataWidget._wi.receiversLineEdit.clear()
         self._dataWidget._wi.severityLineEdit.clear()
         self._dataWidget._wi.formulaTextEdit.clear()
@@ -254,6 +257,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._dataWidget._wi.nameLineEdit.setText(alarm.tag)
         self._dataWidget._wi.deviceLineEdit.setText(alarm.device)
         self._dataWidget._wi.descriptionTextEdit.setText(alarm.description)
+
         self._dataWidget._wi.severityLineEdit.setText(alarm.severity)
         self._dataWidget._wi.receiversLineEdit.setText(alarm.receivers)
         self._dataWidget._wi.formulaTextEdit.setText(alarm.formula)
@@ -262,6 +266,17 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._dataWidget._wi.previewButton.setEnabled(True)
         self._dataWidget._wi.editButton.setEnabled(True)
         self.valueChanged(forced=True)
+
+        # setup wiki link
+        wiki_link = alarm.get_wiki_link()
+        if len(wiki_link) > 0:
+            self._dataWidget._wi.wikiLink.setText('<qt><a href="'+alarm.get_wiki_link()+'">More info on Wiki...</a></qt>')
+            self._dataWidget._wi.wikiLink.show()
+            # self._dataWidget._wi.wikiLabel.show()
+        else:
+            self._dataWidget._wi.wikiLink.hide()
+            # self._dataWidget._wi.wikiLabel.hide()
+
         return
     
     def update_button_states(self,alarm=None):

@@ -1761,7 +1761,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #    Add your own code here
         external = not tag_name #command called outside of process_alarm()
         
-        t0,STATE,VALUE = time.time(),False,None
+        t0,STATE,RAISE,VALUE = time.time(),False,False,None
         variables = notNone(variables,{})
         try:
             if lock: self.lock.acquire()

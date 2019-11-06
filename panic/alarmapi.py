@@ -94,6 +94,36 @@ def unicode2str(obj):
     elif isString(obj): n = str(obj)
     else: n = obj
     return n    
+
+
+def substitute(message, substitutions=[[], {}], depth=1):
+    """
+    Substitute `{%x%}` items values provided by substitutions
+    :param message: message to be substituted
+    :param substitutions: list of list and dictionary. 
+        List is used for {%number%} substitutions and dictionary for
+        {%name%} substitutions
+    :param depth: defines number of pass
+    :return: substituted message
+    """
+    if not isinstance(message, str):
+        raise Exception('StringExpected!')
+
+    if depth <1 :
+        return message
+
+    new_message = message
+
+    # substitute numbered substitutions
+    i = 0
+    for value in substitutions[0]:
+        new_message = new_message.replace("{%%%d%%}" % i, value)
+        i += 1
+    # processing named substitutions
+    for (k, value) in substitutions[1].items():
+        new_message = new_message.replace("{%%%s%%}" % k, value)
+
+    return substitute(new_message, substitutions, depth-1)
     
 
 ###############################################################################
@@ -514,7 +544,7 @@ class Alarm(object):
         return AlarmStates.get_key(self._state)
       
     state = property(fget=get_state,fset=set_state)
-      
+
     def set_time(self,t=None):
         self._time =  t if t and t>0 else time.time()
         #tracer('%s.set_time(%s,%s)'
@@ -601,6 +631,21 @@ class Alarm(object):
         else:
             config = {}
         return config
+
+    def get_wiki_link(self):
+        """Returns string with link to Wiki for this alarm or empty string"""
+        try:
+            wiki_prop = get_tango().get_class_property(
+                'PyAlarm','AlarmWikiLink').get('AlarmWikiLink',['',]) + ['',]
+            wiki_link = wiki_prop[0]
+
+            # change the property
+            wiki_link = substitute(wiki_link, [['',], {"ALARM": self.tag}])
+
+            return wiki_link
+        except:
+            traceback.print_exc()
+            return ''
 
     def get_enabled(self,force=True):
         if force:
@@ -1061,16 +1106,21 @@ class AlarmDS(object):
 class AlarmAPI(fandango.SingletonMap):
     """
     Panic API is a dictionary-like object
+    
+    It will load alarms matching the given filters from the given tango_host
+    Filters will apply only to device names by default.
+    Will be searched also in formulas if extended = True
+    (or None and an initial search returnd no results).
     """
     CURRENT = None
     _phonebooks = {}
     
-    def __init__(self,filters='*',tango_host=None,
-                 extended=False,
-                 logger=fandango.log.WARNING):
+    def __init__(self,filters = '*',tango_host = None,
+                 extended = None,
+                 logger = fandango.log.WARNING):
       
         self.__init_logger(logger)
-        self.log('In AlarmAPI(%s)'%filters)
+        self.warning('In AlarmAPI(%s)'%filters)
         self.alarms = {}
         self.devices = fandango.CaselessDict()
         self.filters = filters
@@ -1092,6 +1142,8 @@ class AlarmAPI(fandango.SingletonMap):
         self.db = self.servers.db
         
         self.load(self.filters,extended=extended)
+        if extended is None and not len(self.keys()):
+            self.load(self.filters, extended = True)
         
     def __init_logger(self,logger):
         if fandango.isCallable(logger):
@@ -1730,7 +1782,7 @@ class AlarmAPI(fandango.SingletonMap):
                 self._eval.update_locals({'PANIC':self})
                 if _locals: self._eval.update_locals(_locals)
                 formula = self.replace_alarms(formula)
-                print('AlarmAPI.evaluate(%s,%s)'%(formula,_locals))
+                self.debug('AlarmAPI.evaluate(%s,%s)'%(formula,_locals))
                 return self._eval.eval(formula,_raise=_raise)
         except Exception,e:
             return e

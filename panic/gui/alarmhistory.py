@@ -16,6 +16,7 @@ class ahWidget(QtGui.QWidget):
         self._ah.alarmhistorySetupUi(self)
 
     def setAlarmCombo(self, alarm=None):
+        print('ahWidget.setAlarmCombo(%s)' % str(alarm))
         self._ah.setAlarmCombo(alarm=alarm or 'All')
 
     def show(self):
@@ -96,6 +97,7 @@ class alarmhistoryForm(object):
         QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("customContextMenuRequested(const QPoint&)"), self.onContextMenu)
 
     def setAlarmCombo(self, alarm=None):
+        print('In alarmHistoryForm.setAlarmCombo(%s)' % str(alarm))
         self.alarmCombo.blockSignals(True)
         pos=self.alarmCombo.currentIndex()
         self.alarmCombo.clear()
@@ -107,7 +109,8 @@ class alarmhistoryForm(object):
         if alarm:
             pos=self.alarmCombo.findText(QtCore.QString(alarm), QtCore.Qt.MatchStartsWith)
             self.alarmCombo.setCurrentIndex(pos)
-        elif pos>=0: self.alarmCombo.setCurrentIndex(pos)
+        elif pos>=0: 
+            self.alarmCombo.setCurrentIndex(pos)
         self.buildList()
         self.alarmCombo.blockSignals(False)
         #self._Form.resize(self._Form.sizeHint().width()+150, 500)
@@ -186,21 +189,34 @@ class alarmhistoryForm(object):
         SnapApp=snapWidget(container=self._Form)
         self.snap=SnapApp.show
         row=self.tableWidget.currentRow()
-        self.ctx_name=str(self.tableWidget.item(row,1).text())
-        self.snap_date=str(self.tableWidget.item(row,0).text())
-        res=self.snapApi.db.search_context(self.ctx_name)
-        for c in res:
-            if c['reason']=='ALARM':
-                self.ctx_id=c['id_context']
-                break
-        self.ctx=self.snapApi.get_context(self.ctx_id)
-        res=sorted(self.ctx.get_snapshots().items(), reverse=True)
-        pos=0;
-        for s in res:
-            if str(s[1][0])==self.snap_date: break
-            pos+=1
-        SnapApp.initContexts(self.ctx_id, pos)
-        self.snap()
+        item = self.tableWidget.item(row,1)
+        if item is None:
+            QtGui.QMessageBox.warning(None,'No row selected', \
+                'Select a Row first!',QtGui.QMessageBox.Ok)            
+        else:
+            try:
+                self.ctx_name=str(item.text())
+                self.snap_date=str(self.tableWidget.item(row,0).text())
+                res=self.snapApi.db.search_context(self.ctx_name)
+                for c in res:
+                    if c['reason']=='ALARM':
+                        self.ctx_id=c['id_context']
+                        break
+                self.ctx=self.snapApi.get_context(self.ctx_id)
+                res=sorted(self.ctx.get_snapshots().items(), reverse=True)
+                pos=0;
+                for s in res:
+                    if str(s[1][0])==self.snap_date: break
+                    pos+=1
+                print(self.ctx)
+                print(self.ctx_id)
+                print(res)
+                print(pos)                    
+                SnapApp.initContexts(self.ctx_id, pos)
+                self.snap()
+            except:
+                QtGui.QMessageBox.warning(None,'Error!', \
+                    traceback.format_exc(),QtGui.QMessageBox.Ok)     
 
     def onRefresh(self):
         row=self.tableWidget.currentRow()
