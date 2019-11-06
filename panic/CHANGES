@@ -1,6 +1,7 @@
-PANIC 7.2.1
+PANIC 7.2.2
 -----------
 
+7.2.3 - fix bug on snaps widget
 7.2.2 - fix bug when UserTimeout is not specified
 7.2.1 - Merge panic-wiki-links by s2Innovation
 
