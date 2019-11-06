@@ -1,0 +1,18 @@
+Source: panic
+Maintainer: srubio <srubio@cells.es>
+Section: python
+Priority: optional
+Build-Depends: dh-python, python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 9)
+Standards-Version: 3.9.8
+
+Package: python-panic
+Architecture: all
+Depends: ${misc:Depends}, ${python:Depends}, python-fandango (>= 14.1.0), python-tango
+Description: Panic, a python alarm system for tango control system
+ Panic is a set of tools (api, tango device server, user interface) 
+ that provides:
+  * periodic evaluation of a set of conditions
+  * notification (email, sms, pop-up, speakers)
+  * keep a log of what happened. (files, tango snapshots)
+  * taking automated actions (tango commands / attributes)
+  * tools for configuration/visualization

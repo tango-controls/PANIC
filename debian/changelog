@@ -1,0 +1,130 @@
+panic (7.2.2+git20190703.1.78bfa7-0~bpo9+0~alba+1~1.gbpfcbad9) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @fcbad9e9e9909de2646110e642ead13727a1a612 **
+
+  * New upstream version 7.2.2+git20190703.1.78bfa7
+
+ -- srubio <srubio@cells.es>  Wed, 03 Jul 2019 14:47:27 +0000
+
+panic (7.2.1+git20190429.1.975410-0~bpo9+0~alba+1~1.gbp122b80) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @122b806b4a937bf067946fb0a334bfe7a6cab2b9 **
+
+  * New upstream version 7.2.1+git20190429.1.975410
+
+ -- srubio <srubio@cells.es>  Mon, 29 Apr 2019 13:12:55 +0000
+
+panic (7.1.2+git20181205.1.11a829-0~bpo9+0~alba+1~1.gbpf15c1d) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @f15c1db8c7aebd2edfdee5918247f8a0bf4a1f0d **
+
+  * New upstream version 7.1.2+git20181205.1.11a829
+
+ -- srubio <srubio@cells.es>  Wed, 05 Dec 2018 14:37:06 +0000
+
+panic (7.1.1+git20181205.1.2333d7-0~bpo9+0~alba+1~1) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @e4471b740e219ae053cdd9240dc861030fd19977 **
+
+  * New upstream version 7.1.1+git20181205.1.2333d7
+
+ -- srubio <srubio@cells.es>  Wed, 05 Dec 2018 11:54:38 +0000
+
+panic (7.1.0+git20181204.1.d2b061-0~bpo9+0~alba+1~1.gbp54e2b8) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @54e2b8afaa08e2bc13e94151e819ba52e5e1facb **
+
+  * New upstream version 7.1.0+git20181204.1.d2b061
+
+ -- srubio <srubio@cells.es>  Tue, 04 Dec 2018 16:13:12 +0000
+
+panic (6.5.1+git20180903.1.02bc92-0~bpo9+0~alba+1~1) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @9834408f95045d653ef4ff8cb51c6949a530fbad **
+
+  * New upstream version 6.5.1+git20180903.1.02bc92
+
+ -- srubio <srubio@cells.es>  Mon, 03 Sep 2018 15:07:23 +0000
+
+panic (6.5.0+git20180228.1.5fe070-1) stretch-backports; urgency=medium
+
+  * New upstream version 6.5.0+git20180228.1.5fe070
+  * Update changelog for 6.5.0+git20180228.1.5fe070-0~bpo9+0~alba+1 release
+
+ -- srubio <srubio@cells.es>  Wed, 28 Feb 2018 16:49:23 +0000
+
+panic (6.5.0+git20180228.1.5fe070-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @5a09227b55c1035bddde3bf799de8bfbd329c980 **
+
+  * New upstream version 6.5.0+git20180228.1.5fe070
+
+ -- srubio <srubio@cells.es>  Wed, 28 Feb 2018 16:35:52 +0000
+
+panic (6.4.0+git20170928.1.f2ced6-1~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+  * Update changelog for 6.4.0+git20170928.1.f2ced6-0~bpo9+0~alba+1 release
+
+ -- srubio <srubio@cells.es>  Thu, 28 Sep 2017 15:52:02 +0000
+
+panic (6.4.0+git20170928.1.f2ced6-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+  ** SNAPSHOT build @d5f52cd582c3f843a8e5c52bccdb3e2c50feca88 **
+  * New upstream version 6.4.0+git20170928.1.f2ced6
+
+ -- srubio <srubio@cells.es>  Thu, 28 Sep 2017 15:51:18 +0000
+
+panic (6.1.2+git20170828.1.9ed779-1~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * Correct lintian warnings
+
+ -- srubio <srubio@cells.es>  Mon, 28 Aug 2017 08:21:58 +0000
+
+panic (6.1.2+git20170828.1.9ed779-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+
+  ** SNAPSHOT build @2c717e7bb63cca8386b62f9d1ea296d263b5b9f3 **
+
+  * New upstream version 6.1.2+git20170828.1.9ed779
+
+ -- srubio <srubio@cells.es>  Mon, 28 Aug 2017 07:22:34 +0000
+
+panic (6.1.1+git20170824.1.514b57-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+
+  ** SNAPSHOT build @af83a32f3e13749826f10b808432f360bef5eb6e **
+
+  * New upstream version 6.1.1+git20170824.1.514b57
+
+ -- srubio <srubio@cells.es>  Thu, 24 Aug 2017 11:20:55 +0000
+
+panic (6.0.6+git20170620.1.ec899b-2~bpo9+0~alba+2) stretch-backports; urgency=medium
+
+  * local package
+  * updated description
+
+ -- srubio <srubio@cells.es>  Tue, 20 Jun 2017 12:17:06 +0000
+
+panic (6.0.6+git20170620.1.ec899b-2~bpo9+0~alba+1) stretch-backports; urgency=low
+
+  * local package
+  * updated debian config
+
+ -- srubio <srubio@cells.es>  Tue, 20 Jun 2017 12:06:24 +0000
+
+panic (6.0.6+git20170620.1.ec899b-1) unstable; urgency=low
+
+  * source package automatically created by stdeb 0.8.5
+
+ -- srubio <srubio@cells.es>  Tue, 20 Jun 2017 12:02:25 +0000
