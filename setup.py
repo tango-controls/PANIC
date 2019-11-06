@@ -62,7 +62,7 @@ setup(
     install_requires=install_requires,
     entry_points=entry_points,
     scripts=scripts,
-    include_package_date=True,
+    #include_package_date=True,
 )
 
 
