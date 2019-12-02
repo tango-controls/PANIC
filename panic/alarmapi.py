@@ -46,6 +46,8 @@
 """
 
 import traceback,re,time,os,sys
+from uuid import uuid4
+
 import fandango
 import fandango as fn
 
@@ -653,6 +655,10 @@ class Alarm(object):
                 self.disabled = self.get_ds().get_disabled(self.tag)
             except: return None
         return not self.disabled
+
+    def activate(self):
+        self.active = time.time()
+        self.instance = str(uuid4())
 
     def enable(self,comment=''):
         """ 

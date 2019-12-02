@@ -299,13 +299,23 @@ __doc__+="""
 ALARM_LOGS: Properties to manage the logging of Alarms
 """
 ALARM_LOGS = {
+    'LogStash':
+    [PyTango.DevString,
+    """Logstash host where we sent Alarms to ElasticSearch.\n
+    Logstash configuration needs a pipeline conf file in order to accept tcp 
+    data on 5099 port.""",
+    [ "" ] ], #Overriden by panic.DefaultPyAlarmProperties
     'LogFile':
         [PyTango.DevString,
         """File where alarms are logged, like /tmp/alarm_$NAME.log\n
         Keywords are $DEVICE,$ALARM,$NAME,$DATE\n
         If version>6.0 a FolderDS-like device can be used for remote logging:\n
         \ttango://test/folder/01/$ALARM_$DATE.log""",
-        [ "" ] ], 
+        [ "" ] ],
+    'LoggerDevice':
+        [PyTango.DevString,
+         "Name of logger device",
+         [""]], 
     'HtmlFolder':
         [PyTango.DevString,
         "File where alarm reports are saved",
