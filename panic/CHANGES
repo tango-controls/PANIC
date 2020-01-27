@@ -1,5 +1,13 @@
-PANIC 7.2.2
+PANIC 7.3.0
 -----------
+
+7.3.0
+    solve disabled bug, add event pushing
+    save regexp of userfilters between ()
+    allow multiple disable/acknowledge
+    Merge branch 'documentation'
+    fix setup.py
+
 
 7.2.3 - fix bug on snaps widget
 7.2.2 - fix bug when UserTimeout is not specified
