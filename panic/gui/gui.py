@@ -667,11 +667,15 @@ class QFilterGUI(QAlarmList):
             regexp = regexp.strip()
             k,regexp = regexp.split('=') if '=' in regexp else ('',regexp)
             neg = regexp.startswith('~')
-            if neg: regexp = regexp[1:].strip()
+            if neg: 
+                regexp = regexp[1:].strip()
             #if regexp and not clmatch('^[~\!\*].*',regexp): 
             if not clmatch('.*[\^\$\*].*',regexp):
-                s = '.*' if fandango.isRegexp(regexp) else '*'
-                regexp = s+regexp.replace(' ',s)+s
+                if fandango.isRegexp(regexp):
+                    regexp,s = '(%s)' % regexp, '.*'
+                else:
+                    s = '*'
+                regexp = s + regexp.replace(' ',s) + s
             if neg: regexp = '~'+regexp
             if k: reg_dict[k] = regexp
             else: return regexp            
