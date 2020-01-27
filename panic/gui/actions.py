@@ -74,14 +74,14 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
                         "Reset Alarm(s)",lambda s=self:ResetAlarm(s))    
         act.setEnabled(any(i.active for i in items))
 
-        #if len([i.acknowledged for i in items]) in (len(items),0):
-        if len(items)==1:
+        if len([i.acknowledged for i in items]) in (len(items),0):
+        #if len(items)==1:
             self.popMenu.addAction(getThemeIcon("media-playback-pause"), 
                 "Acknowledge/Renounce Alarm(s)",
                 lambda s=self:AcknowledgeAlarm(s))
 
-        #if len([i.disabled for i in items]) in (len(items),0):
-        if len(items)==1:
+        if len([i.disabled for i in items]) in (len(items),0):
+        #if len(items)==1:
             self.popMenu.addAction(getThemeIcon("dialog-error"), 
                 "Disable/Enable Alarm(s)",
                 lambda s=self:ChangeDisabled(s))
