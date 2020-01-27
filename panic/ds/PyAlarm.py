@@ -179,13 +179,31 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         return self._status
     
     #--------------------------------------------------------------------------
+    
+    def get_alarm_attribute(self,attr):
 
-    def alarm_attr_read(self,attr): #,fire_event=True):
+        if isString(attr):
+            if attr in self.Alarms:
+                tag_name = attr
+            else:
+                l = self.Alarms.get(attr)
+                tag_name = l[0].get_attribute() if len(l) else attr
+
+        elif hasattr(attr,'get_attribute'):
+            tag_name = attr.get_attribute()
+
+        else:
+            tag_name = attr.get_name()
+
+        return tag_name
+
+    def alarm_attr_read(self,attr,t=0): #,fire_event=True):
         """
         This is the method where you control the value assigned
         to each Alarm attributes
         """
-        tag_name = attr.get_name()
+        tag_name = self.get_alarm_attribute(attr)
+            
         assert tag_name in self.Alarms,'Alarm Removed!'
         value = any(re.match(tag_name.replace('_','.')+'$',a) 
                     for a in self.get_active_alarms())
@@ -205,7 +223,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.quality=PyTango.AttrQuality.ATTR_ALARM
         else: self.quality=PyTango.AttrQuality.ATTR_WARNING
         
-        attr.set_value_date_quality(value,time.time(),self.quality)
+        t = t or time.time()
+        self.push_change_event(aname,value,t,self.quality)
+        attr.set_value_date_quality(value,t,self.quality)
     
     if USE_STATIC_METHODS: 
         alarm_attr_read = staticmethod(self_locked(alarm_attr_read))
@@ -221,21 +241,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         alarm_attr_allowed = staticmethod(alarm_attr_allowed)
 
     def create_alarm_attribute(self,argin):
-        new_attr_name = self.Alarms[argin].get_attribute()
-        if new_attr_name in self.DynamicAttributes:
+        aname = self.Alarms[argin].get_attribute()
+        if aname in self.DynamicAttributes:
             self.info('PyAlarm(%s): attribute %s already exists' 
-                      % (self.get_name(),new_attr_name))
+                      % (self.get_name(),aname))
         else:
             self.info('PyAlarm(%s): Creating attribute %s for %s alarm' 
-                      % (self.get_name(),new_attr_name,argin))
-            self.add_attribute(PyTango.Attr(new_attr_name,
+                      % (self.get_name(),aname,argin))
+            self.add_attribute(PyTango.Attr(aname,
                 PyTango.ArgType.DevBoolean,PyTango.AttrWriteType.READ),
                 self.alarm_attr_read,
                 None, #self.write_new_attribute #(attr)
                 self.alarm_attr_allowed
                 )
-            self.DynamicAttributes.append(new_attr_name)
-        return new_attr_name
+            self.DynamicAttributes.append(aname)
+            self.set_change_event(aname.lower(),True,False)
+        return aname
         
     def update_locals(self,_locals=None,check=True,update=True):
         """
@@ -751,6 +772,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.Alarms[tag_name].recovered = 0
                 self.Alarms[tag_name].set_time(now)
                 result = True
+                self.alarm_attr_read(tag_name) #pushing is done here
         finally:
             self.lock.release()
         return result
@@ -789,6 +811,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                     if tag_name in self.AcknowledgedAlarms: 
                       self.AcknowledgedAlarms.remove(tag_name)
                       
+            self.alarm_attr_read(tag_name) #pushing is done here
         except:
             s = traceback.format_exc()
             self.warning( 'free_alarm(%s) failed!:1: %s' % (tag_name,s))
@@ -1664,6 +1687,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         #setup = 'tag','description','formula'
         setup = SUMMARY_FIELDS
         
+        [alarm.get_state(force=True) for alarm in self.Alarms.values()]
         attr_AlarmSummary_read = sorted(
             sep.join('%s=%s'
             %(s,(str if s!='time' else time2str)
@@ -1954,8 +1978,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         argin = [x[1] for x in args if not x[0]]
         tag,userMessage = argin[0],','.join(argin[1:])
         if tag in self.Alarms:
-            self.free_alarm(tag, userMessage, message='DISABLED')
-            self.Alarms[str(argin[0])].active = 0
             try: 
                 #Setting Disable Timeout
                 self.DisabledAlarms[tag] = time.time()+\
@@ -1963,7 +1985,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             except:
                 self.DisabledAlarms[tag] = END_OF_TIME
                 
-            self.Alarms[str(argin[0])].disabled = self.DisabledAlarms[tag]                
+            self.Alarms[str(argin[0])].disabled = self.DisabledAlarms[tag]
+            # Order of actions matter
+            self.free_alarm(tag, userMessage, message='DISABLED')
+            self.Alarms[str(argin[0])].active = 0            
             return 'DONE'
         else: 
             raise Exception('%s_NotFound'%argin)
