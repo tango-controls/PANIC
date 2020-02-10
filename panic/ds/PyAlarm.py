@@ -224,7 +224,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         else: self.quality=PyTango.AttrQuality.ATTR_WARNING
         
         t = t or time.time()
-        self.push_change_event(tag_name,value,t,self.quality)
+        try:
+            self.push_change_event(tag_name,value,t,self.quality)
+        except:
+            traceback.print_exc()
         attr.set_value_date_quality(value,t,self.quality)
     
     if USE_STATIC_METHODS: 
