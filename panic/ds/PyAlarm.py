@@ -202,33 +202,35 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         This is the method where you control the value assigned
         to each Alarm attributes
         """
-        tag_name = self.get_alarm_attribute(attr)
-            
-        assert tag_name in self.Alarms,'Alarm Removed!'
-        value = any(re.match(tag_name.replace('_','.')+'$',a) 
-                    for a in self.get_active_alarms())
-        self.debug('PyAlarm(%s).read_alarm_attribute(%s) is %s;'\
-                    ' Active Alarms: %s' 
-                % (self.get_name(),tag_name,value,self.get_active_alarms()))
-        
-        self.quality=PyTango.AttrQuality.ATTR_WARNING
-        if tag_name in self.FailedAlarms or self.CheckDisabled(tag_name):
-            self.quality=PyTango.AttrQuality.ATTR_INVALID
-        elif(self.Alarms[tag_name].severity=='DEBUG'):
-            self.quality=PyTango.AttrQuality.ATTR_VALID
-        elif(self.Alarms[tag_name].severity=='WARNING'):
-            self.quality=PyTango.AttrQuality.ATTR_WARNING
-        elif(self.Alarms[tag_name].severity=='ALARM' 
-             or self.Alarms[tag_name].severity=='ERROR'):
-            self.quality=PyTango.AttrQuality.ATTR_ALARM
-        else: self.quality=PyTango.AttrQuality.ATTR_WARNING
-        
-        t = t or time.time()
         try:
+            tag_name = self.get_alarm_attribute(attr)
+                
+            assert tag_name in self.Alarms,'Alarm Removed!'
+            value = any(re.match(tag_name.replace('_','.')+'$',a) 
+                        for a in self.get_active_alarms())
+            self.debug('PyAlarm(%s).read_alarm_attribute(%s) is %s;'
+                ' Active Alarms: %s' 
+                % (self.get_name(),tag_name,value,self.get_active_alarms()))
+            
+            self.quality=PyTango.AttrQuality.ATTR_WARNING
+            if tag_name in self.FailedAlarms or self.CheckDisabled(tag_name):
+                self.quality=PyTango.AttrQuality.ATTR_INVALID
+            elif(self.Alarms[tag_name].severity=='DEBUG'):
+                self.quality=PyTango.AttrQuality.ATTR_VALID
+            elif(self.Alarms[tag_name].severity=='WARNING'):
+                self.quality=PyTango.AttrQuality.ATTR_WARNING
+            elif(self.Alarms[tag_name].severity=='ALARM' 
+                or self.Alarms[tag_name].severity=='ERROR'):
+                self.quality=PyTango.AttrQuality.ATTR_ALARM
+            else: self.quality=PyTango.AttrQuality.ATTR_WARNING
+            
+            t = t or time.time()
+
             self.push_change_event(tag_name,value,t,self.quality)
+            if hasattr(attr,'set_value_date_quality'):
+                attr.set_value_date_quality(value,t,self.quality)
         except:
-            traceback.print_exc()
-        attr.set_value_date_quality(value,t,self.quality)
+            self.error(traceback.format_exc())
     
     if USE_STATIC_METHODS: 
         alarm_attr_read = staticmethod(self_locked(alarm_attr_read))
@@ -776,6 +778,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 self.Alarms[tag_name].set_time(now)
                 result = True
                 self.alarm_attr_read(tag_name) #pushing is done here
+        except:
+            self.error(traceback.format_exc())
         finally:
             self.lock.release()
         return result
@@ -2443,7 +2447,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if not SMS_ALLOWED or not 'smslib' in globals():
             self.warning( 'SMS Messaging is not allowed '
                 +'or smslib not available!!!')
-            return
+            return 'NO_SMS_LIB'
         report = ''
         username,password=self.SMSConfig.split(':',1)
         source = self.FromAddress 
