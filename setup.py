@@ -62,6 +62,7 @@ setup(
     install_requires=install_requires,
     entry_points=entry_points,
     scripts=scripts,
+    python_requires='<=2.7',
     #include_package_date=True,
 )
 
