@@ -1506,32 +1506,37 @@ class AlarmAPI(fandango.SingletonMap):
         setPanicProperty(prop,value)
         
     @staticmethod
-    def get_phonebook(host='', load=False):
+    def get_phonebook(host='', load=False, value=None):
         """
         gets the phonebook for the selected host
         """   
         tango_host = getattr(host,'tango_host',host) or get_tango_host()
-        if load or not AlarmAPI._phonebooks.get(tango_host,None):
-            print('%s: AlarmAPI.get_phonebook(%s, True)' % 
-                  (fn.time2str(), tango_host))
-            ph,prop = {}, getPanicProperty('Phonebook')
-            for line in prop:
-                line = line.split('#',1)[0]
-                if line: 
-                    ph[line.split(':',1)[0]] = line.split(':',1)[-1]
+        if load or value or  not AlarmAPI._phonebooks.get(tango_host,None):
+            print('%s: AlarmAPI.get_phonebook(%s, True, %s)' % 
+                  (fn.time2str(), tango_host, len(value) if value else None))
+            prop = value or getPanicProperty('Phonebook')
+            if isinstance(prop,dict):
+                ph = prop
+            else:
+                ph = {}
+                for line in prop:
+                    line = line.split('#',1)[0]
+                    if line: 
+                        ph[line.split(':',1)[0]] = line.split(':',1)[-1]
 
-            #Replacing nested keys
-            for k,v in ph.items():
-                for s in v.split(','):
-                    for x,w in ph.items():
-                        if s==x: 
-                            ph[k] = v.replace(s,w)
+                ##Replacing nested keys
+                #for k,v in ph.items():
+                    #for s in v.split(','):
+                        #for x,w in ph.items():
+                            #if s==x: 
+                                #ph[k] = v.replace(s,w)
 
             AlarmAPI._phonebooks[tango_host] = ph
+            print('%d entries loaded into PhoneBook' % len(ph))
 
         return AlarmAPI._phonebooks[tango_host]
         
-    def parse_phonebook(self,receivers):
+    def parse_phonebook(self,receivers,recursive=True):
         """
         Replaces phonebook entries in a receivers list
         
@@ -1550,7 +1555,11 @@ class AlarmAPI(fandango.SingletonMap):
               if p in re.split('[,:;/\)\(]',r):
                 r = r.replace(p,ph[p])
           result.append(r)
-        return ','.join(result)
+        result = ','.join(result)
+        if recursive:
+            result = self.parse_phonebook(result,recursive=False)
+            print('parse_phonebook(%s): %s' % (receivers, result))
+        return result
 
     def remove_phonebook(self, tag):
         """ Removes a person from the phonebook """        
