@@ -2506,7 +2506,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         if not SMS_ALLOWED or not 'smslib' in globals():
             self.warning( 'SMS Messaging is not allowed '
                 +'or smslib not available!!!')
-            return
+            return 'NO_SMS_LIB'
         report = ''
         username,password=self.SMSConfig.split(':',1)
         source = self.FromAddress 
