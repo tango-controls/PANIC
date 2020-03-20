@@ -181,6 +181,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def StateMachine(self):
         ## STATUS CALCULLATION
         now = time.time()
+        self.eval_status = ""
         try:
             self.debug('StateMachine()')
             _state = self.get_state()
@@ -190,7 +191,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         
             if [a for a in self.Alarms if a not in self.DisabledAlarms] \
                     and 0<self.last_attribute_check<tlimit:
-                self.info('Check alarm states in FAULT')    
                 self.set_state(PyTango.DevState.FAULT)
                 msg = 'Alarm Values not being updated!!!\n\n'
                 self.eval_status = msg+self.get_status().replace(msg,'')
@@ -198,12 +198,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 
             elif self.worker and not (self.worker._process.is_alive() 
                                       and self.worker._receiver.is_alive()):
-                self.info('Check alarm states in WorkerThread')
                 self.set_state(PyTango.DevState.FAULT)
                 self.eval_status = 'Alarm Values not being processed!!!'
                 self.set_status(self.eval_status)
             else:
-                self.info('Check alarm states in ALARM/ON')    
                 if self.get_enabled():
                     self.set_state(PyTango.DevState.ALARM if actives 
                                    else PyTango.DevState.ON)
@@ -242,7 +240,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             self.warning( traceback.format_exc())
             self.set_state(PyTango.DevState.UNKNOWN) 
         finally:
-            self._last_status = now
+            self.last_status = now
     
     def adm_poll_command(self,command,period):
         """
@@ -1417,8 +1415,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             "::init_device(update_properties=%s,allow=%s)"
             %(update_properties,allow))
         
-        self._last_status = 0
-        self._last_summary = []
+        self.last_status = 0
+        self.last_push = 0
+        self.last_summary = []
 
         # A class object will keep all declared alarms 
         # to search for children alarms and duplications
@@ -1601,16 +1600,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #------------------------------------------------------------------
     def always_executed_hook(self):
         self.debug("In "+ self.get_name()+ "::always_excuted_hook()")
-        self.eval_status = ""
-        now = time.time()
-    
+        now = time.time()  
         # Status/Events processed only once per second
-        if (self._last_status+1.) > now:
-            self.debug("Out of "+ self.get_name()+ "::always_excuted_hook()")
-            return
-
-        self.StateMachine()
-        self.ProcessEvents()
+        if (self.last_status+1.) <= now:
+            self.StateMachine()
         self.debug("Out of "+ self.get_name()+ "::always_excuted_hook()")
 
 
@@ -1771,20 +1764,22 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 for a in self.Alarms:
                     k = 'tag=%s,' % a
                     s = [l for l in attr_AlarmSummary_read if k in l]
-                    if s != [l for l in self._last_summary if k in l]:
+                    if s != [l for l in self.last_summary if k in l]:
                         changed.append(a)
-                if changed or len(attr_AlarmSummary_read)!=len(self.last_summary):
+                if (changed or len(attr_AlarmSummary_read)!=len(self.last_summary)
+                    or self.last_push+(self.PollingPeriod*self.AlarmThreshold) <= time.time()):
                     [self.alarm_attr_read(a,push=True) for a in changed]
                     self.push_change_event('AlarmSummary',attr_AlarmSummary_read)
+                    self.last_push = time.time()
                     self.info('read_AlarmSummary(): %d events pushed'  % len(changed))
             except:
                 self.error(traceback.format_exc())
 
-        self._last_summary = sorted(attr_AlarmSummary_read)
+        self.last_summary = sorted(attr_AlarmSummary_read)
         if attr and hasattr(attr,'set_value'):
-            attr.set_value(self._last_summary, len(self.Alarms))
+            attr.set_value(self.last_summary, len(self.Alarms))
         else:
-            return self._last_summary
+            return self.last_summary
 
 #------------------------------------------------------------------
 #    Read AlarmReceivers attribute
