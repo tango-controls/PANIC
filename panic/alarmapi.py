@@ -260,7 +260,7 @@ class Alarm(object):
         """ This method just initializes Flags updated from PyAlarm devices, 
         it doesn't reset alarm in devices """
         self._state = None
-        self._time = None
+        self._time = None #Should be always None if not called from PyAlarm
         self.counter = 0 #N cycles being active
         self.active = 0 #Last timestamp it was activated
         self.updated = 0 #Last value check
@@ -558,14 +558,14 @@ class Alarm(object):
         It returns 0 if the alarm is not active.
         """
         if attr_value is None and self._time is not None:
+            # Time has been forced using set_time (used within PyAlarm)
             #tracer('%s.get_time(cached): %s'
                     #%(self.tag,time2str(self._time)))
             return self._time
 
-        ## Parsing ActiveAlarms attribute
+        ## Parsing ActiveAlarms attribute (used from GUI's)
         #tracer('%s.get_time(%s): %s'
                 #%(self.tag,attr_value,time2str(self._time)))
-                
         if attr_value in (None,True): #Force attribute cache reading
             actives = self.get_ds().get_active_alarms()
         elif isSequence(attr_value): #Pass the attribute value
@@ -930,7 +930,7 @@ class AlarmDS(object):
     # Device Proxy Methods
     
     def get_proxy(self):
-        """ Returns a device proxy """
+        """ Returns a device proxy or devImpl object """
         if self.proxy is None:
             self.proxy = self.api.get_ds_proxy(self.name)
         return self.proxy
@@ -1013,7 +1013,11 @@ class AlarmDS(object):
               for t in tags]    
       
     def get_active_alarms(self, value = None):
-        """ Returns the list of currently active alarms """
+        """ 
+        Returns the list of currently active alarms.
+        This method is called from get_time() only if set_time() has not
+        been forced.
+        """
         if self._actives is None:
             self._actives = CachedAttributeProxy(self.name+'/ActiveAlarms',
                                                keeptime=3000.)
