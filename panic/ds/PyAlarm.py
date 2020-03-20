@@ -302,10 +302,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
              or self.Alarms[tag_name].severity=='ERROR'):
             quality=PyTango.AttrQuality.ATTR_ALARM
         else: quality=PyTango.AttrQuality.ATTR_WARNING
-        
-        t = t or time.time()
-        if hasattr(attr,'set_value_date_quality'):
-            attr.set_value_date_quality(value,t,quality)
+
+        t = t or time.time()        
         if push:
             try:
                 self.info('read_%s(%s,%s): pushing event' % (
@@ -314,6 +312,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             except:
                 self.warning('read_%s(): unable to push events\n%s' % (
                     tag_name, traceback.format_exc()))
+        
+        # ORDER MATTERS!! IF THIS IS NOT DONE LAST, THERE's A SEGFAULT!
+        if hasattr(attr,'set_value_date_quality'):
+            attr.set_value_date_quality(value,t,quality)
     
     if USE_STATIC_METHODS: 
         alarm_attr_read = staticmethod(self_locked(alarm_attr_read))
@@ -1775,6 +1777,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             except:
                 self.error(traceback.format_exc())
 
+        # THIS MUST BE ALWAYS AT THE END
         self.last_summary = sorted(attr_AlarmSummary_read)
         if attr and hasattr(attr,'set_value'):
             attr.set_value(self.last_summary, len(self.Alarms))
