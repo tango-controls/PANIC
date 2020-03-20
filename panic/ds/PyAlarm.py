@@ -178,6 +178,87 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
     def Status(self):
         return self._status
     
+    def StateMachine(self):
+        ## STATUS CALCULLATION
+        now = time.time()
+        try:
+            self.debug('StateMachine()')
+            _state = self.get_state()
+            actives = list(reversed([(v.active,k) 
+                        for k,v in self.Alarms.items() if v.active]))
+            tlimit = time.time()-2*self.PollingPeriod
+        
+            if [a for a in self.Alarms if a not in self.DisabledAlarms] \
+                    and 0<self.last_attribute_check<tlimit:
+                self.info('Check alarm states in FAULT')    
+                self.set_state(PyTango.DevState.FAULT)
+                msg = 'Alarm Values not being updated!!!\n\n'
+                self.eval_status = msg+self.get_status().replace(msg,'')
+                self.set_status(self.eval_status)
+                
+            elif self.worker and not (self.worker._process.is_alive() 
+                                      and self.worker._receiver.is_alive()):
+                self.info('Check alarm states in WorkerThread')
+                self.set_state(PyTango.DevState.FAULT)
+                self.eval_status = 'Alarm Values not being processed!!!'
+                self.set_status(self.eval_status)
+            else:
+                self.info('Check alarm states in ALARM/ON')    
+                if self.get_enabled():
+                    self.set_state(PyTango.DevState.ALARM if actives 
+                                   else PyTango.DevState.ON)
+                    status = "There are %d/%d active alarms\n" % (
+                            len(actives),len(self.Alarms))
+
+                else:
+                    self.set_state(PyTango.DevState.DISABLE)
+                    status = ("Device is DISABLED temporarily (Enabled=%s)\n"
+                              %self.Enabled)
+                for date,tag_name in actives:
+                    status+=('%s:%s:\n\t%s\n\tSeverity:%s\n\tSent to:%s\n' 
+                             % (time.ctime(date),tag_name,
+                                self.Alarms[tag_name].description,
+                                self.Alarms[tag_name].severity,
+                                self.Alarms[tag_name].receivers))
+                if self.FailedAlarms:
+                    status+='\n%d alarms couldnt be evaluated:\n%s'%(
+                        len(self.FailedAlarms),
+                        ','.join(str(t) for t in self.FailedAlarms.items()))
+                    if (float(len(self.FailedAlarms))/len(self.Alarms) > 0.1
+                        and fandango.isFalse(self.IgnoreExceptions)):
+                      self.set_state(PyTango.DevState.FAULT)
+                if self.Uncatched:
+                    status+='\nUncatched exceptions:\n%s'%self.Uncatched
+                    
+                self.eval_status = "Last eval was %s at %s" % (
+                                self.Eval.getter('TAG'),
+                                time2str(self.Eval.getter('now')))                    
+                #self.eval_status += 'EvalTimes are: \n %s\n'%(self.EvalTimes)
+                self.set_status(status+self.eval_status)
+
+            if self.get_state() != _state:
+                self.push_change_event('State')
+        except:
+            self.warning( traceback.format_exc())
+            self.set_state(PyTango.DevState.UNKNOWN) 
+        finally:
+            self._last_status = now
+    
+    def adm_poll_command(self,command,period):
+        """
+        this method cannot be called at init_device()
+        """
+        U = PyTango.Util.instance()
+        admin = U.get_dserver_device()
+        print(dir(admin))
+        pattrs = self.get_polled_attrs()
+        print(pattrs)
+        #if att not in pattrs:
+            #admin.add_obj_polling([[int(period)],[my_name,'attribute',att]])
+        #else:
+            #admin.upd_obj_polling_period([[int(period)],[my_name,'attribute',att]])
+        
+    
     #--------------------------------------------------------------------------
     
     def get_alarm_attribute(self,attr):
@@ -196,8 +277,8 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             tag_name = attr.get_name()
 
         return tag_name
-
-    def alarm_attr_read(self,attr,t=0): #,fire_event=True):
+    
+    def alarm_attr_read(self,attr,t=0, push=True):
         """
         This is the method where you control the value assigned
         to each Alarm attributes
@@ -227,13 +308,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         t = t or time.time()
         if hasattr(attr,'set_value_date_quality'):
             attr.set_value_date_quality(value,t,quality)
-        try:
-            self.info('read_%s(%s,%s): pushing event' % (
-                tag_name,value,quality))
-            self.push_change_event(tag_name,value,t,quality)
-        except:
-            self.warning('read_%s(): unable to push events\n%s' % (
-                tag_name, traceback.format_exc()))
+        if push:
+            try:
+                self.info('read_%s(%s,%s): pushing event' % (
+                    tag_name,value,quality))
+                self.push_change_event(tag_name,value,t,quality)
+            except:
+                self.warning('read_%s(): unable to push events\n%s' % (
+                    tag_name, traceback.format_exc()))
     
     if USE_STATIC_METHODS: 
         alarm_attr_read = staticmethod(self_locked(alarm_attr_read))
@@ -1297,10 +1379,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.updateThread = None
         self.last_attribute_check = 0
         
-        self._last_status = 0
-        self._last_summary = []
-        self._event_period = 1000
-        
         self.debug('Out of __init__()')
         PyAlarm.init_device(self,allow=True)
 
@@ -1339,6 +1417,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
             "::init_device(update_properties=%s,allow=%s)"
             %(update_properties,allow))
         
+        self._last_status = 0
+        self._last_summary = []
+
         # A class object will keep all declared alarms 
         # to search for children alarms and duplications
         if type(self).Panic is None: 
@@ -1392,6 +1473,10 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                             self.info('Alarm:'+(a))#.formula,v.receivers))
                             if v not in self.DynamicAttributes[:]:
                                 self.create_alarm_attribute(a)
+                                
+                    # Set PyAlarm-driven access (_time is forced)
+                    [a.set_time() for a in self.Alarms.values() 
+                        if a._time is None]                            
                 except Exception,e:
                     raise e
                 finally: self.lock.release()                
@@ -1475,8 +1560,7 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                   '\t\tReceivers: %s'%(tag,alarm.description,alarm.formula,
                                        alarm.severity,alarm.receivers))
                   
-            # State polling will trigger all event pushing
-            self.poll_command('State',self._event_period)
+            self.set_change_event('State',True,False)
             self.set_change_event('AlarmSummary',True,False)
 
             #Create Alarm Attributes (not called in first init(), only after
@@ -1519,81 +1603,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug("In "+ self.get_name()+ "::always_excuted_hook()")
         self.eval_status = ""
         now = time.time()
-        
+    
         # Status/Events processed only once per second
-        if (self._last_status+1e-3*self._event_period) > now:
+        if (self._last_status+1.) > now:
+            self.debug("Out of "+ self.get_name()+ "::always_excuted_hook()")
             return
-        
-        ## STATUS CALCULLATION
-        try:
-            actives = list(reversed([(v.active,k) 
-                        for k,v in self.Alarms.items() if v.active]))
-            tlimit = time.time()-2*self.PollingPeriod
-            
-            if [a for a in self.Alarms if a not in self.DisabledAlarms] \
-                    and 0<self.last_attribute_check<tlimit:
-                
-                self.set_state(PyTango.DevState.FAULT)
-                msg = 'Alarm Values not being updated!!!\n\n'
-                self.eval_status = msg+self.get_status().replace(msg,'')
-                self.set_status(self.eval_status)
-                
-            elif self.worker and not (self.worker._process.is_alive() 
-                                      and self.worker._receiver.is_alive()):
-                self.set_state(PyTango.DevState.FAULT)
-                self.eval_status = 'Alarm Values not being processed!!!'
-                self.set_status(self.eval_status)
-            else:
-                if self.get_enabled():
-                    self.set_state(PyTango.DevState.ALARM if actives 
-                                   else PyTango.DevState.ON)
-                    status = "There are %d/%d active alarms\n" % (
-                            len(actives),len(self.Alarms))
 
-                else:
-                    self.set_state(PyTango.DevState.DISABLE)
-                    status = ("Device is DISABLED temporarily (Enabled=%s)\n"
-                              %self.Enabled)
-                for date,tag_name in actives:
-                    status+=('%s:%s:\n\t%s\n\tSeverity:%s\n\tSent to:%s\n' 
-                             % (time.ctime(date),tag_name,
-                                self.Alarms[tag_name].description,
-                                self.Alarms[tag_name].severity,
-                                self.Alarms[tag_name].receivers))
-                if self.FailedAlarms:
-                    status+='\n%d alarms couldnt be evaluated:\n%s'%(
-                        len(self.FailedAlarms),
-                        ','.join(str(t) for t in self.FailedAlarms.items()))
-                    if (float(len(self.FailedAlarms))/len(self.Alarms) > 0.1
-                        and fandango.isFalse(self.IgnoreExceptions)):
-                      self.set_state(PyTango.DevState.FAULT)
-                if self.Uncatched:
-                    status+='\nUncatched exceptions:\n%s'%self.Uncatched
-                    
-                self.eval_status = "Last eval was %s at %s" % (
-                                self.Eval.getter('TAG'),
-                                time2str(self.Eval.getter('now')))                    
-                #self.eval_status += 'EvalTimes are: \n %s\n'%(self.EvalTimes)
-                self.set_status(status+self.eval_status)
-                
-        except:
-            self.warning( traceback.format_exc())
-            self.set_state(PyTango.DevState.UNKNOWN)
-            
-        ## EVENT PUSHING
-        try:
-            self.debug('In always_executed_hook(): AlarmSummary update')
-            summary = self.read_AlarmSummary(attr = None, push = True)
-            for a in self.Alarms:
-                s = [l for l in summary if a.lower() in str(l).lower()]
-                o = [l for l in self._last_summary if a.lower() in str(l).lower()]
-                if s!=o:
-                    self.alarm_attr_read(a)
-            self._last_summary = summary
-        except:
-            self.warning(traceback.format_exc())
-            
-        self._last_status = now
+        self.StateMachine()
+        self.ProcessEvents()
         self.debug("Out of "+ self.get_name()+ "::always_excuted_hook()")
 
 
@@ -1732,35 +1749,42 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #------------------------------------------------------------------
 #    Read AlarmSummary attribute
 #------------------------------------------------------------------
-    def read_AlarmSummary(self, attr=None, push=False):
+    def read_AlarmSummary(self, attr=None, push=True):
         #self.debug( "In "+self.get_name()+"::read_AlarmSummary()")
 
         #    Add your own code here
-        sep = ';' #':'
+        sep = ',' #';' #':'
         #setup = 'tag','description','formula'
         setup = SUMMARY_FIELDS
         
         [alarm.get_state(force=True) for alarm in self.Alarms.values()]
-        attr_AlarmSummary_read = sorted(
-            sep.join('%s=%s'
-            %(s,(str if s!='time' else time2str)
-              (getattr(alarm,s) if s!='state' or self.get_enabled() 
-                else 'DSUPR'))
-            for s in setup)
-          for alarm in self.Alarms.values())
-
+        attr_AlarmSummary_read = []
+        for alarm in self.Alarms.values():
+            l = ['%s=%s' % (s,(str if s!='time' else time2str)
+                    (getattr(alarm,s) if s!='state' or self.get_enabled() 
+                    else 'DSUPR')) for s in setup]
+            attr_AlarmSummary_read.append(sep.join(l))
+            
         if push:
             try:
-                self.info('read_AlarmSummary(): pushing event')            
-                self.push_change_event('AlarmSummary',attr_AlarmSummary_read)
+                changed = []
+                for a in self.Alarms:
+                    k = 'tag=%s,' % a
+                    s = [l for l in attr_AlarmSummary_read if k in l]
+                    if s != [l for l in self._last_summary if k in l]:
+                        changed.append(a)
+                if changed or len(attr_AlarmSummary_read)!=len(self.last_summary):
+                    [self.alarm_attr_read(a,push=True) for a in changed]
+                    self.push_change_event('AlarmSummary',attr_AlarmSummary_read)
+                    self.info('read_AlarmSummary(): %d events pushed'  % len(changed))
             except:
                 self.error(traceback.format_exc())
 
+        self._last_summary = sorted(attr_AlarmSummary_read)
         if attr and hasattr(attr,'set_value'):
-            attr.set_value(attr_AlarmSummary_read, len(self.Alarms))
+            attr.set_value(self._last_summary, len(self.Alarms))
         else:
-            return attr_AlarmSummary_read
-
+            return self._last_summary
 
 #------------------------------------------------------------------
 #    Read AlarmReceivers attribute
@@ -2803,6 +2827,7 @@ class PyAlarmClass(PyTango.DeviceClass):
             {
                 'description':"Returns the current state and definition of"
                     " alarms managed by this device using key=value; syntax",
+                'Polling period': "1000", #This will trigger Events!!
             } ],            
         'AlarmReceivers':
             [[PyTango.DevString,
