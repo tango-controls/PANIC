@@ -123,8 +123,22 @@ class PhoneBookEntry(iValidatedWidget,object):
                 message='Type email address\n'
                 raise Exception(message)
             else:
-                print 'onAdd.edit_phoneBook(%s,%s,(%s))'%(name,email,section)
-                self.api.edit_phonebook(name,email,section)
+                alarms = [a for a,v in self.api.items() if name in v.receivers]
+                v = QtGui.QMessageBox.warning(None,'Phonebook[%s]'%name,\
+                    'The following alarms will be afected:\n\n'+
+                    '\n'.join(alarms)+'\n\nDo you want to proceed?',
+                    QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel)
+                
+                if v == QtGui.QMessageBox.Ok: 
+                    print 'onAdd.edit_phoneBook(%s,%s,(%s))'%(name,email,section)
+                    self.api.edit_phonebook(name,email,section)
+                    devs = set(self.api[a].device for a in alarms)
+                    for d in devs:
+                        try:
+                            self.api.get_device(d).init()
+                        except:
+                            traceback.print_exc()
+                
         except Exception:
             Qt.QMessageBox.critical(None,"Error", traceback.format_exc())
             return
