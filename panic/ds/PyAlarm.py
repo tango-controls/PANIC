@@ -1335,7 +1335,9 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         print('In PyAlarm.__init__(%s,%s)'%(cl,name))
         PyTango.Device_4Impl.__init__(self,cl,name)
         self.call__init__(fandango.log.Logger,name,
+                use_tango = True, #already True by default, printf may cause I/O issues
                 format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
+        
         self.setLogLevel('DEBUG')
         panic._proxies[name] = self
         init_callbacks(period_ms=50.)
@@ -1744,45 +1746,12 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
 #------------------------------------------------------------------
 #    Read AlarmSummary attribute
 #------------------------------------------------------------------
-    def read_AlarmSummary(self, attr=None, push=True):
+    def read_AlarmSummary(self, attr):
         #self.debug( "In "+self.get_name()+"::read_AlarmSummary()")
 
         #    Add your own code here
-        sep = ',' #';' #':'
-        #setup = 'tag','description','formula'
-        setup = SUMMARY_FIELDS
+        attr.set_value(self.last_summary, len(self.last_summary))
         
-        [alarm.get_state(force=True) for alarm in self.Alarms.values()]
-        attr_AlarmSummary_read = []
-        for alarm in self.Alarms.values():
-            l = ['%s=%s' % (s,(str if s!='time' else time2str)
-                    (getattr(alarm,s) if s!='state' or self.get_enabled() 
-                    else 'DSUPR')) for s in setup]
-            attr_AlarmSummary_read.append(sep.join(l))
-            
-        if push:
-            try:
-                changed = []
-                for a in self.Alarms:
-                    k = 'tag=%s,' % a
-                    s = [l for l in attr_AlarmSummary_read if k in l]
-                    if s != [l for l in self.last_summary if k in l]:
-                        changed.append(a)
-                if (changed or len(attr_AlarmSummary_read)!=len(self.last_summary)
-                    or self.last_push+(self.PollingPeriod*self.AlarmThreshold) <= time.time()):
-                    [self.alarm_attr_read(a,push=True) for a in changed]
-                    self.push_change_event('AlarmSummary',attr_AlarmSummary_read)
-                    self.last_push = time.time()
-                    self.info('read_AlarmSummary(): %d events pushed'  % len(changed))
-            except:
-                self.error(traceback.format_exc())
-
-        # THIS MUST BE ALWAYS AT THE END
-        self.last_summary = sorted(attr_AlarmSummary_read)
-        if attr and hasattr(attr,'set_value'):
-            attr.set_value(self.last_summary, len(self.Alarms))
-        else:
-            return self.last_summary
 
 #------------------------------------------------------------------
 #    Read AlarmReceivers attribute
@@ -2357,6 +2326,41 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         self.debug( 'Out of GenerateReport(%s,%s,%s)'%(tag,receivers,message))
         self.debug( '>'*80)
         return result
+    
+    def GenerateSummary(self, push=True):
+        sep = ';' #';' #','
+        #setup = 'tag','description','formula'
+        setup = SUMMARY_FIELDS
+        
+        [alarm.get_state(force=True) for alarm in self.Alarms.values()]
+        attr_AlarmSummary_read = []
+        for alarm in self.Alarms.values():
+            l = ['%s=%s' % (s,(str if s!='time' else time2str)
+                    (getattr(alarm,s) if s!='state' or self.get_enabled() 
+                    else 'DSUPR')) for s in setup]
+            attr_AlarmSummary_read.append(sep.join(l))
+          
+        # Should be True only when called from Commands
+        if push:
+            try:
+                changed = []
+                for a in self.Alarms:
+                    k = 'tag=%s,' % a
+                    s = [l for l in attr_AlarmSummary_read if k in l]
+                    if s != [l for l in self.last_summary if k in l]:
+                        changed.append(a)
+                if (changed or len(attr_AlarmSummary_read)!=len(self.last_summary)
+                    or self.last_push+(self.PollingPeriod*self.AlarmThreshold) <= time.time()):
+                    [self.alarm_attr_read(a,push=True) for a in changed]
+                    self.push_change_event('AlarmSummary',attr_AlarmSummary_read)
+                    self.last_push = time.time()
+                    self.info('read_AlarmSummary(): %d events pushed'  % len(changed))
+            except:
+                self.error(traceback.format_exc())
+
+        # THIS MUST BE ALWAYS AT THE END
+        self.last_summary = sorted(attr_AlarmSummary_read)
+        return self.last_summary
         
 #------------------------------------------------------------------
 #    CreateAlarmContext command:
@@ -2519,7 +2523,6 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
         :param tag_name:    Alarm or Test message to be sent
         :param receivers:   SMS numbers to receive the alarm
         """
-        self.warning = self.info = fandango.printf
         if not receivers and hasattr(tag,'__iter__'):
             tag,receivers = tag[0],tag[1:]
         alarm = (self.Alarms.get(tag) or [None])[0]
@@ -2763,6 +2766,13 @@ class PyAlarmClass(PyTango.DeviceClass):
         'CheckDisabled':
             [[PyTango.DevString, "alarm tag"],
             [PyTango.DevBoolean,"true if alarm is on the list else false"]],
+        'GenerateSummary':
+            [[PyTango.DevVoid, "generates summary, pushes events"],
+            [PyTango.DevVarStringArray, "alarm summary"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+                'Polling period': 1000,
+            } ],            
         }
 
     #    Attribute definitions
@@ -2825,7 +2835,6 @@ class PyAlarmClass(PyTango.DeviceClass):
             {
                 'description':"Returns the current state and definition of"
                     " alarms managed by this device using key=value; syntax",
-                'Polling period': "1000", #This will trigger Events!!
             } ],            
         'AlarmReceivers':
             [[PyTango.DevString,
