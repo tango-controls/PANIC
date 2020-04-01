@@ -375,21 +375,13 @@ def get_snap_api():
     trace('get_snap_api(): %s'%SNAP_ALLOWED,level=-1)
     return SNAP_ALLOWED
 
-from taurus.qt.qtgui.plot import TaurusTrend
-
 def get_archive_trend(models=None,length=4*3600,show=False):
     # This method is to be added to 
     # PyTangoArchiving.widgets.trend in next releases
+    import taurus.qt.qtgui.plot as tplot
+    import taurus.external.qt as xqt
     
-    #class PressureTrend(TaurusTrend):
-        #def showEvent(self,event):
-            #if not getattr(self,'_tuned',False): 
-                #setup_pressure_trend(self)
-                #setattr(self,'_tuned',True)        
-            #TaurusTrend.showEvent(self,event)
-    
-    from taurus.external.qt import Qwt5
-    tt = TaurusTrend()
+    tt = tplot.TaurusTrend()
     try:
         tt.setXDynScale(True)
         tt.setUseArchiving(True)
@@ -399,7 +391,7 @@ def get_archive_trend(models=None,length=4*3600,show=False):
         xMax = time.time() #tt.axisScaleDiv(Qwt5.QwtPlot.xBottom).upperBound()
         rg = length #abs(self.str2deltatime(str(self.ui.xRangeCB.currentText())))
         xMin=xMax-rg
-        tt.setAxisScale(Qwt5.QwtPlot.xBottom,xMin, xMax)
+        tt.setAxisScale(xqt.Qwt5.QwtPlot.xBottom,xMin, xMax)
         if models: tt.setModel(models)
         if show: tt.show()
         tt.setWindowTitle('Trend')
