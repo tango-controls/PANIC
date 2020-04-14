@@ -3,4 +3,4 @@
 PANIC Description
 -----------------
 
-.. include:: README
+.. include:: ../README.rst

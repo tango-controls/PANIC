@@ -110,8 +110,8 @@ if True:  #
     # Override default css to get a larger width for ReadTheDoc build
     html_context = {
         'extra_css_files': [
-            'static/css/tango_cs_theme.css',
-            'static/css/meta_label_tango.css'
+            '_static/css/tango_cs_theme.css',
+            '_static/css/meta_label_tango.css'
         ],
     }
     
@@ -135,7 +135,7 @@ html_logo = '../panic/gui/icon/panic-6.png'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['./static']
+html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
