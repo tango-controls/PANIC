@@ -11,6 +11,7 @@ from fandango.qt import Qt, QtCore, QtGui, DoubleClickable
 import panic
 from panic import AlarmAPI, AlarmView
 from panic.gui.actions import QAlarmManager
+from utils import get_qt_major_version
 
  
 @DoubleClickable
@@ -110,8 +111,11 @@ class QAlarmPanel(QAlarmManager,Qt.QWidget):
                 fd.log.shortstr(self.tags)) + '\n'+'#'*80)
                 
         self.refreshTimer = Qt.QTimer()
-        Qt.QObject.connect(self.refreshTimer, 
-                           Qt.SIGNAL("timeout()"), self.updateAlarms)
+        if get_qt_major_version() == 5:
+            self.refreshTimer.timeout.connect(self.updateAlarms)
+        else:
+            Qt.QObject.connect(self.refreshTimer,
+                               Qt.SIGNAL("timeout()"), self.updateAlarms)
 
         self.refreshTimer.start(self.REFRESH_TIME)
         side = side or (min((self.rows,self.cols))==1 and 50) or 50#70#120

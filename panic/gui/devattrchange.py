@@ -6,7 +6,7 @@ GPL Licensed
 
 import panic, fandango
 from fandango.qt import Qt, QtCore, QtGui
-from utils import iValidatedWidget,getThemeIcon
+from utils import iValidatedWidget,getThemeIcon, get_qt_major_version, translate
 
 
 class dacWidget(QtGui.QWidget):
@@ -55,32 +55,36 @@ class devattrchangeForm(iValidatedWidget,object):
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QtGui.QApplication.translate("Form", 
-            "PyAlarm Device Configuration", None, 
-            QtGui.QApplication.UnicodeUTF8))
-        self.refreshButton.setText(QtGui.QApplication.translate("Form", 
-            "Refresh", None, QtGui.QApplication.UnicodeUTF8))
+        Form.setWindowTitle(translate("Form", "PyAlarm Device Configuration"))
+        self.refreshButton.setText(translate("Form", "Refresh"))
         self.refreshButton.setIcon(getThemeIcon("view-refresh"))
         self.refreshButton.setToolTip("Refresh list")
-        self.testButton.setText(QtGui.QApplication.translate("Form", 
-            "Test", None, QtGui.QApplication.UnicodeUTF8))
+        self.testButton.setText(translate("Form",
+            "Test"))
         self.testButton.setIcon(getThemeIcon("view-refresh"))
         self.testButton.setToolTip("Test")        
-        self.newDevice.setText(QtGui.QApplication.translate("Form", 
-            "Create New", None, QtGui.QApplication.UnicodeUTF8))
+        self.newDevice.setText(translate("Form",
+            "Create New"))
         self.newDevice.setIcon(getThemeIcon("new"))
         self.newDevice.setToolTip("Add a new PyAlarm device")        
 
-        QtCore.QObject.connect(self.tableWidget, 
-            QtCore.SIGNAL("itemChanged(QTableWidgetItem *)"), self.onEdit)
-        QtCore.QObject.connect(self.deviceCombo, 
-            QtCore.SIGNAL("currentIndexChanged(QString)"), self.buildList)
-        QtCore.QObject.connect(self.refreshButton, 
-            QtCore.SIGNAL("clicked()"), self.buildList)
-        QtCore.QObject.connect(self.testButton, 
-            QtCore.SIGNAL("clicked()"), self.testDevice)
-        QtCore.QObject.connect(self.newDevice, 
-            QtCore.SIGNAL("clicked()"), self.onNew)
+        if get_qt_major_version() == 5:
+            self.tableWidget.itemChanged.connect(self.onEdit)
+            self.deviceCombo.currentIndexChanged.connect(self.buildList)
+            self.refreshButton.clicked.connect(self.buildList)
+            self.testButton.clicked.connect(self.testDevice)
+            self.newDevice.clicked.connect(self.onNew)
+        else:
+            QtCore.QObject.connect(self.tableWidget,
+                QtCore.SIGNAL("itemChanged(QTableWidgetItem *)"), self.onEdit)
+            QtCore.QObject.connect(self.deviceCombo,
+                QtCore.SIGNAL("currentIndexChanged(QString)"), self.buildList)
+            QtCore.QObject.connect(self.refreshButton,
+                QtCore.SIGNAL("clicked()"), self.buildList)
+            QtCore.QObject.connect(self.testButton,
+                QtCore.SIGNAL("clicked()"), self.testDevice)
+            QtCore.QObject.connect(self.newDevice,
+                QtCore.SIGNAL("clicked()"), self.onNew)
         Form.resize(430, 600)
 
     def setDevCombo(self,device=None):
@@ -124,7 +128,7 @@ class devattrchangeForm(iValidatedWidget,object):
                 else:
                     item=QtGui.QTableWidgetItem("%s" % data[prop])
                 if row%2==0:
-                    item.setBackgroundColor(QtGui.QColor(225,225,225))
+                    item.setBackground(QtGui.QColor(225,225,225))
                 self.tableWidget.setItem(row, col, item)
         self.tableWidget.resizeColumnsToContents()
         self.tableWidget.blockSignals(False)
@@ -153,7 +157,10 @@ class devattrchangeForm(iValidatedWidget,object):
                 traceback.print_exc()
             self.api.load()
             p.close()
-        QtCore.QObject.connect(doit, QtCore.SIGNAL("clicked()"), create)
+        if get_qt_major_version() == 5:
+            doit.clicked.connect(create)
+        else:
+            QtCore.QObject.connect(doit, QtCore.SIGNAL("clicked()"), create)
         w.exec_()
         self.setDevCombo()
 

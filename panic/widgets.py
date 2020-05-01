@@ -20,11 +20,13 @@ from taurus.qt.qtgui.container import TaurusMainWindow
 from taurus.qt.qtgui.panel import TaurusForm
 import panic
 from panic import AlarmAPI, AlarmView
+from panic.gui.utils import get_qt_major_version
 
 try: 
   #if available, this module will try to load the full AlarmGUI
   from panic.gui import AlarmGUI
 except: AlarmGUI = None
+
 
 ###############################################################################
 
@@ -96,6 +98,9 @@ class GuiWidget(QtGui.QWidget):
 ##############################################################################
         
 class AlarmValueLabel(Qt.QLabel):#TaurusValueLabel):
+
+    if get_qt_major_version() == 5:
+        alarmUpdated = QtCore.pyqtSignal()
     
     def setModel(self,model):
         print('AlarmValueLabel.setModel(%s(%s))'
@@ -135,15 +140,18 @@ class AlarmValueLabel(Qt.QLabel):#TaurusValueLabel):
                 self.ss = "background-color:lightgreen; color:black;"
             self.setText(state)
         self.setStyleSheet(self.ss)
-        self.alarmUpdated()
+        self.updateAlarm()
         #TaurusBaseWidget.updateStyle(self)
 
-    def alarmUpdated(self):
+    def updateAlarm(self):
         #print('AlarmValueLabel.alarmUpdated()')
-        self.emit(Qt.SIGNAL('alarmUpdated'))        
-        
-        
-###############################################################################
+        if get_qt_major_version() == 5:
+            self.alarmUpdated.emit()
+        else:
+            self.emit(Qt.SIGNAL('alarmUpdated'))
+
+
+        ###############################################################################
 
 class ToolbarActionButton(TaurusBaseComponent, Qt.QPushButton):
     SHOW_FAILED_ALARMS = False
@@ -306,7 +314,10 @@ class PanicToolbar(TaurusBaseWidget, Qt.QToolBar):
         self.setup()
         self.refresh()
         self.refreshTimer = QtCore.QTimer()
-        QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.refresh)
+        if get_qt_major_version() == 5:
+            self.refreshTimer.timeout.connect(self.refresh)
+        else:
+            QtCore.QObject.connect(self.refreshTimer, QtCore.SIGNAL("timeout()"), self.refresh)
         self.refreshTimer.start(refresh)
 
     def setRefresh(self,interval):

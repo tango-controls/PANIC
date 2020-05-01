@@ -16,6 +16,23 @@ from taurus.qt.qtgui.container import TaurusWidget
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.core.util  import Logger
 
+
+
+def get_qt_major_version():
+    if Qt.PYQT_VERSION_STR.startswith('5'):
+        return 5
+    elif Qt.PYQT_VERSION_STR.startswith('4'):
+        return 4
+    else:
+        raise Exception('Unsupported Qt version: {}'.format(Qt.PYQT_VERSION_STR))
+
+
+def translate(context, sourceText):
+    if get_qt_major_version() == 5:
+        return QtGui.QApplication.translate(context, sourceText, None)
+    else:
+      return QtGui.QApplication.translate(context, sourceText, None, QtGui.QApplication.UnicodeUTF8)
+
 try:
     # Set tangoFormatter as default formatter 
     from taurus.qt.qtgui.base import TaurusBaseComponent
@@ -156,7 +173,10 @@ def getAlarmReport(alarm,parent=None):
     widget.setMinimumWidth(350)
     bt = Qt.QDialogButtonBox(Qt.QDialogButtonBox.Ok,Qt.Qt.Horizontal,widget)
     widget.layout().addWidget(bt)
-    bt.connect(bt,Qt.SIGNAL("accepted()"),widget.accept)
+    if get_qt_major_version() == 5:
+        bt.accepted.connect(widget.accept)
+    else:
+        bt.connect(bt,Qt.SIGNAL("accepted()"),widget.accept)
     return widget
         
 def formatAlarm(f):
@@ -380,14 +400,18 @@ def get_archive_trend(models=None,length=4*3600,show=False):
     # PyTangoArchiving.widgets.trend in next releases
     import taurus.qt.qtgui.plot as tplot
     import taurus.external.qt as xqt
-    
+
     tt = tplot.TaurusTrend()
     try:
         tt.setXDynScale(True)
         tt.setUseArchiving(True)
         tt.setModelInConfig(False)
-        tt.disconnect(tt.axisWidget(tt.xBottom), 
-                      Qt.SIGNAL("scaleDivChanged ()"), tt._scaleChangeWarning)
+
+        if get_qt_major_version() == 5:
+            tt.axisWidget(tt.xBottom).scaleDivChanged.disconnect(tt._scaleChangeWarning)
+        else:
+            tt.disconnect(tt.axisWidget(tt.xBottom),
+                        Qt.SIGNAL("scaleDivChanged ()"), tt._scaleChangeWarning)
         xMax = time.time() #tt.axisScaleDiv(Qwt5.QwtPlot.xBottom).upperBound()
         rg = length #abs(self.str2deltatime(str(self.ui.xRangeCB.currentText())))
         xMin=xMax-rg
@@ -403,6 +427,9 @@ def get_archive_trend(models=None,length=4*3600,show=False):
 ###############################################################################
         
 class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
+
+    if get_qt_major_version() == 5:
+        saved = QtCore.pyqtSignal()
   
     def __init__(self,model=None,parent=None,device=None,
                  _locals=None,allow_edit=False):
@@ -461,18 +488,27 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
                 #@todo setClickHook stop working for unknown reasons !?!?!
                 self.tf.setReadOnly(True)
                 self.tf.setEnabled(False)
-                self.connect(self.editcb,Qt.SIGNAL('toggled(bool)'),self.onEdit)
+                if get_qt_major_version() == 5:
+                    self.editcb.toggled.connect(self.onEdit)
+                else:
+                    self.connect(self.editcb,Qt.SIGNAL('toggled(bool)'),self.onEdit)
                 upperPanel.layout().addWidget(self.editcb,0,4,1,1)
                 self.undobt.setIcon(getThemeIcon('edit-undo'))
                 self.undobt.setToolTip('Undo changes in formula')
                 self.undobt.setEnabled(True)
-                self.connect(self.undobt,Qt.SIGNAL('pressed()'),self.undoEdit)
+                if get_qt_major_version() == 5:
+                    self.undobt.pressed.connect(self.undoEdit)
+                else:
+                    self.connect(self.undobt,Qt.SIGNAL('pressed()'),self.undoEdit)
                 upperPanel.layout().addWidget(self.undobt,0,5,1,1)
                 self.savebt.setIcon(getThemeIcon('media-floppy'))
                 self.savebt.setToolTip('Save Alarm Formula')
                 self.savebt.setEnabled(False)
                 upperPanel.layout().addWidget(self.savebt,0,6,1,1)
-                self.connect(self.savebt,Qt.SIGNAL('pressed()'),self.onSave)
+                if get_qt_major_version() == 5:
+                    self.savebt.pressed.connect(self.onSave)
+                else:
+                    self.connect(self.savebt,Qt.SIGNAL('pressed()'),self.onSave)
 
             upperPanel.layout().addWidget(l,0,0,1,1)
             u = 2
@@ -490,7 +526,10 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
             self.redobt = Qt.QPushButton("Evaluate")
             self.redobt.setIcon(getThemeIcon('view-refresh'))
             self.redobt.setToolTip('Update result')
-            self.connect(self.redobt,Qt.SIGNAL('pressed()'),self.updateResult)
+            if get_qt_major_version() == 5:
+                self.redobt.pressed.connect(self.updateResult)
+            else:
+                self.connect(self.redobt,Qt.SIGNAL('pressed()'),self.updateResult)
             #lowerPanel.layout().addWidget(self.redobt,row,6,1,1)
             #lowerPanel.layout().addWidget(self.tb,row+1,0,1,7)
             upperPanel.layout().addWidget(self.redobt,u+1,5,1,2)
@@ -512,8 +551,13 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
         if self.updateFormula()!=self.org_formula and not checked:
             self.undoEdit()
         self.savebt.setEnabled(self.updateFormula()!=self.org_formula)
-        if checked: self.emit(Qt.SIGNAL("onEdit()"))
-        else: self.emit(Qt.SIGNAL("onReadOnly()"))
+
+        if get_qt_major_version() == 5:
+            # QUESTION: Do this signals really needed?
+            pass
+        else:
+            if checked: self.emit(Qt.SIGNAL("onEdit()"))
+            else: self.emit(Qt.SIGNAL("onReadOnly()"))
         
     def onSave(self,ask=False):
         print 'In AlarmFormula.onSave()'
@@ -525,7 +569,10 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
         f = self.toPlainText()
         self.obj.setup(formula=f,write=True)
         self.org_formula = f
-        self.emit(Qt.SIGNAL("onSave"),self.obj)
+        if get_qt_major_version() == 5:
+            self.saved.emit()
+        else:
+            self.emit(Qt.SIGNAL("onSave"), self.obj)
         
     def onClose(self):
         print 'In AlarmFormula.onClose()'
@@ -536,7 +583,11 @@ class AlarmFormula(Qt.QSplitter): #Qt.QFrame):
                 QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel);
             if v == QtGui.QMessageBox.Cancel: return
             self.onSave()
-        self.emit(Qt.SIGNAL("onClose()"))
+        if get_qt_major_version() == 5:
+            # Question: need? (has no connections")
+            pass
+        else:
+            self.onClose.emit()
         
     def undoEdit(self):
         print 'In AlarmFormula.undoEdit()'
@@ -629,8 +680,11 @@ class AttributesPreview(Qt.QFrame):
                 Qt.QLabel('Values of attributes used in the Alarm formula:'),
                 0,0,1,1)
             self.layout().addWidget(self.taurusForm,1,0,1,7)
-            self.connect(self.redobt,Qt.SIGNAL('pressed()'),
-                         self.updateAttributes)
+            if get_qt_major_version() == 5:
+                self.redobt.pressed.connect(self.updateAttributes)
+            else:
+                self.connect(self.redobt, Qt.SIGNAL('pressed()'),
+                             self.updateAttributes)
         except:
             print traceback.format_exc()
     
@@ -678,7 +732,10 @@ class AlarmPreview(Qt.QDialog):
                             formula=formula or None,parent=gui.parent())
         #form.exec_()
         form.show()
-        gui.connect(gui,Qt.SIGNAL('closed()'),form.close)
+        if get_qt_major_version() == 5:
+            gui.closed.connect(form.close)
+        else:
+            gui.connect(gui,Qt.SIGNAL('closed()'),form.close)
         return form
         
     @staticmethod
@@ -691,7 +748,10 @@ class AlarmPreview(Qt.QDialog):
             form.exec_() 
         else:
             if gui: gui._AlarmFormulaPreview = form
-            gui.connect(gui,Qt.SIGNAL('closed()'),form.close)
+            if get_qt_major_version() == 5:
+                gui.closed.connect(form.close)
+            else:
+                gui.connect(gui,Qt.SIGNAL('closed()'),form.close)
             form.show()
         return form
             
@@ -754,8 +814,15 @@ def addOkCancelButtons(widget,cancel=True):
     qb.addButton(qb.Ok)
     if cancel: qb.addButton(qb.Cancel)
     widget.layout().addWidget(qb)
-    widget.connect(qb,Qt.SIGNAL("accepted()"),widget.accept)
-    if cancel: widget.connect(qb,Qt.SIGNAL("rejected()"),widget.reject)
+    if get_qt_major_version() == 5:
+        qb.accepted.connect(widget.accept)
+    else:
+        widget.connect(qb,Qt.SIGNAL("accepted()"),widget.accept)
+    if cancel:
+        if get_qt_major_version() == 5:
+            qb.rejected.connect(widget.reject)
+        else:
+            widget.connect(qb,Qt.SIGNAL("rejected()"),widget.reject)
     return
     
 def AlarmsSelector(alarms,text='Choose alarms to modify',):

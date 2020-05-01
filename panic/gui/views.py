@@ -29,6 +29,7 @@ import fandango.tango as ft
 
 from fandango.qt import Qt,getApplication
 from panic.properties import SORT_ORDER
+from utils import get_qt_major_version
 
 class ViewRawBrowser(Qt.QTextBrowser):
     
@@ -37,8 +38,10 @@ class ViewRawBrowser(Qt.QTextBrowser):
         self.model = model
         if not hasattr(self,'_timer'):
             self._timer = Qt.QTimer()
-            self.connect(self._timer,Qt.SIGNAL("timeout()"),
-                         self.valueChanged)
+            if get_qt_major_version() == 5:
+                self._timer.timeout.connect(self.valueChanged)
+            else:
+                self.connect(self._timer,Qt.SIGNAL("timeout()"),self.valueChanged)
             self._timer.start(refresh)
             print('AlarmForm._timer(%s)'%refresh)
         self.show()
@@ -80,8 +83,13 @@ class ViewChooser(Qt.QDialog):
         self.layout().addWidget(self.chooser)
         self.button = Qt.QPushButton('Done')
         self.layout().addWidget(self.button)
-        self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.done)
-        self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.close)
+
+        if get_qt_major_version() == 5:
+            self.button.pressed.connect(self.done)
+            self.button.pressed.connect(self.close)
+        else:
+            self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.done)
+            self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.close)
         
     def get_view(self,txt = None):
         try:

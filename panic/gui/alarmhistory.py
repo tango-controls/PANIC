@@ -83,18 +83,26 @@ class alarmhistoryForm(object):
 
     def retranslateUi(self, Form):
       
-        Form.setWindowTitle(QtGui.QApplication.translate("Form", "Alarm History Viewer", None, QtGui.QApplication.UnicodeUTF8))
-        self.refreshButton.setText(QtGui.QApplication.translate("Form", "Refresh", None, QtGui.QApplication.UnicodeUTF8))
+        Form.setWindowTitle(translate("Form", "Alarm History Viewer"))
+        self.refreshButton.setText(translate("Form", "Refresh"))
         self.refreshButton.setIcon(getThemeIcon("view-refresh"))
         self.refreshButton.setToolTip("Refresh list")
-        self.viewButton.setText(QtGui.QApplication.translate("Form", "Open Snapshot", None, QtGui.QApplication.UnicodeUTF8))
+        self.viewButton.setText(translate("Form", "Open Snapshot"))
         self.viewButton.setIcon(getThemeIcon("face-glasses"))
         self.viewButton.setToolTip("Open Snapshot")
-        QtCore.QObject.connect(self.alarmCombo, QtCore.SIGNAL("currentIndexChanged(QString)"), self.buildList)
-        QtCore.QObject.connect(self.refreshButton, QtCore.SIGNAL("clicked()"), self.onRefresh)
-        QtCore.QObject.connect(self.viewButton, QtCore.SIGNAL("clicked()"), self.onOpen)
-        QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("itemDoubleClicked(QTableWidgetItem *)"), self.onDouble)
-        QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("customContextMenuRequested(const QPoint&)"), self.onContextMenu)
+
+        if get_qt_major_version() == 5:
+            self.alarmCombo.currentIndexChanged.connect(self.buildList)
+            self.refreshButton.clicked.connect(self.onRefresh)
+            self.viewButton.clicked.connect(self.onOpen)
+            self.tableWidget.itemDoubleClicked.connect(self.onDouble)
+            self.tableWidget.customContextMenuRequested.connect(self.onContextMenu)
+        else:
+            QtCore.QObject.connect(self.alarmCombo, QtCore.SIGNAL("currentIndexChanged(QString)"), self.buildList)
+            QtCore.QObject.connect(self.refreshButton, QtCore.SIGNAL("clicked()"), self.onRefresh)
+            QtCore.QObject.connect(self.viewButton, QtCore.SIGNAL("clicked()"), self.onOpen)
+            QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("itemDoubleClicked(QTableWidgetItem *)"), self.onDouble)
+            QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("customContextMenuRequested(const QPoint&)"), self.onContextMenu)
 
     def setAlarmCombo(self, alarm=None):
         print('In alarmHistoryForm.setAlarmCombo(%s)' % str(alarm))
@@ -158,7 +166,7 @@ class alarmhistoryForm(object):
                         item=QtGui.QTableWidgetItem("%s" % data[row][col])
                         item.setFlags(QtCore.Qt.ItemIsSelectable)
                         if row%2!=0:
-                            item.setBackgroundColor(QtGui.QColor(225,225,225))
+                            item.setBackground(QtGui.QColor(225,225,225))
                         self.tableWidget.setItem(row, col, item)
                 if not self.viewButton.isEnabled():
                     self.viewButton.setEnabled(True)

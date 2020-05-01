@@ -5,7 +5,7 @@ GPL Licensed
 """
 
 from utils import Qt, QtCore, QtGui
-from utils import getThemeIcon
+from utils import getThemeIcon, translate
 
 class Ui_AlarmList(object):
     def setupUi(self, Form):
@@ -258,8 +258,8 @@ class Ui_AlarmList(object):
         #self.customButton5.hide()
         self.buttonClose = QtGui.QPushButton(Form)
         self.buttonClose.setObjectName("buttonClose")
-        self.buttonClose.setText(QtGui.QApplication.translate("Form", "Close", None, QtGui.QApplication.UnicodeUTF8))
-        self.buttonClose.setToolTip(QtGui.QApplication.translate("Form", "Close Application", None, QtGui.QApplication.UnicodeUTF8))
+        self.buttonClose.setText(translate("Form", "Close"))
+        self.buttonClose.setToolTip(translate("Form", "Close Application"))
         self.icon_close = getThemeIcon(":/actions/process-stop.svg")
         self.buttonClose.setIcon(self.icon_close)
         self.buttonClose.hide()
@@ -303,8 +303,8 @@ class Ui_AlarmList(object):
         self.infoLabel1_1.show()
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QtGui.QApplication.translate("Form", "Form", None, QtGui.QApplication.UnicodeUTF8))
-        self.infoLabel0_1.setText(QtGui.QApplication.translate("Form", "Attribute", None, QtGui.QApplication.UnicodeUTF8))
+        Form.setWindowTitle(translate("Form", "Form"))
+        self.infoLabel0_1.setText(translate("Form", "Attribute"))
 
 if __name__ == "__main__":
     import sys
