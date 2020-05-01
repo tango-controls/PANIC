@@ -1,6 +1,8 @@
 from utils import Qt, QtCore, QtGui, getThemeIcon
 
 import panic, fandango, taurus
+from utils import translate, get_qt_major_version
+
 
 class htmlviewForm(object):
     def __init__(self,alarm_api=None):
@@ -24,12 +26,15 @@ class htmlviewForm(object):
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QtGui.QApplication.translate("Form", "Details", None, QtGui.QApplication.UnicodeUTF8))
-        self.refreshButton.setText(QtGui.QApplication.translate("Form", "Refresh", None, QtGui.QApplication.UnicodeUTF8))
+        Form.setWindowTitle(translate("Form", "Details"))
+        self.refreshButton.setText(translate("Form", "Refresh"))
         self.refreshButton.setIcon(getThemeIcon("view-refresh"))
         self.refreshButton.setToolTip("Refresh list")
 
-        QtCore.QObject.connect(self.refreshButton, QtCore.SIGNAL("clicked()"), self.onRefresh)
+        if get_qt_major_version() == 5:
+            self.refreshButton.clicked.connect(self.onRefresh)
+        else:
+            QtCore.QObject.connect(self.refreshButton, QtCore.SIGNAL("clicked()"), self.onRefresh)
 
     def onRefresh(self):
         print('refresh')

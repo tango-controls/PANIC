@@ -6,7 +6,7 @@ GPL Licensed
 
 import sys, panic, traceback
 from utils import Qt, QtCore, QtGui
-from utils import getThemeIcon
+from utils import getThemeIcon, translate, get_qt_major_version
 from utils import iValidatedWidget
 
 class PhoneBook(QtGui.QWidget):
@@ -91,18 +91,23 @@ class PhoneBookEntry(iValidatedWidget,object):
         QtCore.QMetaObject.connectSlotsByName(addForm)
 
     def addRetranslateUi(self, addForm):
-        addForm.setWindowTitle(QtGui.QApplication.translate("addForm", "Add Recipient", None, QtGui.QApplication.UnicodeUTF8))
-        self.addButton.setText(QtGui.QApplication.translate("addForm", "Add", None, QtGui.QApplication.UnicodeUTF8))
+        addForm.setWindowTitle(translate("addForm", "Add Recipient"))
+        self.addButton.setText(translate("addForm", "Add"))
         self.addButton.setIcon(getThemeIcon("list-add"))
         self.addButton.setToolTip("Add person to the list")
-        self.cancelButton.setText(QtGui.QApplication.translate("addForm", "Cancel", None, QtGui.QApplication.UnicodeUTF8))
+        self.cancelButton.setText(translate("addForm", "Cancel"))
         self.cancelButton.setIcon(getThemeIcon("process-stop"))
         self.cancelButton.setToolTip("Cancel")
         addForm.resize(250, 150)
 
-        QtCore.QObject.connect(self.addButton,QtCore.SIGNAL("clicked()"), self.onAdd)
-        QtCore.QObject.connect(self.cancelButton,QtCore.SIGNAL("clicked()"), self.onCancel)
-        QtCore.QObject.connect(self.smsCheckBox,QtCore.SIGNAL("stateChanged(int)"), self.onCheckStateChanged)
+        if get_qt_major_version() == 5:
+            self.addButton.clicked.connect(self.onAdd)
+            self.cancelButton.clicked.connect(self.onCancel)
+            self.smsCheckBox.stateChanged.connect(self.onCheckStateChanged)
+        else:
+            QtCore.QObject.connect(self.addButton, QtCore.SIGNAL("clicked()"), self.onAdd)
+            QtCore.QObject.connect(self.cancelButton, QtCore.SIGNAL("clicked()"), self.onCancel)
+            QtCore.QObject.connect(self.smsCheckBox, QtCore.SIGNAL("stateChanged(int)"), self.onCheckStateChanged)
 
     def onAdd(self):
         try:
@@ -188,21 +193,27 @@ class PhoneBookUi(object):
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QtGui.QApplication.translate("Form", "Phonebook", None, QtGui.QApplication.UnicodeUTF8))
-        self.addButton.setText(QtGui.QApplication.translate("Form", "Add", None, QtGui.QApplication.UnicodeUTF8))
+        Form.setWindowTitle(translate("Form", "Phonebook"))
+        self.addButton.setText(translate("Form", "Add"))
         self.addButton.setIcon(getThemeIcon("list-add"))
         self.addButton.setToolTip("Add person to the list")
-        self.removeButton.setText(QtGui.QApplication.translate("Form", "Remove", None, QtGui.QApplication.UnicodeUTF8))
+        self.removeButton.setText(translate("Form", "Remove"))
         self.removeButton.setIcon(getThemeIcon("list-remove"))
         self.removeButton.setToolTip("Remove person from list")
-        self.refreshButton.setText(QtGui.QApplication.translate("Form", "Refresh", None, QtGui.QApplication.UnicodeUTF8))
+        self.refreshButton.setText(translate("Form", "Refresh"))
         self.refreshButton.setIcon(getThemeIcon("view-refresh"))
         self.refreshButton.setToolTip("Refresh list")
 
-        QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("itemDoubleClicked(QTableWidgetItem *)"), self.onEdit)
-        QtCore.QObject.connect(self.addButton,QtCore.SIGNAL("clicked()"), self.onAdd)
-        QtCore.QObject.connect(self.removeButton,QtCore.SIGNAL("clicked()"), self.onRemove)
-        QtCore.QObject.connect(self.refreshButton,QtCore.SIGNAL("clicked()"), self.onRefresh)
+        if get_qt_major_version() == 5:
+            self.tableWidget.itemDoubleClicked.connect(self.onEdit)
+            self.addButton.clicked.connect(self.onAdd)
+            self.removeButton.clicked.connect(self.onRemove)
+            self.refreshButton.clicked.connect(self.onRefresh)
+        else:
+            QtCore.QObject.connect(self.tableWidget, QtCore.SIGNAL("itemDoubleClicked(QTableWidgetItem *)"), self.onEdit)
+            QtCore.QObject.connect(self.addButton,QtCore.SIGNAL("clicked()"), self.onAdd)
+            QtCore.QObject.connect(self.removeButton,QtCore.SIGNAL("clicked()"), self.onRemove)
+            QtCore.QObject.connect(self.refreshButton,QtCore.SIGNAL("clicked()"), self.onRefresh)
         Form.resize(430, 800)
 
     def buildList(self):
@@ -218,7 +229,10 @@ class PhoneBookUi(object):
                 #if k.split('#')[0].strip():
                     #item.setFlags(QtCore.Qt.ItemIsEnabled)
                 if not (i/2)%2:
-                    item.setBackgroundColor(QtGui.QColor(225,225,225))
+                    if get_qt_major_version() == 5:
+                        item.setBackground(QtGui.QColor(225,225,225))
+                    else:
+                        item.setBackgroundColor(QtGui.QColor(225,225,225))
                 self.tableWidget.setItem(int(i/2),i%2,item)
                 i+=1
             self.tableWidget.resizeColumnsToContents()

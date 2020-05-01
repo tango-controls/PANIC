@@ -88,8 +88,14 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
     
     ALARM_ROW = ['tag','get_state','get_time','device','description']
     ALARM_LENGTHS = [50,10,20,25,200]
-    
-    __pyqtSignals__ = ("valueChanged",)
+
+    if get_qt_major_version() == 5:
+        valueChanged = QtCore.pyqtSignal()
+        closed = QtCore.pyqtSignal()
+        alarmSelected = QtCore.pyqtSignal(str)
+        devicesSelected = QtCore.pyqtSignal(str)
+    else:
+        __pyqtSignals__ = ("valueChanged",)
     
     def __init__(self, parent=None, filters='', options=None, mainwindow=None,
                  api=None):
@@ -202,16 +208,24 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
     
     def emitValueChanged(self):
         #trace ('emitValueChanged()')
-        self.emit(Qt.SIGNAL("valueChanged"))    
+        if get_qt_major_version() == 5:
+            self.valueChanged.emit()
+        else:
+            self.emit(Qt.SIGNAL("valueChanged"))
     
     def init_timers(self):
         #TIMERS (to reload database and refresh alarm list).
         self.reloadTimer = Qt.QTimer()
         self.refreshTimer = Qt.QTimer()
-        Qt.QObject.connect(self.refreshTimer, 
-                           Qt.SIGNAL("timeout()"), self.onRefresh)
-        Qt.QObject.connect(self.reloadTimer, 
-                           Qt.SIGNAL("timeout()"), self.onReload)
+
+        if get_qt_major_version() == 5:
+            self.refreshTimer.timeout.connect(self.onRefresh)
+            self.reloadTimer.timeout.connect(self.onReload)
+        else:
+            Qt.QObject.connect(self.refreshTimer,
+                               Qt.SIGNAL("timeout()"), self.onRefresh)
+            Qt.QObject.connect(self.reloadTimer,
+                               Qt.SIGNAL("timeout()"), self.onReload)
         #first fast loading
         self.reloadTimer.start(min((5000,self.REFRESH_TIME/2.))) 
         self.refreshTimer.start(self.REFRESH_TIME)    
@@ -302,12 +316,18 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             if len(items)==1:
                 a = self.view.get_alarm_from_text(items[0])
                 tags = a.tag.split('_')
-                self.emit(Qt.SIGNAL('alarmSelected'),a.tag)
+                if get_qt_major_version() == 5:
+                    self.alarmSelected.emit(a.tag)
+                else:
+                    self.emit(Qt.SIGNAL('alarmSelected'),a.tag)
                 models = self.api.parse_attributes(a.formula)
                 devices = sorted(set(fn.tango.parse_tango_model(m)['device'] 
                                      for m in models))
                 print('onItemSelected(%s) devices: %s'%(a,shortstr(devices)))
-                self.emit(Qt.SIGNAL('devicesSelected'),'|'.join(devices+tags))
+                if get_qt_major_version() == 5:
+                    self.devicesSelected.emit('|'.join(devices+tags))
+                else:
+                    self.emit(Qt.SIGNAL('devicesSelected'), '|'.join(devices + tags))
         except: traceback.print_exc()      
             
     def getCurrentAlarm(self,item=None):
@@ -368,7 +388,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         icon = ""
         
         if state in ('OOSRV',):
-            color = Qt.QColor("grey").light()
+            color = Qt.QColor("grey").lighter(150)
             background = Qt.QColor("white")
             
         elif state in ('ERROR',):
@@ -391,7 +411,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
                 background = Qt.QColor("yellow").lighter()
                 
         elif state in ('DSUPR','SHLVD'):
-            color = Qt.QColor("grey").light()
+            color = Qt.QColor("grey").lighter(150)
             background = Qt.QColor("white")
             
         elif state == 'NORM':
@@ -410,8 +430,13 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         #tracer('setFontsAndColors(%s,%s,%s,%s,%s)'
           #%(alarm.tag,state,icon,background,bold))
         item.setIcon(alarmicon or Qt.QIcon())
-        item.setTextColor(color)
-        item.setBackgroundColor(background)
+
+        if get_qt_major_version() == 5:
+            item.setForeground(color)
+            item.setBackground(background)
+        else:
+            item.setTextColor(color)
+            item.setBackgroundColor(background)
         f = item.font()
         f.setFixedPitch(True)
         f.setBold(bold)
@@ -440,7 +465,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             if forms:
                 #@TODO: these checks will be not needed after full update
                 tracer("\tupdating %d %s forms"%(len(forms),alarm))
-                [f.valueChanged(forced=True) for f in forms]
+                [f.changeValue(forced=True) for f in forms]
             else:
                 pass #tracer("no forms open?")
         except:
@@ -539,7 +564,10 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             item = self._ui.listWidget.item(i)
             item.setHidden(True)
             item.setText('')
-            item.setBackgroundColor(Qt.QColor('white'))
+            if get_qt_major_version() == 5:
+                item.setBackground(Qt.QColor('white'))
+            else:
+                item.setBackgroundColor(Qt.QColor('white'))
             item.setIcon(self.NO_ICON)
             
         self.changed = False
@@ -565,24 +593,34 @@ class QFilterGUI(QAlarmList):
         self.setFirstCombo()
         self.setSecondCombo()
         self._ui.infoLabel0_1.setText(self._ui.contextComboBox.currentText())
-        Qt.QObject.connect(self._ui.contextComboBox, 
-                           Qt.SIGNAL("currentIndexChanged(QString)"), 
-                           self._ui.infoLabel0_1.setText)
-        Qt.QObject.connect(self._ui.contextComboBox, 
-                           Qt.SIGNAL("currentIndexChanged(int)"), 
-                           self.setSecondCombo)
-        Qt.QObject.connect(self._ui.comboBoxx, 
-                           Qt.SIGNAL("currentIndexChanged(QString)"), 
-                           self.onFilter)
-        
-        Qt.QObject.connect(self._ui.regExUpdate, 
-                           Qt.SIGNAL("clicked(bool)"), self.onRegExUpdate)
-        Qt.QObject.connect(self._ui.regExSave, 
-                           Qt.SIGNAL("clicked(bool)"), self.onRegExSave)        
-        Qt.QObject.connect(self._ui.selectCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onSelectAllNone)
-        Qt.QObject.connect(self._ui.activeCheckBox, 
-                           Qt.SIGNAL('stateChanged(int)'), self.onFilter)
+        if get_qt_major_version() == 5:
+            self._ui.contextComboBox.currentIndexChanged.connect(self._ui.infoLabel0_1.setText)
+            self._ui.contextComboBox.currentIndexChanged.connect(self.setSecondCombo)
+            self._ui.comboBoxx.currentIndexChanged.connect(self.onFilter)
+
+            self._ui.regExUpdate.clicked.connect(self.onRegExUpdate)
+            self._ui.regExSave.clicked.connect(self.onRegExSave)
+            self._ui.selectCheckBox.stateChanged.connect(self.onSelectAllNone)
+            self._ui.activeCheckBox.stateChanged.connect(self.onFilter)
+        else:
+            Qt.QObject.connect(self._ui.contextComboBox,
+                               Qt.SIGNAL("currentIndexChanged(QString)"),
+                               self._ui.infoLabel0_1.setText)
+            Qt.QObject.connect(self._ui.contextComboBox,
+                               Qt.SIGNAL("currentIndexChanged(int)"),
+                               self.setSecondCombo)
+            Qt.QObject.connect(self._ui.comboBoxx,
+                               Qt.SIGNAL("currentIndexChanged(QString)"),
+                               self.onFilter)
+
+            Qt.QObject.connect(self._ui.regExUpdate,
+                               Qt.SIGNAL("clicked(bool)"), self.onRegExUpdate)
+            Qt.QObject.connect(self._ui.regExSave,
+                               Qt.SIGNAL("clicked(bool)"), self.onRegExSave)
+            Qt.QObject.connect(self._ui.selectCheckBox,
+                               Qt.SIGNAL('stateChanged(int)'), self.onSelectAllNone)
+            Qt.QObject.connect(self._ui.activeCheckBox,
+                               Qt.SIGNAL('stateChanged(int)'), self.onFilter)
         
         #@DEPRECATED
         #Qt.QObject.connect(self._ui.sevAlarmCheckBox, 
@@ -925,31 +963,46 @@ class AlarmGUI(QFilterGUI):
         trace('connecting')
         
         #Qt.QObject.connect(self.refreshTimer, Qt.SIGNAL("timeout()"), self.onRefresh)
-        if self.USE_EVENT_REFRESH: 
-            Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
-        #Qt.QObject.connect(self, 
+        if self.USE_EVENT_REFRESH:
+            if get_qt_major_version() == 5:
+                self.valueChanged.connect(self.hurry)
+            else:
+                Qt.QObject.connect(self,Qt.SIGNAL("valueChanged"),self.hurry)
+        #Qt.QObject.connect(self,
             #Qt.SIGNAL('setfontsandcolors'),AlarmRow.setFontsAndColors)
-        Qt.QObject.connect(self._ui.listWidget, 
-            Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
-        Qt.QObject.connect(self._ui.listWidget, 
-            Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
+        if get_qt_major_version() == 5:
+            self._ui.listWidget.itemSelectionChanged.connect(self.onItemSelected)
+            self._ui.listWidget.itemDoubleClicked.connect(self.onView) #self.onEdit)
+        else:
+            Qt.QObject.connect(self._ui.listWidget,
+                Qt.SIGNAL("itemSelectionChanged()"), self.onItemSelected)
+            Qt.QObject.connect(self._ui.listWidget,
+                Qt.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.onView) #self.onEdit)
         #Qt.QObject.connect(self._ui.listWidget, Qt.SIGNAL("currentRowChanged(int)"), self.setAlarmData)
         
         self.connectContextMenu(self._ui.listWidget)
         
         #Qt.QObject.connect(self._ui.actionExpert,
                             #Qt.SIGNAL("changed()"),self.setExpertView)
-        Qt.QObject.connect(self._ui.newButton, 
-                           Qt.SIGNAL("clicked()"), self.onNew) # "New"
-        Qt.QObject.connect(self._ui.deleteButton, 
-                           Qt.SIGNAL("clicked(bool)"), self.onDelete) # Delete
-        Qt.QObject.connect(self._ui.refreshButton, 
-                           Qt.SIGNAL("clicked()"), self.onReload) # "Refresh"        
-        Qt.QObject.connect(self._ui.buttonClose,
-                           Qt.SIGNAL("clicked()"), self.close)
-        
-        Qt.QObject.connect(fandango.qt.getApplication(),
-                           Qt.SIGNAL("aboutToQuit()"),self.exitThreads)
+        if get_qt_major_version() == 5:
+            self._ui.newButton.clicked.connect(self.onNew) # "New"
+            self._ui.deleteButton.clicked.connect(self.onDelete) # Delete
+            self._ui.refreshButton.clicked.connect(self.onReload) # "Refresh"
+            self._ui.buttonClose.clicked.connect(self.close)
+
+            fandango.qt.getApplication().aboutToQuit.connect(self.exitThreads)
+        else:
+            Qt.QObject.connect(self._ui.newButton,
+                               Qt.SIGNAL("clicked()"), self.onNew) # "New"
+            Qt.QObject.connect(self._ui.deleteButton,
+                               Qt.SIGNAL("clicked(bool)"), self.onDelete) # Delete
+            Qt.QObject.connect(self._ui.refreshButton,
+                               Qt.SIGNAL("clicked()"), self.onReload) # "Refresh"
+            Qt.QObject.connect(self._ui.buttonClose,
+                               Qt.SIGNAL("clicked()"), self.close)
+
+            Qt.QObject.connect(fandango.qt.getApplication(),
+                               Qt.SIGNAL("aboutToQuit()"),self.exitThreads)
 
         trace('all connected')
         
@@ -987,8 +1040,11 @@ class AlarmGUI(QFilterGUI):
             "Use external editor",alarmApp.editFile)
         tmw.fileMenu.addAction(getThemeIcon("applications-system"),
             "Exit",tmw.close)
-        tmw.windowMenu.connect(tmw.windowMenu,
-            Qt.SIGNAL('aboutToShow()'),alarmApp.setWindowMenu)
+        if get_qt_major_version() == 5:
+            tmw.windowMenu.aboutToShow.connect(alarmApp.setWindowMenu)
+        else:
+            tmw.windowMenu.connect(tmw.windowMenu,
+                Qt.SIGNAL('aboutToShow()'),alarmApp.setWindowMenu)
         
         from phonebook import PhoneBook
         alarmApp.tools['bookApp'] = WindowManager.addWindow(

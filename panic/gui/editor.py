@@ -24,9 +24,12 @@ from ui_data import uiBodyForm,uiRowForm
 FormParentClass = Qt.QDialog
 
 class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
-    
-    __pyqtSignals__ = ("valueChanged",)
-    
+
+    if get_qt_major_version() == 5:
+        valueChanged = QtCore.pyqtSignal()
+    else:
+        __pyqtSignals__ = ("valueChanged",)
+
     def __init__(self,parent=None,refresh=0):
         FormParentClass.__init__(self,parent)
         self._message = QtGui.QMessageBox(self)
@@ -43,7 +46,10 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._parent = parent
         if refresh:
             self._timer = Qt.QTimer()
-            self.connect(self._timer,Qt.SIGNAL("timeout()"), self.valueChanged)
+            if get_qt_major_version() == 5:
+                self._timer.timeout.connect(self.changeValue)
+            else:
+                self.connect(self._timer,Qt.SIGNAL("timeout()"), self.valueChanged)
             self._timer.start(refresh)
             print('AlarmForm._timer(%s)'%refresh)
             
@@ -72,28 +78,41 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.prepareLineWidget()
         #self._ui.gridLayout.addWidget(self._dataWidget)
         self._dataWidget._wi.formulaStacked.addWidget(self.formulaeditor)
-        
-        QtCore.QObject.connect(self._receiversLine._wi.okButton, 
-                QtCore.SIGNAL("clicked(bool)"), self.onPlusOk) # Add
-        QtCore.QObject.connect(self.formulaeditor._ui.rowEditButton, 
-                QtCore.SIGNAL("clicked(bool)"), self.onRowEdit)
-        
-        QtCore.QObject.connect(self._dataWidget._wi.addReceiversButton, 
-                QtCore.SIGNAL("clicked(bool)"), self.onPlus)
-        QtCore.QObject.connect(self._dataWidget._wi.previewButton, 
-                QtCore.SIGNAL("clicked()"), self.showAlarmPreview)
-        QtCore.QObject.connect(self._dataWidget._wi.cancelButton, 
-                QtCore.SIGNAL("clicked()"), self.onCancel) # "Cancel"
-        QtCore.QObject.connect(self._dataWidget._wi.saveButton, 
-                QtCore.SIGNAL("clicked()"), self.onSave) # "Save"
-        QtCore.QObject.connect(self._dataWidget._wi.editButton, 
-                QtCore.SIGNAL("clicked()"), self.onEdit) # "Edit"
-        QtCore.QObject.connect(self._dataWidget._wi.disabledCheckBox, 
-                QtCore.SIGNAL("stateChanged(int)"), self.onDisStateChanged)
-        QtCore.QObject.connect(self._dataWidget._wi.ackCheckBox, 
-                QtCore.SIGNAL("stateChanged(int)"), self.onAckStateChanged)
-        QtCore.QObject.connect(self._dataWidget._wi.deviceConfig, 
-                QtCore.SIGNAL("clicked()"), self.onDeviceConfig)
+
+        if get_qt_major_version() == 5:
+            self._receiversLine._wi.okButton.clicked.connect(self.onPlusOk)  # Add
+            self.formulaeditor._ui.rowEditButton.clicked.connect(self.onRowEdit)
+
+            self._dataWidget._wi.addReceiversButton.clicked.connect(self.onPlus)
+            self._dataWidget._wi.previewButton.clicked.connect(self.showAlarmPreview)
+            self._dataWidget._wi.cancelButton.clicked.connect(self.onCancel)  # "Cancel"
+            self._dataWidget._wi.saveButton.clicked.connect(self.onSave)  # "Save"
+            self._dataWidget._wi.editButton.clicked.connect(self.onEdit)  # "Edit"
+            self._dataWidget._wi.disabledCheckBox.stateChanged.connect(self.onDisStateChanged)
+            self._dataWidget._wi.ackCheckBox.stateChanged.connect(self.onAckStateChanged)
+            self._dataWidget._wi.deviceConfig.clicked.connect(self.onDeviceConfig)
+        else:
+            QtCore.QObject.connect(self._receiversLine._wi.okButton,
+                    QtCore.SIGNAL("clicked(bool)"), self.onPlusOk) # Add
+            QtCore.QObject.connect(self.formulaeditor._ui.rowEditButton,
+                    QtCore.SIGNAL("clicked(bool)"), self.onRowEdit)
+
+            QtCore.QObject.connect(self._dataWidget._wi.addReceiversButton,
+                    QtCore.SIGNAL("clicked(bool)"), self.onPlus)
+            QtCore.QObject.connect(self._dataWidget._wi.previewButton,
+                    QtCore.SIGNAL("clicked()"), self.showAlarmPreview)
+            QtCore.QObject.connect(self._dataWidget._wi.cancelButton,
+                    QtCore.SIGNAL("clicked()"), self.onCancel) # "Cancel"
+            QtCore.QObject.connect(self._dataWidget._wi.saveButton,
+                    QtCore.SIGNAL("clicked()"), self.onSave) # "Save"
+            QtCore.QObject.connect(self._dataWidget._wi.editButton,
+                    QtCore.SIGNAL("clicked()"), self.onEdit) # "Edit"
+            QtCore.QObject.connect(self._dataWidget._wi.disabledCheckBox,
+                    QtCore.SIGNAL("stateChanged(int)"), self.onDisStateChanged)
+            QtCore.QObject.connect(self._dataWidget._wi.ackCheckBox,
+                    QtCore.SIGNAL("stateChanged(int)"), self.onAckStateChanged)
+            QtCore.QObject.connect(self._dataWidget._wi.deviceConfig,
+                    QtCore.SIGNAL("clicked()"), self.onDeviceConfig)
         
         self._dataWidget._wi.nameLineEdit.setClickHook(self.onEdit)
         self._dataWidget._wi.deviceLineEdit.setClickHook(self.onEdit)
@@ -105,8 +124,11 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     def showAlarmPreview(self):
         self.preview = AlarmPreview(tag=self.getCurrentAlarm().tag,
             formula=self._wi.formulaTextEdit.toPlainText(),parent=self.parent())
-        self.preview.connect(self.preview.upperPanel,Qt.SIGNAL('onSave'),
-            lambda obj,s=self:(s.enableEditForm(False),s.setAlarmData(obj)))
+        if get_qt_major_version() == 5:
+            self.preview.upperPanel.saved.connect(lambda obj,s=self:(s.enableEditForm(False),s.setAlarmData(obj)))
+        else:
+            self.preview.connect(self.preview.upperPanel,Qt.SIGNAL('onSave'),
+                lambda obj,s=self:(s.enableEditForm(False),s.setAlarmData(obj)))
         from utils import WindowManager
         WindowManager.addWindow(self.preview)
         self.preview.show()
@@ -153,7 +175,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             self.enableEditForm(False)
         else:
             self._message.critical(self, "Critical", "Alarm not saved!")
-        self.valueChanged()
+        self.changeValue()
 
     def onCancel(self):
         print'onCancel()'
@@ -178,7 +200,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     def onReset(self,alarm=None):
         panic.gui.actions.ResetAlarm(self,alarm)
             
-    def valueChanged(self,forced=False):
+    def changeValue(self,forced=False):
         timed = hasattr(self,'_timer')
         alarm = self.getCurrentAlarm()
         print('AlarmForm(%s).valueChanged(%s,%s)'%(alarm.tag,forced,timed))
@@ -188,10 +210,13 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
             print('\tdis,ack = ',(dis,ack))
         if timed:
             alarm.set_active(alarm.get_time(True))
-            alarm.set_state()            
+            alarm.set_state()
 
-        self.emit(Qt.SIGNAL('valueChanged'))
-        
+        if get_qt_major_version() == 5:
+            self.valueChanged.emit()
+        else:
+            self.emit(Qt.SIGNAL('valueChanged'))
+
     ###########################################################################
 
     def prepareLineWidget(self):
@@ -200,21 +225,27 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self.w.setLayout(Qt.QHBoxLayout())
         self._tvl = AlarmValueLabel(self.w)
         #self._tvl.setShowQuality(False)
-        self._tvl.connect(self,Qt.SIGNAL('valueChanged'),
-                          self._tvl.updateStyle)
-        self.connect(self,Qt.SIGNAL('valueChanged'),
-                          self.update_button_states)
+        if get_qt_major_version() == 5:
+            self.valueChanged.connect(self._tvl.updateStyle)
+            self.valueChanged.connect(self.update_button_states)
+        else:
+            self._tvl.connect(self,Qt.SIGNAL('valueChanged'), self._tvl.updateStyle)
+            self.connect(self,Qt.SIGNAL('valueChanged'),self.update_button_states)
         self._detailsButton = Qt.QPushButton(self.w)
         self._detailsButton.setText('Last Report')
         self._detailsButton.setIcon(getThemeIcon("edit-find"))
-        self._detailsButton.connect(self._detailsButton,Qt.SIGNAL("clicked()"),
-                                    self.showAlarmReport)
+        if get_qt_major_version() == 5:
+            self._detailsButton.clicked.connect(self.showAlarmReport)
+        else:
+            self._detailsButton.connect(self._detailsButton,Qt.SIGNAL("clicked()"),self.showAlarmReport)
         self._detailsButton.setEnabled(False)
         self._resetButton = Qt.QPushButton(self.w)
         self._resetButton.setText('Reset')
         self._resetButton.setIcon(getThemeIcon("edit-undo"))
-        self._resetButton.connect(self._resetButton,Qt.SIGNAL("clicked()"),
-                                  self.onReset)
+        if get_qt_major_version() == 5:
+            self._resetButton.clicked.connect(self.onReset)
+        else:
+            self._resetButton.connect(self._resetButton,Qt.SIGNAL("clicked()"),self.onReset)
         self._resetButton.setEnabled(False)
         self.w.layout().addWidget(self._tvl)
         self.w.layout().addWidget(self._detailsButton)
@@ -265,7 +296,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
         self._tvl.setModel(alarm) #.device+'/'+alarm.get_attribute())
         self._dataWidget._wi.previewButton.setEnabled(True)
         self._dataWidget._wi.editButton.setEnabled(True)
-        self.valueChanged(forced=True)
+        self.changeValue(forced=True)
 
         # setup wiki link
         wiki_link = alarm.get_wiki_link()
@@ -411,7 +442,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
                 self.api.rename(tag,tag,new_device=device)
                 alarm = self.api[tag]
                 self._tvl.setModel(alarm) #.device+'/'+alarm.get_attribute())
-                self.valueChanged()
+                self.changeValue()
                 #setAlarmModel() moved to AlarmGUI
                 #self.AlarmRows[tag].setAlarmModel(self.api[tag])
             alarm.setup(write=True,**data)
@@ -442,7 +473,7 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
                 except: print 'Renaming context: Failed!\n%s'%traceback.format_exc()
         
         self.setAlarmData(tag)
-        self.valueChanged()
+        self.changeValue()
         print 'Out of saveNewData()'
     
     ###########################################################################
@@ -451,12 +482,12 @@ class AlarmForm(FormParentClass,iValidatedWidget): #(QtGui.QWidget):
     @Catched
     def onAckStateChanged(self,checked=False):
         panic.gui.actions.AcknowledgeAlarm(self,self.getCurrentAlarm())
-        self.valueChanged(forced=True)
+        self.changeValue(forced=True)
         
     @Catched
     def onDisStateChanged(self,checked=False):
         panic.gui.actions.ChangeDisabled(self,self.getCurrentAlarm())
-        self.valueChanged(forced=True)
+        self.changeValue(forced=True)
         
 
 class ReceiversForm(QtGui.QWidget):
@@ -470,6 +501,10 @@ class ReceiversForm(QtGui.QWidget):
 # Formula editor widgets
 
 class MyRow(QtGui.QWidget):
+
+    if get_qt_major_version() == 5:
+        textChanged = QtCore.pyqtSignal(str)
+
     def __init__(self,parent=None):
         QtGui.QWidget.__init__(self,parent)
         self._wi = uiRowForm()
@@ -482,7 +517,7 @@ class MyRow(QtGui.QWidget):
 
     def CreateText(self):
         self.newText = self.GetText()
-        self.emit(QtCore.SIGNAL('textChanged(QString)'),self.newText)
+        self.textChanged.emit(self.newText)
         return self.newText
 
 class MyRelation(QtGui.QWidget):
@@ -518,8 +553,11 @@ class MyRelation(QtGui.QWidget):
         self.spacerItem1 = QtGui.QSpacerItem(40, 20, 
                 QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         self.gridLayout.addItem(self.spacerItem1, 0, 4, 1, 1)
-        QtCore.QObject.connect(self.comboBox, 
-                QtCore.SIGNAL("currentIndexChanged(QString)"), self.CreateText)
+        if get_qt_major_version() == 5:
+            self.comboBox.currentIndexChanged.connect(self.CreateText)
+        else:
+            QtCore.QObject.connect(self.comboBox,
+                            QtCore.SIGNAL("currentIndexChanged(QString)"), self.CreateText)
 
     def GetText(self):
         return self.comboBox.currentText()
@@ -566,6 +604,10 @@ class MyRelation(QtGui.QWidget):
             #print "Something else"
 
 class FormulaEditor(QtGui.QWidget):
+
+    if get_qt_major_version() == 5:
+        usunMnie = QtCore.pyqtSignal(QtGui.QWidget)
+
     def __init__(self, parent=None):
         QtGui.QWidget.__init__(self, parent)
         self._ui = uiBodyForm()
@@ -575,12 +617,17 @@ class FormulaEditor(QtGui.QWidget):
         self.booleans = ['OR','AND','XOR','NOT','(',')']
         self.operators = ['==','>=','>','<=','<','!=']
         self._widgetList=[]
-        QtCore.QObject.connect(self._ui.clearButton, 
-                               QtCore.SIGNAL("clicked()"), self.Clr)
-        QtCore.QObject.connect(self._ui.addExpressionButton, 
-                               QtCore.SIGNAL("clicked()"), self.Add)
-        QtCore.QObject.connect(self._ui.addRelationButton, 
-                               QtCore.SIGNAL("clicked()"), self.addRelation)
+        if get_qt_major_version() == 5:
+            self._ui.clearButton.clicked.connect(self.Clr)
+            self._ui.addExpressionButton.clicked.connect(self.Add)
+            self._ui.addRelationButton.clicked.connect(self.addRelation)
+        else:
+            QtCore.QObject.connect(self._ui.clearButton,
+                                   QtCore.SIGNAL("clicked()"), self.Clr)
+            QtCore.QObject.connect(self._ui.addExpressionButton,
+                                   QtCore.SIGNAL("clicked()"), self.Add)
+            QtCore.QObject.connect(self._ui.addRelationButton,
+                                   QtCore.SIGNAL("clicked()"), self.addRelation)
 
     def clickedClose(self):
         self.Clr()
@@ -596,15 +643,21 @@ class FormulaEditor(QtGui.QWidget):
         """Add expressions"""
         self.exampleRow = MyRow()
         self.firstList(self.exampleRow)
-        QtCore.QObject.connect(self.exampleRow._wi.removeButton, 
-                               QtCore.SIGNAL("clicked()"), self.Rm)
+        if get_qt_major_version() == 5:
+            self.exampleRow._wi.removeButton.clicked.connect(self.Rm)
+        else:
+            QtCore.QObject.connect(self.exampleRow._wi.removeButton,
+                                   QtCore.SIGNAL("clicked()"), self.Rm)
         self._ui.scrollAreaWidgetContents.layout().addWidget(self.exampleRow)
         if edit:
             self.exampleRow._wi.variableCombo.addItem(QtCore.QString(edit[0]))
             self.exampleRow._wi.valueCombo.setItemText(0, edit[1])
             self.exampleRow._wi.operatorCombo.addItem(QtCore.QString(edit[2]))
-        self.connect(self.exampleRow,
-                     QtCore.SIGNAL('textChanged(QString)'),self.UpdateText)
+        if get_qt_major_version() == 5:
+            self.exampleRow.textChanged.connect(self.UpdateText)
+        else:
+            self.connect(self.exampleRow,
+                                 QtCore.SIGNAL('textChanged(QString)'),self.UpdateText)
 
     def addRelation(self, edit=False):
         self.relation = MyRelation(self)
@@ -612,14 +665,20 @@ class FormulaEditor(QtGui.QWidget):
         self._ui.scrollAreaWidgetContents.layout().addWidget(self.relation)
         if edit:
             self.relation.comboBox.setItemText(0, edit)
-        self.connect(self.relation,QtCore.SIGNAL('textChanged(QString)'),
-                     self.UpdateText)
-        QtCore.QObject.connect(self.relation.pushButton, 
-                               QtCore.SIGNAL("clicked()"), self.UpRelation)
-        QtCore.QObject.connect(self.relation.pushButton_2, 
-                               QtCore.SIGNAL("clicked()"), self.DownRelation)
-        QtCore.QObject.connect(self.relation.pushButton_3, 
-                               QtCore.SIGNAL("clicked()"), self.Rm)
+        if get_qt_major_version() == 5:
+            self.relation.textChanged.connect(self.UpdateText)
+            self.relation.pushButton.clicked.connect(self.UpRelation)
+            self.relation.pushButton_2clicked.connect(self.DownRelation)
+            self.relation.pushButton_3.clicked.connect(self.Rm)
+        else:
+            self.connect(self.relation,QtCore.SIGNAL('textChanged(QString)'),
+                         self.UpdateText)
+            QtCore.QObject.connect(self.relation.pushButton,
+                                   QtCore.SIGNAL("clicked()"), self.UpRelation)
+            QtCore.QObject.connect(self.relation.pushButton_2,
+                                   QtCore.SIGNAL("clicked()"), self.DownRelation)
+            QtCore.QObject.connect(self.relation.pushButton_3,
+                                   QtCore.SIGNAL("clicked()"), self.Rm)
 
     def UpRelation(self):
         self.widget = self.sender().parent()
@@ -668,13 +727,24 @@ class FormulaEditor(QtGui.QWidget):
     def Rm(self):
         """Remove widget"""
         self.i = self.sender().parent()
-        Qt.QObject().connect(self, Qt.SIGNAL("usunMnie"), self.onUsunMnie)
-        self.emit(Qt.SIGNAL("usunMnie"), self.i)
+        if get_qt_major_version() == 5:
+            self.usunMnie.connect(self.onUsunMnie)
+        else:
+            Qt.QObject().connect(self, Qt.SIGNAL("usunMnie"), self.onUsunMnie)
+
+        if get_qt_major_version() == 5:
+            self.usunMnie.emit(i)
+        else:
+            self.emit(Qt.SIGNAL("usunMnie"), self.i)
         self.UpdateText()
 
     def onUsunMnie(self, i):
         """this is the help comment"""
-        Qt.QObject.disconnect(self, Qt.SIGNAL("usunMnie"), self.onUsunMnie)
+
+        if get_qt_major_version() == 5:
+            self.usunMnie.disconnect(self.onUsunMnie)
+        else:
+            Qt.QObject.disconnect(self, Qt.SIGNAL("usunMnie"), self.onUsunMnie)
         self._rowList.remove(i)
         i.setParent(None)
         i.close()

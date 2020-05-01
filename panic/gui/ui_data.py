@@ -1,5 +1,5 @@
 from utils import QtCore, QtGui
-from utils import clickableQLineEdit, clickableQTextEdit,getThemeIcon
+from utils import clickableQLineEdit, clickableQTextEdit,getThemeIcon, translate, get_qt_major_version
 
 """
 ui_data.py, this file contains the Ui Classes used for AlarmEditor form.
@@ -258,14 +258,18 @@ class Ui_ReceiversLine(object):
         self.verticalLayout.addLayout(self.gridLayout)
 
         self.retranslateUi(ReceiversLine)
-        QtCore.QObject.connect(self.okButton, QtCore.SIGNAL("clicked(bool)"), ReceiversLine.close)
-        QtCore.QObject.connect(self.cancelButton, QtCore.SIGNAL("clicked(bool)"), ReceiversLine.close)
+        if get_qt_major_version() == 5:
+            self.okButton.clicked.connect(ReceiversLine.close)
+            self.cancelButton.clicked.connect(ReceiversLine.close)
+        else:
+            QtCore.QObject.connect(self.okButton, QtCore.SIGNAL("clicked(bool)"), ReceiversLine.close)
+            QtCore.QObject.connect(self.cancelButton, QtCore.SIGNAL("clicked(bool)"), ReceiversLine.close)
         QtCore.QMetaObject.connectSlotsByName(ReceiversLine)
 
     def retranslateUi(self, ReceiversLine):
-        ReceiversLine.setWindowTitle(QtGui.QApplication.translate("ReceiversLine", "Form", None, QtGui.QApplication.UnicodeUTF8))
-        self.okButton.setText(QtGui.QApplication.translate("ReceiversLine", "Ok", None, QtGui.QApplication.UnicodeUTF8))
-        self.cancelButton.setText(QtGui.QApplication.translate("ReceiversLine", "Cancel", None, QtGui.QApplication.UnicodeUTF8))
+        ReceiversLine.setWindowTitle(translate("ReceiversLine", "Form"))
+        self.okButton.setText(translate("ReceiversLine", "Ok"))
+        self.cancelButton.setText(translate("ReceiversLine", "Cancel"))
         
 ##########################################################################################################
         
@@ -363,15 +367,18 @@ class uiBodyForm(object):
         self.verticalLayout_2.addLayout(self.gridLayout)
 
         self.retranslateUi(Form)
-        QtCore.QObject.connect(self.rowEditButton, QtCore.SIGNAL("clicked(bool)"), self.formulaLineEdit.setDisabled)
+        if get_qt_major_version() == 5:
+            self.rowEditButton.clicked.connect(self.formulaLineEdit.setDisabled)
+        else:
+            QtCore.QObject.connect(self.rowEditButton, QtCore.SIGNAL("clicked(bool)"), self.formulaLineEdit.setDisabled)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QtGui.QApplication.translate("Form", "Form", None, QtGui.QApplication.UnicodeUTF8))
-        self.addExpressionButton.setText(QtGui.QApplication.translate("Form", "Add Expression", None, QtGui.QApplication.UnicodeUTF8))
-        self.addRelationButton.setText(QtGui.QApplication.translate("Form", "Add Relation", None, QtGui.QApplication.UnicodeUTF8))
-        self.clearButton.setText(QtGui.QApplication.translate("Form", "Clear", None, QtGui.QApplication.UnicodeUTF8))
-        self.rowEditButton.setText(QtGui.QApplication.translate("Form", "Raw Edit", None, QtGui.QApplication.UnicodeUTF8))
+        Form.setWindowTitle(translate("Form", "Form"))
+        self.addExpressionButton.setText(translate("Form", "Add Expression"))
+        self.addRelationButton.setText(translate("Form", "Add Relation"))
+        self.clearButton.setText(translate("Form", "Clear"))
+        self.rowEditButton.setText(translate("Form", "Raw Edit"))
 
 ########################################################################################################
 
@@ -387,7 +394,10 @@ class uiRowForm(object):
         sizePolicy.setHeightForWidth(row_widget.sizePolicy().hasHeightForWidth())
         row_widget.setSizePolicy(sizePolicy)
         self.gridLayout = QtGui.QGridLayout(row_widget)
-        self.gridLayout.setMargin(0)
+        if get_qt_major_version() == 5:
+            self.gridLayout.setContentsMargins(0,0,0,0)
+        else:
+            self.gridLayout.setMargin(0)
         self.gridLayout.setObjectName("gridLayout")
         self.valueCombo = QtGui.QComboBox(row_widget)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
@@ -433,10 +443,15 @@ class uiRowForm(object):
         self.gridLayout.addWidget(self.removeButton, 1, 3, 1, 1)
         self.retranslateUi(row_widget)
 
-        QtCore.QObject.connect(self.variableCombo, QtCore.SIGNAL("editTextChanged(QString)"), self.row_widget.CreateText)
-        QtCore.QObject.connect(self.operatorCombo, QtCore.SIGNAL("editTextChanged(QString)"), self.row_widget.CreateText)
-        QtCore.QObject.connect(self.valueCombo, QtCore.SIGNAL("currentIndexChanged(QString)"), self.row_widget.CreateText)
+        if get_qt_major_version() == 5:
+            self.variableCombo.editTextChanged.connect(self.row_widget.CreateText)
+            self.operatorCombo.editTextChanged.connect(self.row_widget.CreateText)
+            self.valueCombo.currentIndexChanged.connect(self.row_widget.CreateText)
+        else:
+            QtCore.QObject.connect(self.variableCombo, QtCore.SIGNAL("editTextChanged(QString)"), self.row_widget.CreateText)
+            QtCore.QObject.connect(self.operatorCombo, QtCore.SIGNAL("editTextChanged(QString)"), self.row_widget.CreateText)
+            QtCore.QObject.connect(self.valueCombo, QtCore.SIGNAL("currentIndexChanged(QString)"), self.row_widget.CreateText)
         QtCore.QMetaObject.connectSlotsByName(row_widget)
 
     def retranslateUi(self, row_widget):
-        row_widget.setWindowTitle(QtGui.QApplication.translate("row_widget", "Form", None, QtGui.QApplication.UnicodeUTF8))
+        row_widget.setWindowTitle(translate("row_widget", "Form"))

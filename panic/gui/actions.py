@@ -19,6 +19,8 @@ from panic.gui.editor import AlarmForm
 from panic.gui.alarmhistory import ahWidget
 from panic.gui.devattrchange import dacWidget
 
+from utils import get_qt_major_version
+
 #from htmlview import *
 
 class QAlarmManager(iValidatedWidget,object): #QAlarm):
@@ -34,10 +36,11 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
     
     def connectContextMenu(self,widget):
         self._manager = widget
-        Qt.QObject.connect(widget, 
-            Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), 
-            self.onContextMenu)        
-  
+        if get_qt_major_version() == 5:
+            widget.customContextMenuRequested.connect(self.onContextMenu)
+        else:
+            Qt.QObject.connect(widget, Qt.SIGNAL('customContextMenuRequested(const QPoint&)'), self.onContextMenu)
+
     @Catched
     def onContextMenu(self, point):
         self.popMenu = QtGui.QMenu(self)
@@ -65,9 +68,13 @@ class QAlarmManager(iValidatedWidget,object): #QAlarm):
         sevMenu = self.popMenu.addMenu('Change Priority')
         for S in SEVERITIES:
             action = sevMenu.addAction(S)
-            self.connect(action, QtCore.SIGNAL("triggered()"), 
-                lambda ks=items,sev=S,o=self:
-                  ChangeSeverity(parent=o,severity=sev))
+            if get_qt_major_version() == 5:
+                action.triggered.connect(lambda ks=items, sev=S, o=self:
+                                         ChangeSeverity(parent=o, severity=sev))
+            else:
+                self.connect(action, QtCore.SIGNAL("triggered()"),
+                    lambda ks=items,sev=S,o=self:
+                      ChangeSeverity(parent=o,severity=sev))
         
         # Reset / Acknowledge options
         act = self.popMenu.addAction(getThemeIcon("edit-undo"), 
@@ -272,7 +279,7 @@ def emitValueChanged(self):
     if hasattr(self,'emitValueChanged'):
         self.emitValueChanged()
     elif hasattr(self,'valueChanged'):
-        self.valueChanged()        
+        self.changeValue()
     #[o.get_acknowledged(force=True) for o in items]
     #[f.setAlarmData() for f in WindowManager.WINDOWS 
             #if isinstance(f,AlarmForm)]
