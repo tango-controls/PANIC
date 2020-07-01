@@ -1,5 +1,4 @@
-
 Changelog
 =========
 
-.. include:: ../../panic/CHANGES
+.. include:: ../panic/CHANGES

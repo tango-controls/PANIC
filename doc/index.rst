@@ -20,7 +20,7 @@ Contents:
    :maxdepth: 2
 
    description
-   changes   
+   changes
    Install
    PyAlarmUserGuide
    recipes
