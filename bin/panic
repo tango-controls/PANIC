@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export QT_API=pyqt4
+
 PANIC=$(python2 -c "import imp;print(imp.find_module('panic')[1])")
 
 CMD="python2 $PANIC/gui/gui.py"
