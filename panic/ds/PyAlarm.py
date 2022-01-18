@@ -1485,14 +1485,14 @@ class PyAlarm(PyTango.Device_4Impl, fandango.log.Logger):
                 finally: self.lock.release()                
                 
                 
-                #@TODO: Period should be in SECONDS!: 
-                #this patch must be DEPRECATED
-                if self.PollingPeriod>3600: 
-                    self.warning('PERIODS IN MILLISECONDS ARE DEPRECATED!: '
-                        '%s ms >> %s s'
-                        %(self.PollingPeriod,self.PollingPeriod*1e-3))
-                    #Converting from ms to s
-                    self.PollingPeriod = self.PollingPeriod*1e-3
+                ##@TODO: Period should be in SECONDS!: 
+                ##this patch must be DEPRECATED
+                #if self.PollingPeriod>3600: 
+                    #self.warning('PERIODS IN MILLISECONDS ARE DEPRECATED!: '
+                        #'%s ms >> %s s'
+                        #%(self.PollingPeriod,self.PollingPeriod*1e-3))
+                    ##Converting from ms to s
+                    #self.PollingPeriod = self.PollingPeriod*1e-3
                   
                 if (str(self.AlertOnRecovery).strip().lower()
                        in ('false','no','none')): 

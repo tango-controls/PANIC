@@ -163,19 +163,50 @@ def getAttrValue(obj,default=Exception):
         
     return r
 
-def getPanicProperty(prop):
+def getPanicProperty(prop,value=None):
     """
     Method to obtain global properties 
     It manages compatibility with PANIC <= 6 using PyAlarm properties
     BUT!!! It triggers exceptions in device servers if called at Init()
     """
     print('getPanicProperty(%s)' % prop)
+    if ':' in prop and '/' in prop:
+        thost,prop = prop.split('/',1)
+    else:
+        thost = ''
+
     k = [prop] if not fn.isSequence(prop) else prop
-    r = get_tango().get_property('PANIC',k)
-    if not any(r.values()):
-        r = get_tango().get_class_property('PyAlarm',k)
+    
+    if value is None:
+        r = get_tango(thost).get_property('PANIC',k)
+        
+        if not any(r.values()):
+            print('getting Panic config from PyAlarm (deprecated)')
+            r = get_tango(thost).get_class_property('PyAlarm',k)
+    else:
+        r = value
+        
     r = r if fn.isSequence(prop) else r[prop]
-    return list(r) if fn.isSequence(r) else r
+    if fn.isSequence(r):
+        rr = []
+        for l in r:
+            if l.startswith('!LOAD('):
+                print(l)
+                try:
+                    f = l.split('(')[1].split(')')[0].strip('"').strip("'")
+                    print(f)
+                    if f.startswith('/'):
+                        f = open(f)
+                        rr.extend(l.strip() for l in f.readlines() if l.strip())
+                        f.close()
+                    
+                except:
+                    traceback.print_exc()
+            else:
+                rr.append(l)
+        return rr
+    else:
+        return r
 
 def setPanicProperty(prop, value):
     """
@@ -1518,7 +1549,8 @@ class AlarmAPI(fandango.SingletonMap):
         if load or value or  not AlarmAPI._phonebooks.get(tango_host,None):
             print('%s: AlarmAPI.get_phonebook(%s, True, %s)' % 
                   (fn.time2str(), tango_host, len(value) if value else None))
-            prop = value or getPanicProperty('Phonebook')
+            prop = '%s/Phonebook' % tango_host if tango_host else 'Phonebook'
+            prop = value or getPanicProperty(prop)
             if isinstance(prop,dict):
                 ph = prop
             else:
