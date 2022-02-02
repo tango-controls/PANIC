@@ -1172,13 +1172,16 @@ class AlarmAPI(fandango.SingletonMap):
             ]
         [self._eval.add_macro(*m) for m in self.macros]
         
-        try: self.servers = fandango.servers.ServersDict(tango_host=tango_host)
-        except: self.servers = fandango.servers.ServersDict()
+        try: 
+            self.servers = fandango.servers.ServersDict(tango_host=tango_host)
+        except: 
+            self.servers = fandango.servers.ServersDict()
         self.db = self.servers.db
         
-        self.load(self.filters,extended=extended)
-        if extended is None and not len(self.keys()):
-            self.load(self.filters, extended = True)
+        if self.filters:
+            self.load(self.filters,extended=extended)
+            if extended is None and not len(self.keys()):
+                self.load(self.filters, extended = True)
         
     def __init_logger(self,logger):
         if fandango.isCallable(logger):

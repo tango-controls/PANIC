@@ -43,8 +43,8 @@ Usage:
 Without arguments, it will parse defaults from 
 PANIC.DefaultArgs property of Tango Database
 
---scope will constrain the devices accessed by the application, cannot
-be changed on runtime.
+--scope will constrain the devices accessed by the application (panic api),
+    cannot be changed on runtime (e.g. --scope="*/di/*").
 
 --default will setup a default regular expression to be applied when 
 the search field is empty. It will be overriden by any expression entered
@@ -111,6 +111,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         self.tools = {} #Widgets dictionary
         
         self.scope = options.get('scope','*') #filters or '*'
+        exported = options.get('exported','')
         self.default_regEx = options.get('default',filters or '*')
         self.regEx = self.default_regEx
         self.NO_ICON = Qt.QIcon()
@@ -124,7 +125,8 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             #self._ui.regExLine.setText(str(self.regEx))
         
         print('AlarmGUI(%s, %s)'%(api,self.scope))
-        self.api = api or panic.AlarmAPI(self.scope)
+        self.api = api or panic.AlarmAPI(None)
+        self.api.load(self.scope,exported=exported)
         print('AlarmGUI(%s): api done, %d devs, %d alarms' % 
               (self.scope, len(self.api.devices), len(self.api.alarms)))
 
