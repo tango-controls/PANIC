@@ -190,11 +190,18 @@ def getPanicProperty(prop,value=None):
     if fn.isSequence(r):
         rr = []
         for l in r:
-            if l.startswith('!LOAD('):
+            if l.startswith('!LOAD(') or l.startswith('!FILE('):
                 print(l)
                 try:
                     f = l.split('(')[1].split(')')[0].strip('"').strip("'")
                     print(f)
+                    if f.startswith('http'):
+                        try:
+                            import urllib
+                            s = urllib.urlretrieve(f,'/tmp/'+f.split('/')[-1])
+                            f = s[0]
+                        except Exception as e:
+                            print('Unable to get %s.%s: %s' % (k,f,e))
                     if f.startswith('/'):
                         f = open(f)
                         rr.extend(l.strip() for l in f.readlines() if l.strip())
