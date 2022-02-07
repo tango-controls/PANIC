@@ -126,16 +126,20 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         
         print('AlarmGUI(%s, %s)'%(api,self.scope))
         self.api = api or panic.AlarmAPI(None)
-        self.api.load(self.scope,exported=exported)
-        print('AlarmGUI(%s): api done, %d devs, %d alarms' % 
-              (self.scope, len(self.api.devices), len(self.api.alarms)))
+        self.api.load(self.scope, exported=exported)
+        print('AlarmGUI(%s,%s): api done, %d devs, %d alarms' % 
+              (self.scope, exported, len(self.api.devices), 
+               len(self.api.alarms)))
 
         self.init_ui(parent,mainwindow) #init_mw is called here
         
         # @TODO: api-based views are not multi-host
-        self.view = panic.view.AlarmView(api=self.api,scope=self.scope,
-                refresh = self.REFRESH_TIME/1e3,events=False,verbose=1) 
-        trace('AlarmGUI(): view done')
+        self.view = panic.view.AlarmView(api=self.api,
+                    scope=self.scope,
+                    refresh = self.REFRESH_TIME/1e3,
+                    events=False,
+                    verbose=1) 
+        trace('AlarmGUI(): view created')
         
         self.snaps = None
 
@@ -157,7 +161,7 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         self.init_timers()
         self.init_filters()        
         
-        trace('AlarmGUI(): signals done')
+        trace('AlarmGUI(): signals connected')
         ## connection of ui signals is delayed until first onRefresh()
         
         self.updateStatusLabel()
