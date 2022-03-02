@@ -832,7 +832,7 @@ class AlarmDS(object):
         except:
             print('Device %s is not running' % self.name)
         
-    def read(self,filters='*'):
+    def read(self,filters='*', extended=False):
         """ 
         Updates from the database the Alarms related to this device 
         Only alarms which AlarmList row matches filters will be loaded
@@ -842,7 +842,7 @@ class AlarmDS(object):
         for line in props['AlarmList']:
             #print('read:',line)
             line = line.split('#',1)[0].strip()
-            if not line or not searchCl(filters,line): 
+            if not line or not searchCl(filters,line, extend=extended): 
                 #print('read:pass')
                 continue
             try:
@@ -1121,7 +1121,7 @@ class AlarmAPI(fandango.SingletonMap):
     
     def __init__(self,filters = '*',tango_host = None,
                  extended = None,
-                 logger = fandango.log.WARNING):
+                 logger = fandango.log.WARNING, hard_filtering=False):
       
         self.__init_logger(logger)
         self.warning('In AlarmAPI(%s)'%filters)
@@ -1198,6 +1198,14 @@ class AlarmAPI(fandango.SingletonMap):
         filters = filters or self.filters or '*'
         if isSequence(filters): filters = '|'.join(filters)
         filters = filters.lower()
+        
+        device_filters = filters
+        if "\&" in filters:
+            device_filters, filters = filters.split("\&")
+
+        if "*" not in device_filters:
+            device_filters = "*" + device_filters + "*"
+
         all_alarms = {}
         self.log('Loading Alarm devices matching %s'%(filters))
         
@@ -1215,16 +1223,15 @@ class AlarmAPI(fandango.SingletonMap):
             all_devices = [d for d in all_devices if d in dev_exported]
         
         #If filter is the exact name of a device, only this will be loaded
-        if filters in all_devices:
-            all_devices = matched = [filters]
-            
-        elif (filters!='*' and '/' in filters 
-                and any(matchCl(filters,s) for s in all_servers)):
-            self.servers.load_by_name(filters)
+        if device_filters in all_devices:
+            all_devices = matched = [device_filters]
+
+        elif device_filters != '*' and '/' in device_filters and any(matchCl(device_filters, s) for s in all_servers):
+            self.servers.load_by_name(device_filters)
             matched = [d.lower() for d in self.servers.get_all_devices() 
                     if d.lower() in all_devices]
             #If filter is the exact name of a server, only this will be loaded
-            if filters in self.servers:
+            if device_filters in self.servers:
                 all_devices = matched
             
         else:
@@ -1245,10 +1252,10 @@ class AlarmAPI(fandango.SingletonMap):
             elif extended:
                 #Parsing also if the filters are referenced in the formula
                 #This kind of extended filter exceeds the domain concept
-                alarms = ad.read(filters=filters)
-                if alarms: 
-                    self.devices[d],all_alarms[d] = ad,alarms
-                    
+                alarms = ad.read(filters=filters, extended=extended)
+                if alarms and matchCl(device_filters, d):
+                    self.devices[d], all_alarms[d] = ad, alarms
+
         removed = [d for d in self.devices.keys() 
                         if d.lower().strip() not in all_devices] 
         for r in removed:

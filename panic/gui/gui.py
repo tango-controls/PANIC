@@ -114,7 +114,8 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         self.default_regEx = options.get('default',filters or '*')
         self.regEx = self.default_regEx
         self.NO_ICON = Qt.QIcon()
-        
+        self.extended = False
+        self.hard_filtering = 'hard' in options.keys()  # enable filtering on loading alarms from DB
         refresh = int(options.get('refresh',self.REFRESH_TIME))
         self.REFRESH_TIME = refresh
          #AlarmRow.REFRESH_TIME = refresh
@@ -123,17 +124,32 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
             #print 'Setting RegExp filter: %s'%self.regEx
             #self._ui.regExLine.setText(str(self.regEx))
         
-        print('AlarmGUI(%s, %s)'%(api,self.scope))
-        self.api = api or panic.AlarmAPI(self.scope)
-        print('AlarmGUI(%s): api done, %d devs, %d alarms' % 
-              (self.scope, len(self.api.devices), len(self.api.alarms)))
+        if self.hard_filtering:
+            self.filter = self.scope
+            self._update_hard_filter()
+            print('AlarmGUI(%s, %s)' % (api, self.filter))
+            self.api = api or panic.AlarmAPI(self.filter, extended=self.extended)
+            print('AlarmGUI(%s): api done, hard filtering enabled, %d devs, %d alarms' %
+                  (self.scope, len(self.api.devices), len(self.api.alarms)))
 
-        self.init_ui(parent,mainwindow) #init_mw is called here
-        
-        # @TODO: api-based views are not multi-host
-        self.view = panic.view.AlarmView(api=self.api,scope=self.scope,
-                refresh = self.REFRESH_TIME/1e3,events=False,verbose=1) 
-        trace('AlarmGUI(): view done')
+            self.init_ui(parent, mainwindow)  # init_mw is called here
+
+            # @TODO: api-based views are not multi-host
+            self.view = panic.view.AlarmView(api=self.api, scope=self.filter,
+                                             refresh=self.REFRESH_TIME / 1e3, events=False, verbose=1)
+            trace('AlarmGUI(): view done')
+        else:
+            print('AlarmGUI(%s, %s)'%(api,self.scope))
+            self.api = api or panic.AlarmAPI(self.scope)
+            print('AlarmGUI(%s): api done, %d devs, %d alarms' % 
+                  (self.scope, len(self.api.devices), len(self.api.alarms)))
+    
+            self.init_ui(parent,mainwindow) #init_mw is called here
+            
+            # @TODO: api-based views are not multi-host
+            self.view = panic.view.AlarmView(api=self.api,scope=self.scope,
+                    refresh = self.REFRESH_TIME/1e3,events=False,verbose=1) 
+            trace('AlarmGUI(): view done')
         
         self.snaps = None
 
@@ -166,6 +182,10 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         # here
     
     ###########################################################################
+    def _update_hard_filter(self):
+        if self.regEx != "*":
+            self.filter = self.scope + "\&" + self.regEx
+            self.extended = True
         
     @Cached(expire=0.2)
     def getAlarms(self,filtered=True):
@@ -175,6 +195,8 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         """
         trace('getAlarms(): sorting ...',level=0)
         self.view.sort()
+        if self.hard_filtering:
+            self.api.load(filters=self.filter, extended=self.extended)
         return self.view.ordered
     
     @Cached(expire=0.2)
@@ -276,7 +298,8 @@ class QAlarmList(QAlarmManager,PARENT_CLASS):
         
         if nones or not self._connected: 
             text = 'Loading %s ... %d / %d'%(
-              self.scope,size-nones,size)
+              self.scope,size-nones,size) if not self.hard_filtering else 'Loading %s ... %d / %d'%(
+              self.filter,size-nones,size)
         else: 
             text = (time2str()+': Showing %d %s alarms,'
               ' %d in database.'%(added,self.scope,size))
@@ -791,6 +814,10 @@ class QFilterGUI(QAlarmList):
         (do not reload database)."""
         print('onFilter() '+'*'*60)
         print(self.getFilters())
+        if self.hard_filtering:
+            self.extended = True
+            self.onReload()
+            self._update_hard_filter()
         self.buildList(changed=True)
         self.showList()
         self.refreshTimer.setInterval(self.REFRESH_TIME)
