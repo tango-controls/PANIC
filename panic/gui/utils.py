@@ -30,6 +30,11 @@ from panic.alarmapi import getPanicProperty, setPanicProperty
 from panic.widgets import AlarmValueLabel,getThemeIcon,getIconForAlarm
 import getpass
 
+try:
+    from PyTangoArchiving.widget.panel import TaurusSingleValueForm
+except:
+    TaurusSingleValueForm = TaurusForm
+
 dummies = []
 
 def get_user():
@@ -621,14 +626,14 @@ class AttributesPreview(Qt.QFrame):
             self.redobt = Qt.QPushButton()
             self.redobt.setIcon(getThemeIcon('view-refresh'))
             self.redobt.setToolTip('Update result')
-            self.taurusForm=TaurusForm()
-            self.taurusForm.setWithButtons(False)
-            self.taurusForm.setWindowTitle('Preview')
+            self.form = TaurusSingleValueForm()
+            self.form.setWithButtons(False)            
+            self.form.setWindowTitle('Preview')
             self.layout().addWidget(self.redobt,0,6,1,1)
             self.layout().addWidget(
                 Qt.QLabel('Values of attributes used in the Alarm formula:'),
                 0,0,1,1)
-            self.layout().addWidget(self.taurusForm,1,0,1,7)
+            self.layout().addWidget(self.form,1,0,1,7)
             self.connect(self.redobt,Qt.SIGNAL('pressed()'),
                          self.updateAttributes)
         except:
@@ -654,9 +659,10 @@ class AttributesPreview(Qt.QFrame):
             
         self.model = sorted(model)
         print('In AttributesPreview.updateAttributes(%s)'%model)
-        self.taurusForm.setModel(model)
+        self.form.setModel(model)
         [tvalue.setLabelConfig("<attr_fullname>") 
-            for tvalue in self.taurusForm.getItems()]
+            for tvalue in self.form.getItems()]
+        print('In AttributesPreview.updateAttributes(%s)'%'done')
         
     ###########################################################################
 
