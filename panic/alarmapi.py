@@ -1175,7 +1175,8 @@ class AlarmAPI(fandango.SingletonMap):
             
         self._eval = fandango.TangoEval(cache=2*3,use_tau=False,timeout=10000)
         self.macros = [
-            ('GROUP(%s)',self.GROUP_EXP,self.group_macro)
+            ('GROUP(%s)',self.GROUP_EXP,self.group_macro),
+            ('COPY(%s)',self.COPY_EXP,self.copy_macro)
             ]
         [self._eval.add_macro(*m) for m in self.macros]
         
@@ -1705,6 +1706,7 @@ class AlarmAPI(fandango.SingletonMap):
           return ''
         
     GROUP_EXP = fandango.tango.TangoEval.FIND_EXP.replace('FIND','GROUP')
+    COPY_EXP = fandango.tango.TangoEval.FIND_EXP.replace('FIND','COPY')
     
     def group_macro(self,match):
         """
@@ -1736,6 +1738,19 @@ class AlarmAPI(fandango.SingletonMap):
 
         exp = 'any([%s for x in [ %s ]])'%(cond,' , '.join(attrs))
         return exp
+    
+    def copy_macro(self,match):
+        """ 
+        This macro copies the formula from another one, allowing replacement
+        
+        COPY(FE_ALARM_TEMPLATE,FE06=FE29)
+        """
+        exps = match.split(',')
+        formula = self[exps[0]].formula
+        for e in exps[1:]:
+            r = e.partition('=')
+            formula = formula.replace(r[0].strip(),r[-1].strip())
+        return formula
       
     def split_formula(self,formula,keep_operators=False):
         f = self[formula].formula if formula in self else formula
